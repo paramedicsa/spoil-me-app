@@ -1,0 +1,36 @@
+{
+  "name": "spoil-me-vintage",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "docker:build": "docker build -t gcr.io/spoil-me-vintage-781329997536/spoil-me-vintage .",
+    "docker:push": "docker push gcr.io/spoil-me-vintage-781329997536/spoil-me-vintage",
+    "cloudrun:deploy": "gcloud run deploy spoil-me-vintage --image gcr.io/spoil-me-vintage-781329997536/spoil-me-vintage --platform managed --region us-west1 --allow-unauthenticated",
+    "android:build": "npm run build && npx cap sync android && cd android && .\\gradlew.bat assembleDebug",
+    "android:watch": "node scripts/watch-android.cjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@google/genai": "^0.12.0",
+    "firebase": "^10.8.0",
+    "firebase-admin": "^13.6.0",
+    "lucide-react": "^0.363.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "chokidar": "^3.5.3",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

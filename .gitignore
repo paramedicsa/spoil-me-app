@@ -1,0 +1,50 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+
+# Vite build output but we'll keep dist tracked for CI if you want. Uncomment to ignore.
+# dist/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Android build
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+
+# Gradle
+.gradle/
+
+# Capacitor
+android/app/src/main/assets/capacitor.config.json
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Firebase cache
+.firebase/
+
+# Logs
+logs/
+*.log
+
+# Misc
+dist/*.map
+
