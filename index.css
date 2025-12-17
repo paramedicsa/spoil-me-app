@@ -1,0 +1,87 @@
+/* index.css - global styles for Spoil Me Vintage
+   This file restores the missing CSS referenced by index.html.
+   It includes Tailwind directives so Tailwind is built locally instead of relying on the CDN.
+*/
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom overrides and variables (kept after Tailwind so they can override defaults) */
+:root {
+  --spv-bg: #000000;
+  --spv-primary: #ff2d6d; /* pink-ish */
+  --spv-accent: #ffb3c6;
+  --spv-muted: #9ca3af; /* gray-400 */
+  --spv-text: #f3f4f6; /* gray-100 */
+}
+
+/* Ensure body uses Tailwind reset + our fonts */
+@layer base {
+  html, body, #root { height: 100%; }
+  body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background-color: var(--spv-bg); color: var(--spv-text); }
+}
+
+/* Small utility aliases that complement Tailwind classes */
+.bg-spv { background-color: var(--spv-bg); }
+.text-spv { color: var(--spv-text); }
+.text-primary { color: var(--spv-primary); }
+.bg-primary { background-color: var(--spv-primary); }
+.border-primary { border-color: var(--spv-primary); }
+
+/* Buttons (minimal) - these complement tailwind classes */
+.btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg; }
+.btn-primary { @apply bg-pink-600 text-white hover:bg-pink-500; }
+
+/* Card surface */
+.card { @apply rounded-xl p-4 shadow-lg bg-zinc-900/40 border border-gray-800; }
+
+/* Image helpers */
+.img-cover { object-fit: cover; width: 100%; height: 100%; display: block; }
+
+/* Some components relied on custom font classes declared inline in index.html, no changes needed there. */
+
+/* Preserve any custom rules from previous file below */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* App color variables (used in some components) */
+:root {
+  --spv-bg: #000000;
+  --spv-primary: #ff2d6d; /* pink-ish */
+  --spv-accent: #ffb3c6;
+  --spv-muted: #9ca3af; /* gray-400 */
+  --spv-text: #f3f4f6; /* gray-100 */
+}
+
+/* Basic utilities expected by the app */
+.bg-spv { background-color: var(--spv-bg); }
+.text-spv { color: var(--spv-text); }
+.text-primary { color: var(--spv-primary); }
+.bg-primary { background-color: var(--spv-primary); }
+.border-primary { border-color: var(--spv-primary); }
+
+/* Buttons (minimal) - these complement tailwind classes */
+.btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; }
+.btn-primary { background: var(--spv-primary); color: white; }
+.btn-ghost { background: transparent; color: var(--spv-text); border: 1px solid rgba(255,255,255,0.06); }
+
+/* Card surface */
+.card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius: 0.75rem; padding: 1rem; box-shadow: 0 6px 24px rgba(0,0,0,0.6); }
+
+/* Image helpers */
+.img-cover { object-fit: cover; width: 100%; height: 100%; display: block; }
+
+/* Small responsive helpers */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+
+/* Utility to hide/show elements with transitions */
+.sr-fade { transition: opacity 180ms ease, transform 180ms ease; }
+.hidden { display: none !important; }
+
+/* Keep previous inline style definitions in index.html consistent */
+body.selection\:bg-pink-500 ::selection { background: var(--spv-primary); color: white; }
+
+/* Some components relied on custom font classes declared inline in index.html, no changes needed here. */

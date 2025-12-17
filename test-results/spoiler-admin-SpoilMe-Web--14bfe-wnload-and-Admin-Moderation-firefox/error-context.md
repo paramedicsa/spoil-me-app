@@ -1,0 +1,2464 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - img [ref=e8]
+        - text: Trusted by 10,000+ Shoppers
+      - generic [ref=e13]: •
+      - generic [ref=e14]:
+        - img [ref=e15]
+        - text: Sold over 50,000 unique vintage pieces
+      - generic [ref=e21]: •
+      - generic [ref=e22]:
+        - img [ref=e23]
+        - text: Free Shipping over R500
+      - generic [ref=e29]: •
+      - generic [ref=e30]:
+        - img [ref=e31]
+        - text: "Membership Perk: Free Gifts on Valentine's, Mother's & Father's Day"
+      - generic [ref=e36]: •
+      - generic [ref=e37]:
+        - img [ref=e38]
+        - text: "Membership Perk: Pay as little as R8 per item"
+      - generic [ref=e41]: •
+      - generic [ref=e42]:
+        - img [ref=e43]
+        - text: "Membership Perk: R50 - R200 Birthday Voucher"
+      - generic [ref=e46]: •
+      - generic [ref=e47]:
+        - img [ref=e48]
+        - text: And lots more!
+    - generic [ref=e51]:
+      - generic [ref=e52]: •
+      - generic [ref=e53]:
+        - img [ref=e54]
+        - text: Trusted by 10,000+ Shoppers
+      - generic [ref=e59]: •
+      - generic [ref=e60]:
+        - img [ref=e61]
+        - text: Sold over 50,000 unique vintage pieces
+      - generic [ref=e67]: •
+      - generic [ref=e68]:
+        - img [ref=e69]
+        - text: Free Shipping over R500
+      - generic [ref=e75]: •
+      - generic [ref=e76]:
+        - img [ref=e77]
+        - text: "Membership Perk: Free Gifts on Valentine's, Mother's & Father's Day"
+      - generic [ref=e82]: •
+      - generic [ref=e83]:
+        - img [ref=e84]
+        - text: "Membership Perk: Pay as little as R8 per item"
+      - generic [ref=e87]: •
+      - generic [ref=e88]:
+        - img [ref=e89]
+        - text: "Membership Perk: R50 - R200 Birthday Voucher"
+      - generic [ref=e92]: •
+      - generic [ref=e93]:
+        - img [ref=e94]
+        - text: And lots more!
+  - banner [ref=e97]:
+    - generic [ref=e99]:
+      - link "Spoil Me Vintage" [ref=e100] [cursor=pointer]:
+        - /url: "#/"
+        - generic [ref=e101]: Spoil Me
+        - generic [ref=e102]: Vintage
+      - generic [ref=e103]:
+        - button "ZAR" [ref=e104] [cursor=pointer]
+        - button [ref=e105] [cursor=pointer]:
+          - img [ref=e106]
+        - link "Earn Rewards" [ref=e109] [cursor=pointer]:
+          - /url: "#/earn-rewards"
+          - img [ref=e110]
+        - link [ref=e113] [cursor=pointer]:
+          - /url: "#/login"
+          - img [ref=e114]
+        - link [ref=e118] [cursor=pointer]:
+          - /url: "#/cart"
+          - img [ref=e119]
+  - main [ref=e123]:
+    - generic [ref=e124]:
+      - generic [ref=e128]:
+        - generic [ref=e130]:
+          - generic [ref=e131]:
+            - generic [ref=e132]: LIMITED OFFER
+            - generic [ref=e133]: Give the perfect gift
+          - heading "Buy a Gift Voucher" [level=2] [ref=e134]
+          - paragraph [ref=e135]:
+            - text: Purchase between
+            - strong [ref=e136]: R250 - R500
+            - text: and get an EXTRA R100 to spend!
+        - link "Create Voucher" [ref=e137] [cursor=pointer]:
+          - /url: "#/gift-cards"
+          - text: Create Voucher
+          - img [ref=e138]
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - generic [ref=e143]: 15 spots left
+          - generic [ref=e146]:
+            - generic [ref=e147]:
+              - heading "🎁 The Spoil Me Club" [level=2] [ref=e148]
+              - paragraph [ref=e149]: Join for just R19 / $2 per month. Cancel anytime.
+              - generic [ref=e150]:
+                - generic [ref=e151]: ✅ Get a R25 / $3 Voucher instantly.
+                - generic [ref=e152]: ✅ Automatic entry into the Weekly R500 Drop.
+            - generic [ref=e153]:
+              - link "[ JOIN THE CLUB ]" [ref=e154] [cursor=pointer]:
+                - /url: "#/membership"
+                - text: "[ JOIN THE CLUB ]"
+                - img [ref=e155]
+              - link "[ View Past Winners ]" [ref=e158] [cursor=pointer]:
+                - /url: "#/weekly-winners"
+                - text: "[ View Past Winners ]"
+                - img [ref=e159]
+        - generic [ref=e167]:
+          - img [ref=e168]
+          - generic [ref=e175]: "🏆 THIS WEEK'S WINNER: Anja P. from Pretoria just won a R500 Voucher!"
+      - generic [ref=e176]:
+        - generic [ref=e177]:
+          - heading "Best Sellers" [level=2] [ref=e178]
+          - link "View All" [ref=e179] [cursor=pointer]:
+            - /url: "#/catalog/best"
+            - text: View All
+            - img [ref=e180]
+        - generic [ref=e184]:
+          - generic [ref=e186]:
+            - link "Electric Lime Geometric Studs" [ref=e187] [cursor=pointer]:
+              - /url: "#/product/SPV-1764827442171"
+              - img "Electric Lime Geometric Studs" [ref=e188]
+            - button [ref=e189] [cursor=pointer]:
+              - img [ref=e190]
+            - generic [ref=e192]:
+              - generic [ref=e193]:
+                - paragraph [ref=e194]: Green Collection
+                - button "View Options" [ref=e195] [cursor=pointer]:
+                  - img [ref=e196]
+              - link "Electric Lime Geometric Studs" [ref=e199] [cursor=pointer]:
+                - /url: "#/product/SPV-1764827442171"
+                - heading "Electric Lime Geometric Studs" [level=3] [ref=e200]
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - img [ref=e203]
+                  - generic [ref=e205]: "4.4"
+                  - generic [ref=e206]: (4)
+                - generic [ref=e208]: 365 sold
+              - generic [ref=e209]:
+                - generic [ref=e210]:
+                  - generic [ref=e211]: RRP R59.00
+                  - button [ref=e212] [cursor=pointer]:
+                    - img [ref=e213]
+                - generic [ref=e217]: Retail R29.00
+              - generic [ref=e221]:
+                - text: "Members:"
+                - generic [ref=e222]: R23.20
+          - generic [ref=e224]:
+            - link "Electric Violet Heart Studs" [ref=e225] [cursor=pointer]:
+              - /url: "#/product/SPV-1764827239907"
+              - img "Electric Violet Heart Studs" [ref=e226]
+            - button [ref=e227] [cursor=pointer]:
+              - img [ref=e228]
+            - generic [ref=e230]:
+              - generic [ref=e231]:
+                - paragraph [ref=e232]: Purple Collection
+                - button "View Options" [ref=e233] [cursor=pointer]:
+                  - img [ref=e234]
+              - link "Electric Violet Heart Studs" [ref=e237] [cursor=pointer]:
+                - /url: "#/product/SPV-1764827239907"
+                - heading "Electric Violet Heart Studs" [level=3] [ref=e238]
+              - generic [ref=e239]:
+                - generic [ref=e240]:
+                  - img [ref=e241]
+                  - generic [ref=e243]: "4.5"
+                  - generic [ref=e244]: (4)
+                - generic [ref=e246]: 1856 sold
+              - generic [ref=e247]:
+                - generic [ref=e248]:
+                  - generic [ref=e249]: RRP R59.00
+                  - button [ref=e250] [cursor=pointer]:
+                    - img [ref=e251]
+                - generic [ref=e255]: Retail R29.00
+              - generic [ref=e259]:
+                - text: "Members:"
+                - generic [ref=e260]: R23.20
+          - generic [ref=e262]:
+            - link "Electric Azure Square Studs" [ref=e263] [cursor=pointer]:
+              - /url: "#/product/SPV-1764815481086"
+              - img "Electric Azure Square Studs" [ref=e264]
+            - button [ref=e265] [cursor=pointer]:
+              - img [ref=e266]
+            - generic [ref=e268]:
+              - generic [ref=e269]:
+                - paragraph [ref=e270]: Blue Collection
+                - button "View Options" [ref=e271] [cursor=pointer]:
+                  - img [ref=e272]
+              - link "Electric Azure Square Studs" [ref=e275] [cursor=pointer]:
+                - /url: "#/product/SPV-1764815481086"
+                - heading "Electric Azure Square Studs" [level=3] [ref=e276]
+              - generic [ref=e277]:
+                - generic [ref=e278]:
+                  - img [ref=e279]
+                  - generic [ref=e281]: "4.5"
+                  - generic [ref=e282]: (4)
+                - generic [ref=e284]: 745 sold
+              - generic [ref=e285]:
+                - generic [ref=e286]:
+                  - generic [ref=e287]: RRP R59.00
+                  - button [ref=e288] [cursor=pointer]:
+                    - img [ref=e289]
+                - generic [ref=e293]: Retail R29.00
+              - generic [ref=e297]:
+                - text: "Members:"
+                - generic [ref=e298]: R23.20
+          - generic [ref=e300]:
+            - link "Blush Stardust Octagon Studs" [ref=e301] [cursor=pointer]:
+              - /url: "#/product/SPV-1764815335575"
+              - img "Blush Stardust Octagon Studs" [ref=e302]
+            - button [ref=e303] [cursor=pointer]:
+              - img [ref=e304]
+            - generic [ref=e306]:
+              - generic [ref=e307]:
+                - paragraph [ref=e308]: Pink Collection
+                - button "View Options" [ref=e309] [cursor=pointer]:
+                  - img [ref=e310]
+              - link "Blush Stardust Octagon Studs" [ref=e313] [cursor=pointer]:
+                - /url: "#/product/SPV-1764815335575"
+                - heading "Blush Stardust Octagon Studs" [level=3] [ref=e314]
+              - generic [ref=e315]:
+                - generic [ref=e316]:
+                  - img [ref=e317]
+                  - generic [ref=e319]: "4.4"
+                  - generic [ref=e320]: (5)
+                - generic [ref=e322]: 785 sold
+              - generic [ref=e323]:
+                - generic [ref=e324]:
+                  - generic [ref=e325]: RRP R59.00
+                  - button [ref=e326] [cursor=pointer]:
+                    - img [ref=e327]
+                - generic [ref=e331]: Retail R29.00
+              - generic [ref=e335]:
+                - text: "Members:"
+                - generic [ref=e336]: R23.20
+          - generic [ref=e338]:
+            - link "Cerulean Scallop Studs" [ref=e339] [cursor=pointer]:
+              - /url: "#/product/SPV-1764815159963"
+              - img "Cerulean Scallop Studs" [ref=e340]
+            - button [ref=e341] [cursor=pointer]:
+              - img [ref=e342]
+            - generic [ref=e344]:
+              - generic [ref=e345]:
+                - paragraph [ref=e346]: Blue Collection
+                - button "View Options" [ref=e347] [cursor=pointer]:
+                  - img [ref=e348]
+              - link "Cerulean Scallop Studs" [ref=e351] [cursor=pointer]:
+                - /url: "#/product/SPV-1764815159963"
+                - heading "Cerulean Scallop Studs" [level=3] [ref=e352]
+              - generic [ref=e353]:
+                - generic [ref=e354]:
+                  - img [ref=e355]
+                  - generic [ref=e357]: "4.5"
+                  - generic [ref=e358]: (5)
+                - generic [ref=e360]: 325 sold
+              - generic [ref=e361]:
+                - generic [ref=e362]:
+                  - generic [ref=e363]: RRP R59.00
+                  - button [ref=e364] [cursor=pointer]:
+                    - img [ref=e365]
+                - generic [ref=e369]: Retail R29.00
+              - generic [ref=e373]:
+                - text: "Members:"
+                - generic [ref=e374]: R23.20
+          - generic [ref=e376]:
+            - link "Vivid Magenta Square Studs" [ref=e377] [cursor=pointer]:
+              - /url: "#/product/SPV-1764814999297"
+              - img "Vivid Magenta Square Studs" [ref=e378]
+            - button [ref=e379] [cursor=pointer]:
+              - img [ref=e380]
+            - generic [ref=e382]:
+              - generic [ref=e383]:
+                - paragraph [ref=e384]: Pink Collection
+                - button "Add to Cart" [ref=e385] [cursor=pointer]:
+                  - img [ref=e386]
+              - link "Vivid Magenta Square Studs" [ref=e390] [cursor=pointer]:
+                - /url: "#/product/SPV-1764814999297"
+                - heading "Vivid Magenta Square Studs" [level=3] [ref=e391]
+              - generic [ref=e392]:
+                - generic [ref=e393]:
+                  - img [ref=e394]
+                  - generic [ref=e396]: "4.4"
+                  - generic [ref=e397]: (5)
+                - generic [ref=e399]: 458 sold
+              - generic [ref=e400]:
+                - generic [ref=e401]:
+                  - generic [ref=e402]: RRP R59.00
+                  - button [ref=e403] [cursor=pointer]:
+                    - img [ref=e404]
+                - generic [ref=e408]: Retail R29.00
+              - generic [ref=e412]:
+                - text: "Members:"
+                - generic [ref=e413]: R23.20
+          - generic [ref=e415]:
+            - link "Aqua Reverie Heart Studs" [ref=e416] [cursor=pointer]:
+              - /url: "#/product/SPV-1764230748130"
+              - img "Aqua Reverie Heart Studs" [ref=e417]
+            - button [ref=e418] [cursor=pointer]:
+              - img [ref=e419]
+            - generic [ref=e421]:
+              - generic [ref=e422]:
+                - paragraph [ref=e423]: Blue Collection
+                - button "View Options" [ref=e424] [cursor=pointer]:
+                  - img [ref=e425]
+              - link "Aqua Reverie Heart Studs" [ref=e428] [cursor=pointer]:
+                - /url: "#/product/SPV-1764230748130"
+                - heading "Aqua Reverie Heart Studs" [level=3] [ref=e429]
+              - generic [ref=e430]:
+                - generic [ref=e431]:
+                  - img [ref=e432]
+                  - generic [ref=e434]: "4.5"
+                  - generic [ref=e435]: (5)
+                - generic [ref=e437]: 568 sold
+              - generic [ref=e438]:
+                - generic [ref=e439]:
+                  - generic [ref=e440]: RRP R59.00
+                  - button [ref=e441] [cursor=pointer]:
+                    - img [ref=e442]
+                - generic [ref=e446]: Retail R29.00
+              - generic [ref=e450]:
+                - text: "Members:"
+                - generic [ref=e451]: R23.20
+          - generic [ref=e453]:
+            - link "Radiant Heartbeat Duo" [ref=e454] [cursor=pointer]:
+              - /url: "#/product/SPV-1763852084384"
+              - img "Radiant Heartbeat Duo" [ref=e455]
+            - button [ref=e456] [cursor=pointer]:
+              - img [ref=e457]
+            - generic [ref=e459]:
+              - generic [ref=e460]:
+                - paragraph [ref=e461]: Pink Collection
+                - button "Add to Cart" [ref=e462] [cursor=pointer]:
+                  - img [ref=e463]
+              - link "Radiant Heartbeat Duo" [ref=e467] [cursor=pointer]:
+                - /url: "#/product/SPV-1763852084384"
+                - heading "Radiant Heartbeat Duo" [level=3] [ref=e468]
+              - generic [ref=e469]:
+                - generic [ref=e470]:
+                  - img [ref=e471]
+                  - generic [ref=e473]: "5.0"
+                  - generic [ref=e474]: (0)
+                - generic [ref=e475]:
+                  - generic [ref=e476]: 796 sold
+                  - generic [ref=e477]: Low Stock
+              - generic [ref=e478]:
+                - generic [ref=e479]:
+                  - generic [ref=e480]: RRP R150.00
+                  - button [ref=e481] [cursor=pointer]:
+                    - img [ref=e482]
+                - generic [ref=e486]: Retail R99.00
+              - generic [ref=e490]:
+                - text: "Members:"
+                - generic [ref=e491]: R79.20
+          - generic [ref=e493]:
+            - link "Pink Feline Silhouette Dangles" [ref=e494] [cursor=pointer]:
+              - /url: "#/product/SPV-1763850089742"
+              - img "Pink Feline Silhouette Dangles" [ref=e495]
+            - button [ref=e496] [cursor=pointer]:
+              - img [ref=e497]
+            - generic [ref=e499]:
+              - generic [ref=e500]:
+                - paragraph [ref=e501]: Pink Collection
+                - button "View Options" [ref=e502] [cursor=pointer]:
+                  - img [ref=e503]
+              - link "Pink Feline Silhouette Dangles" [ref=e506] [cursor=pointer]:
+                - /url: "#/product/SPV-1763850089742"
+                - heading "Pink Feline Silhouette Dangles" [level=3] [ref=e507]
+              - generic [ref=e508]:
+                - generic [ref=e509]:
+                  - img [ref=e510]
+                  - generic [ref=e512]: "4.6"
+                  - generic [ref=e513]: (20)
+                - generic [ref=e515]: 152 sold
+              - generic [ref=e516]:
+                - generic [ref=e517]:
+                  - generic [ref=e518]: RRP R85.00
+                  - button [ref=e519] [cursor=pointer]:
+                    - img [ref=e520]
+                - generic [ref=e524]: Retail R45.00
+              - generic [ref=e528]:
+                - text: "Members:"
+                - generic [ref=e529]: R36.00
+          - generic [ref=e531]:
+            - link "Lagoon Shimmer Cabochons" [ref=e532] [cursor=pointer]:
+              - /url: "#/product/SPV-1763849942151"
+              - img "Lagoon Shimmer Cabochons" [ref=e533]
+            - button [ref=e534] [cursor=pointer]:
+              - img [ref=e535]
+            - generic [ref=e537]:
+              - generic [ref=e538]:
+                - paragraph [ref=e539]: Blue Collection
+                - button "View Options" [ref=e540] [cursor=pointer]:
+                  - img [ref=e541]
+              - link "Lagoon Shimmer Cabochons" [ref=e544] [cursor=pointer]:
+                - /url: "#/product/SPV-1763849942151"
+                - heading "Lagoon Shimmer Cabochons" [level=3] [ref=e545]
+              - generic [ref=e546]:
+                - generic [ref=e547]:
+                  - img [ref=e548]
+                  - generic [ref=e550]: "4.6"
+                  - generic [ref=e551]: (20)
+                - generic [ref=e553]: 348 sold
+              - generic [ref=e554]:
+                - generic [ref=e555]:
+                  - generic [ref=e556]: RRP R59.00
+                  - button [ref=e557] [cursor=pointer]:
+                    - img [ref=e558]
+                - generic [ref=e562]: Retail R29.00
+              - generic [ref=e566]:
+                - text: "Members:"
+                - generic [ref=e567]: R23.20
+          - generic [ref=e569]:
+            - link "Mystic Mandala Drop Earrings" [ref=e570] [cursor=pointer]:
+              - /url: "#/product/SPV-1763735940424"
+              - img "Mystic Mandala Drop Earrings" [ref=e571]
+            - button [ref=e572] [cursor=pointer]:
+              - img [ref=e573]
+            - generic [ref=e575]:
+              - generic [ref=e576]:
+                - paragraph [ref=e577]: Purple Collection
+                - button "View Options" [ref=e578] [cursor=pointer]:
+                  - img [ref=e579]
+              - link "Mystic Mandala Drop Earrings" [ref=e582] [cursor=pointer]:
+                - /url: "#/product/SPV-1763735940424"
+                - heading "Mystic Mandala Drop Earrings" [level=3] [ref=e583]
+              - generic [ref=e584]:
+                - generic [ref=e585]:
+                  - img [ref=e586]
+                  - generic [ref=e588]: "4.4"
+                  - generic [ref=e589]: (10)
+                - generic [ref=e591]: 385 sold
+              - generic [ref=e592]:
+                - generic [ref=e593]:
+                  - generic [ref=e594]: RRP R120.00
+                  - button [ref=e595] [cursor=pointer]:
+                    - img [ref=e596]
+                - generic [ref=e600]: Retail R59.00
+              - generic [ref=e604]:
+                - text: "Members:"
+                - generic [ref=e605]: R47.20
+          - generic [ref=e607]:
+            - link "Emerald Forest Spirit Earrings" [ref=e608] [cursor=pointer]:
+              - /url: "#/product/SPV-1763735698442"
+              - img "Emerald Forest Spirit Earrings" [ref=e609]
+            - button [ref=e610] [cursor=pointer]:
+              - img [ref=e611]
+            - generic [ref=e613]:
+              - generic [ref=e614]:
+                - paragraph [ref=e615]: Green Collection
+                - button "View Options" [ref=e616] [cursor=pointer]:
+                  - img [ref=e617]
+              - link "Emerald Forest Spirit Earrings" [ref=e620] [cursor=pointer]:
+                - /url: "#/product/SPV-1763735698442"
+                - heading "Emerald Forest Spirit Earrings" [level=3] [ref=e621]
+              - generic [ref=e622]:
+                - generic [ref=e623]:
+                  - img [ref=e624]
+                  - generic [ref=e626]: "4.5"
+                  - generic [ref=e627]: (10)
+                - generic [ref=e629]: 547 sold
+              - generic [ref=e630]:
+                - generic [ref=e631]:
+                  - generic [ref=e632]: RRP R120.00
+                  - button [ref=e633] [cursor=pointer]:
+                    - img [ref=e634]
+                - generic [ref=e638]: Retail R59.00
+              - generic [ref=e642]:
+                - text: "Members:"
+                - generic [ref=e643]: R47.20
+          - generic [ref=e645]:
+            - link "Radiant Heart Drop Earrings" [ref=e646] [cursor=pointer]:
+              - /url: "#/product/SPV-1763735477570"
+              - img "Radiant Heart Drop Earrings" [ref=e647]
+            - button [ref=e648] [cursor=pointer]:
+              - img [ref=e649]
+            - generic [ref=e651]:
+              - generic [ref=e652]:
+                - paragraph [ref=e653]: Yellow Collection
+                - button "View Options" [ref=e654] [cursor=pointer]:
+                  - img [ref=e655]
+              - link "Radiant Heart Drop Earrings" [ref=e658] [cursor=pointer]:
+                - /url: "#/product/SPV-1763735477570"
+                - heading "Radiant Heart Drop Earrings" [level=3] [ref=e659]
+              - generic [ref=e660]:
+                - generic [ref=e661]:
+                  - img [ref=e662]
+                  - generic [ref=e664]: "4.5"
+                  - generic [ref=e665]: (20)
+                - generic [ref=e667]: 658 sold
+              - generic [ref=e668]:
+                - generic [ref=e669]:
+                  - generic [ref=e670]: RRP R120.00
+                  - button [ref=e671] [cursor=pointer]:
+                    - img [ref=e672]
+                - generic [ref=e676]: Retail R59.00
+              - generic [ref=e680]:
+                - text: "Members:"
+                - generic [ref=e681]: R47.20
+          - generic [ref=e683]:
+            - link "Aura Glow Incense & Charm" [ref=e684] [cursor=pointer]:
+              - /url: "#/product/SPV-1763733488882"
+              - img "Aura Glow Incense & Charm" [ref=e685]
+            - button [ref=e686] [cursor=pointer]:
+              - img [ref=e687]
+            - generic [ref=e689]:
+              - generic [ref=e690]:
+                - paragraph [ref=e691]: Orange Collection
+                - button "View Options" [ref=e692] [cursor=pointer]:
+                  - img [ref=e693]
+              - link "Aura Glow Incense & Charm" [ref=e696] [cursor=pointer]:
+                - /url: "#/product/SPV-1763733488882"
+                - heading "Aura Glow Incense & Charm" [level=3] [ref=e697]
+              - generic [ref=e698]:
+                - generic [ref=e699]:
+                  - img [ref=e700]
+                  - generic [ref=e702]: "4.6"
+                  - generic [ref=e703]: (20)
+                - generic [ref=e705]: 745 sold
+              - generic [ref=e706]:
+                - generic [ref=e707]:
+                  - generic [ref=e708]: RRP R59.00
+                  - button [ref=e709] [cursor=pointer]:
+                    - img [ref=e710]
+                - generic [ref=e714]: Retail R29.00
+              - generic [ref=e718]:
+                - text: "Members:"
+                - generic [ref=e719]: R23.20
+          - generic [ref=e721]:
+            - link "Heartfelt Ribbon Ring" [ref=e722] [cursor=pointer]:
+              - /url: "#/product/SPV-1763716176794"
+              - img "Heartfelt Ribbon Ring" [ref=e723]
+            - button [ref=e724] [cursor=pointer]:
+              - img [ref=e725]
+            - generic [ref=e727]:
+              - generic [ref=e728]:
+                - paragraph [ref=e729]: Pink Collection
+                - button "View Options" [ref=e730] [cursor=pointer]:
+                  - img [ref=e731]
+              - link "Heartfelt Ribbon Ring" [ref=e734] [cursor=pointer]:
+                - /url: "#/product/SPV-1763716176794"
+                - heading "Heartfelt Ribbon Ring" [level=3] [ref=e735]
+              - generic [ref=e736]:
+                - generic [ref=e737]:
+                  - img [ref=e738]
+                  - generic [ref=e740]: "4.5"
+                  - generic [ref=e741]: (20)
+                - generic [ref=e743]: 856 sold
+              - generic [ref=e744]:
+                - generic [ref=e745]:
+                  - generic [ref=e746]: RRP R195.00
+                  - button [ref=e747] [cursor=pointer]:
+                    - img [ref=e748]
+                - generic [ref=e752]: Retail R186.00
+              - generic [ref=e756]:
+                - text: "Members:"
+                - generic [ref=e757]: R148.80
+          - generic [ref=e759]:
+            - link "Enchanted Forest Teal Bloom Ring" [ref=e760] [cursor=pointer]:
+              - /url: "#/product/SPV-1763596177626"
+              - img "Enchanted Forest Teal Bloom Ring" [ref=e761]
+            - button [ref=e762] [cursor=pointer]:
+              - img [ref=e763]
+            - generic [ref=e765]:
+              - generic [ref=e766]:
+                - paragraph [ref=e767]: Blue Collection
+                - button "View Options" [ref=e768] [cursor=pointer]:
+                  - img [ref=e769]
+              - link "Enchanted Forest Teal Bloom Ring" [ref=e772] [cursor=pointer]:
+                - /url: "#/product/SPV-1763596177626"
+                - heading "Enchanted Forest Teal Bloom Ring" [level=3] [ref=e773]
+              - generic [ref=e774]:
+                - generic [ref=e775]:
+                  - img [ref=e776]
+                  - generic [ref=e778]: "4.8"
+                  - generic [ref=e779]: (10)
+                - generic [ref=e781]: 485 sold
+              - generic [ref=e782]:
+                - generic [ref=e783]:
+                  - generic [ref=e784]: RRP R385.00
+                  - button [ref=e785] [cursor=pointer]:
+                    - img [ref=e786]
+                - generic [ref=e790]: Retail R165.00
+              - generic [ref=e794]:
+                - text: "Members:"
+                - generic [ref=e795]: R132.00
+      - generic [ref=e798]:
+        - generic [ref=e799]:
+          - img [ref=e800]
+          - heading "THE SECRET VAULT" [level=2] [ref=e803]
+          - img [ref=e804]
+        - paragraph [ref=e807]: Exclusive Clearance & Samples for Deluxe Members. Unlock massive discounts on vintage treasures!
+        - link "Enter The Vault" [ref=e808] [cursor=pointer]:
+          - /url: "#/vault"
+          - img [ref=e809]
+          - text: Enter The Vault
+          - img [ref=e812]
+      - generic [ref=e815]:
+        - heading "Shop by Category" [level=2] [ref=e817]
+        - generic [ref=e818]:
+          - link "Red Collection Red Collection" [ref=e820] [cursor=pointer]:
+            - /url: "#/collections/Red%20Collection%20"
+            - img "Red Collection" [ref=e821]
+            - generic [ref=e822]:
+              - heading "Red Collection" [level=3] [ref=e823]
+              - paragraph
+          - link "Blue Collection Blue Collection" [ref=e825] [cursor=pointer]:
+            - /url: "#/collections/Blue%20Collection"
+            - img "Blue Collection" [ref=e826]
+            - generic [ref=e827]:
+              - heading "Blue Collection" [level=3] [ref=e828]
+              - paragraph
+          - link "Purple Collection Purple Collection" [ref=e830] [cursor=pointer]:
+            - /url: "#/collections/Purple%20Collection"
+            - img "Purple Collection" [ref=e831]
+            - generic [ref=e832]:
+              - heading "Purple Collection" [level=3] [ref=e833]
+              - paragraph
+          - link "Pink Collection Pink Collection" [ref=e835] [cursor=pointer]:
+            - /url: "#/collections/Pink%20Collection"
+            - img "Pink Collection" [ref=e836]
+            - generic [ref=e837]:
+              - heading "Pink Collection" [level=3] [ref=e838]
+              - paragraph
+          - link "White & Pearl Collection White & Pearl Collection" [ref=e840] [cursor=pointer]:
+            - /url: "#/collections/White%20%26%20Pearl%20Collection"
+            - img "White & Pearl Collection" [ref=e841]
+            - generic [ref=e842]:
+              - heading "White & Pearl Collection" [level=3] [ref=e843]
+              - paragraph
+          - link "Bronze and Brown Collection Bronze and Brown Collection" [ref=e845] [cursor=pointer]:
+            - /url: "#/collections/Bronze%20and%20Brown%20Collection"
+            - img "Bronze and Brown Collection" [ref=e846]
+            - generic [ref=e847]:
+              - heading "Bronze and Brown Collection" [level=3] [ref=e848]
+              - paragraph
+          - link "Black Collection Black Collection" [ref=e850] [cursor=pointer]:
+            - /url: "#/collections/Black%20Collection"
+            - img "Black Collection" [ref=e851]
+            - generic [ref=e852]:
+              - heading "Black Collection" [level=3] [ref=e853]
+              - paragraph
+          - link "Green Collection Green Collection" [ref=e855] [cursor=pointer]:
+            - /url: "#/collections/Green%20Collection"
+            - img "Green Collection" [ref=e856]
+            - generic [ref=e857]:
+              - heading "Green Collection" [level=3] [ref=e858]
+              - paragraph
+          - link "Silver Collection Silver Collection" [ref=e860] [cursor=pointer]:
+            - /url: "#/collections/Silver%20Collection"
+            - img "Silver Collection" [ref=e861]
+            - generic [ref=e862]:
+              - heading "Silver Collection" [level=3] [ref=e863]
+              - paragraph
+          - link "Gold Collection Gold Collection" [ref=e865] [cursor=pointer]:
+            - /url: "#/collections/Gold%20Collection"
+            - img "Gold Collection" [ref=e866]
+            - generic [ref=e867]:
+              - heading "Gold Collection" [level=3] [ref=e868]
+              - paragraph
+          - link "Yellow Collection Yellow Collection" [ref=e870] [cursor=pointer]:
+            - /url: "#/collections/Yellow%20Collection"
+            - img "Yellow Collection" [ref=e871]
+            - generic [ref=e872]:
+              - heading "Yellow Collection" [level=3] [ref=e873]
+              - paragraph
+          - link "Orange Collection Orange Collection" [ref=e875] [cursor=pointer]:
+            - /url: "#/collections/Orange%20Collection"
+            - img "Orange Collection" [ref=e876]
+            - generic [ref=e877]:
+              - heading "Orange Collection" [level=3] [ref=e878]
+              - paragraph
+          - link "Colorfull Colorfull" [ref=e880] [cursor=pointer]:
+            - /url: "#/collections/Colorfull"
+            - img "Colorfull" [ref=e881]
+            - generic [ref=e882]:
+              - heading "Colorfull" [level=3] [ref=e883]
+              - paragraph
+          - link "Girls Girls" [ref=e885] [cursor=pointer]:
+            - /url: "#/collections/Girls%20"
+            - img "Girls" [ref=e886]
+            - generic [ref=e887]:
+              - heading "Girls" [level=3] [ref=e888]
+              - paragraph
+      - generic [ref=e889]:
+        - link "Loyalty Rewards Earn points on every vintage find." [ref=e890] [cursor=pointer]:
+          - /url: "#/earn-rewards"
+          - img [ref=e892]
+          - generic [ref=e897]:
+            - heading "Loyalty Rewards" [level=4] [ref=e898]
+            - paragraph [ref=e899]: Earn points on every vintage find.
+        - link "Partnership Program Earn 20% commission on referrals." [ref=e900] [cursor=pointer]:
+          - /url: "#/affiliate-program"
+          - img [ref=e902]
+          - generic [ref=e905]:
+            - heading "Partnership Program" [level=4] [ref=e906]
+            - paragraph [ref=e907]: Earn 20% commission on referrals.
+        - generic [ref=e908]:
+          - img [ref=e910]
+          - generic [ref=e913]:
+            - heading "Flash Sales" [level=4] [ref=e914]
+            - paragraph [ref=e915]: Daily limited-time offers.
+      - generic [ref=e916]:
+        - generic [ref=e917]:
+          - heading "Unique Pendants" [level=2] [ref=e918]
+          - link "View All" [ref=e919] [cursor=pointer]:
+            - /url: "#/catalog/unique"
+            - text: View All
+            - img [ref=e920]
+        - generic [ref=e924]:
+          - generic [ref=e926]:
+            - link "Azure Embrace Pendant" [ref=e927] [cursor=pointer]:
+              - /url: "#/product/SPV-1764404579978"
+              - img "Azure Embrace Pendant" [ref=e928]
+            - button [ref=e929] [cursor=pointer]:
+              - img [ref=e930]
+            - generic [ref=e932]:
+              - generic [ref=e933]:
+                - paragraph [ref=e934]: Blue Collection
+                - button "View Options" [ref=e935] [cursor=pointer]:
+                  - img [ref=e936]
+              - link "Azure Embrace Pendant" [ref=e939] [cursor=pointer]:
+                - /url: "#/product/SPV-1764404579978"
+                - heading "Azure Embrace Pendant" [level=3] [ref=e940]
+              - generic [ref=e941]:
+                - generic [ref=e942]:
+                  - img [ref=e943]
+                  - generic [ref=e945]: "4.7"
+                  - generic [ref=e946]: (21)
+                - generic [ref=e948]: Low Stock
+              - generic [ref=e949]:
+                - generic [ref=e950]:
+                  - generic [ref=e951]: RRP R599.00
+                  - button [ref=e952] [cursor=pointer]:
+                    - img [ref=e953]
+                - generic [ref=e957]: Retail R299.00
+              - generic [ref=e961]:
+                - text: "Members:"
+                - generic [ref=e962]: R239.20
+          - generic [ref=e964]:
+            - link "Veridian Heart Pendant" [ref=e965] [cursor=pointer]:
+              - /url: "#/product/SPV-1764324243203"
+              - img "Veridian Heart Pendant" [ref=e966]
+            - button [ref=e967] [cursor=pointer]:
+              - img [ref=e968]
+            - generic [ref=e970]:
+              - generic [ref=e971]:
+                - paragraph [ref=e972]: Green Collection
+                - button "View Options" [ref=e973] [cursor=pointer]:
+                  - img [ref=e974]
+              - link "Veridian Heart Pendant" [ref=e977] [cursor=pointer]:
+                - /url: "#/product/SPV-1764324243203"
+                - heading "Veridian Heart Pendant" [level=3] [ref=e978]
+              - generic [ref=e979]:
+                - generic [ref=e980]:
+                  - img [ref=e981]
+                  - generic [ref=e983]: "4.8"
+                  - generic [ref=e984]: (22)
+                - generic [ref=e986]: Low Stock
+              - generic [ref=e987]:
+                - generic [ref=e988]:
+                  - generic [ref=e989]: RRP R599.00
+                  - button [ref=e990] [cursor=pointer]:
+                    - img [ref=e991]
+                - generic [ref=e995]: Retail R299.00
+              - generic [ref=e999]:
+                - text: "Members:"
+                - generic [ref=e1000]: R239.20
+          - generic [ref=e1002]:
+            - link "Nebula Flame Pendant" [ref=e1003] [cursor=pointer]:
+              - /url: "#/product/SPV-1764232304219"
+              - img "Nebula Flame Pendant" [ref=e1004]
+            - button [ref=e1005] [cursor=pointer]:
+              - img [ref=e1006]
+            - generic [ref=e1008]:
+              - generic [ref=e1009]:
+                - paragraph [ref=e1010]: Colorfull
+                - button "View Options" [ref=e1011] [cursor=pointer]:
+                  - img [ref=e1012]
+              - link "Nebula Flame Pendant" [ref=e1015] [cursor=pointer]:
+                - /url: "#/product/SPV-1764232304219"
+                - heading "Nebula Flame Pendant" [level=3] [ref=e1016]
+              - generic [ref=e1017]:
+                - generic [ref=e1018]:
+                  - img [ref=e1019]
+                  - generic [ref=e1021]: "4.8"
+                  - generic [ref=e1022]: (25)
+                - generic [ref=e1024]: Low Stock
+              - generic [ref=e1025]:
+                - generic [ref=e1026]:
+                  - generic [ref=e1027]: RRP R599.00
+                  - button [ref=e1028] [cursor=pointer]:
+                    - img [ref=e1029]
+                - generic [ref=e1033]: Retail R299.00
+              - generic [ref=e1037]:
+                - text: "Members:"
+                - generic [ref=e1038]: R239.20
+          - generic [ref=e1040]:
+            - link "Veridian Whisper Pendant" [ref=e1041] [cursor=pointer]:
+              - /url: "#/product/SPV-1764230076276"
+              - img "Veridian Whisper Pendant" [ref=e1042]
+            - button [ref=e1043] [cursor=pointer]:
+              - img [ref=e1044]
+            - generic [ref=e1046]:
+              - generic [ref=e1047]:
+                - paragraph [ref=e1048]: Green Collection
+                - button "View Options" [ref=e1049] [cursor=pointer]:
+                  - img [ref=e1050]
+              - link "Veridian Whisper Pendant" [ref=e1053] [cursor=pointer]:
+                - /url: "#/product/SPV-1764230076276"
+                - heading "Veridian Whisper Pendant" [level=3] [ref=e1054]
+              - generic [ref=e1055]:
+                - generic [ref=e1056]:
+                  - img [ref=e1057]
+                  - generic [ref=e1059]: "4.8"
+                  - generic [ref=e1060]: (9)
+                - generic [ref=e1062]: Low Stock
+              - generic [ref=e1063]:
+                - generic [ref=e1064]:
+                  - generic [ref=e1065]: RRP R599.00
+                  - button [ref=e1066] [cursor=pointer]:
+                    - img [ref=e1067]
+                - generic [ref=e1071]: Retail R299.00
+              - generic [ref=e1075]:
+                - text: "Members:"
+                - generic [ref=e1076]: R239.20
+          - generic [ref=e1078]:
+            - link "Aegean Whisper Pendant" [ref=e1079] [cursor=pointer]:
+              - /url: "#/product/SPV-1764229854042"
+              - img "Aegean Whisper Pendant" [ref=e1080]
+            - button [ref=e1081] [cursor=pointer]:
+              - img [ref=e1082]
+            - generic [ref=e1084]:
+              - generic [ref=e1085]:
+                - paragraph [ref=e1086]: Blue Collection
+                - button "View Options" [ref=e1087] [cursor=pointer]:
+                  - img [ref=e1088]
+              - link "Aegean Whisper Pendant" [ref=e1091] [cursor=pointer]:
+                - /url: "#/product/SPV-1764229854042"
+                - heading "Aegean Whisper Pendant" [level=3] [ref=e1092]
+              - generic [ref=e1093]:
+                - generic [ref=e1094]:
+                  - img [ref=e1095]
+                  - generic [ref=e1097]: "4.9"
+                  - generic [ref=e1098]: (25)
+                - generic [ref=e1100]: Low Stock
+              - generic [ref=e1101]:
+                - generic [ref=e1102]:
+                  - generic [ref=e1103]: RRP R599.00
+                  - button [ref=e1104] [cursor=pointer]:
+                    - img [ref=e1105]
+                - generic [ref=e1109]: Retail R299.00
+              - generic [ref=e1113]:
+                - text: "Members:"
+                - generic [ref=e1114]: R239.20
+          - generic [ref=e1116]:
+            - link "Amber Kissed Copper Pendant" [ref=e1117] [cursor=pointer]:
+              - /url: "#/product/SPV-1764229614759"
+              - img "Amber Kissed Copper Pendant" [ref=e1118]
+            - button [ref=e1119] [cursor=pointer]:
+              - img [ref=e1120]
+            - generic [ref=e1122]:
+              - generic [ref=e1123]:
+                - paragraph [ref=e1124]: Orange Collection
+                - button "View Options" [ref=e1125] [cursor=pointer]:
+                  - img [ref=e1126]
+              - link "Amber Kissed Copper Pendant" [ref=e1129] [cursor=pointer]:
+                - /url: "#/product/SPV-1764229614759"
+                - heading "Amber Kissed Copper Pendant" [level=3] [ref=e1130]
+              - generic [ref=e1131]:
+                - generic [ref=e1132]:
+                  - img [ref=e1133]
+                  - generic [ref=e1135]: "4.9"
+                  - generic [ref=e1136]: (25)
+                - generic [ref=e1138]: Low Stock
+              - generic [ref=e1139]:
+                - generic [ref=e1140]:
+                  - generic [ref=e1141]: RRP R599.00
+                  - button [ref=e1142] [cursor=pointer]:
+                    - img [ref=e1143]
+                - generic [ref=e1147]: Retail R299.00
+              - generic [ref=e1151]:
+                - text: "Members:"
+                - generic [ref=e1152]: R239.20
+          - generic [ref=e1154]:
+            - link "Celestial Shimmer Pendant" [ref=e1155] [cursor=pointer]:
+              - /url: "#/product/SPV-1764229152241"
+              - img "Celestial Shimmer Pendant" [ref=e1156]
+            - button [ref=e1157] [cursor=pointer]:
+              - img [ref=e1158]
+            - generic [ref=e1160]:
+              - generic [ref=e1161]:
+                - paragraph [ref=e1162]: Green Collection
+                - button "View Options" [ref=e1163] [cursor=pointer]:
+                  - img [ref=e1164]
+              - link "Celestial Shimmer Pendant" [ref=e1167] [cursor=pointer]:
+                - /url: "#/product/SPV-1764229152241"
+                - heading "Celestial Shimmer Pendant" [level=3] [ref=e1168]
+              - generic [ref=e1169]:
+                - generic [ref=e1170]:
+                  - img [ref=e1171]
+                  - generic [ref=e1173]: "4.8"
+                  - generic [ref=e1174]: (20)
+                - generic [ref=e1176]: Low Stock
+              - generic [ref=e1177]:
+                - generic [ref=e1178]:
+                  - generic [ref=e1179]: RRP R599.00
+                  - button [ref=e1180] [cursor=pointer]:
+                    - img [ref=e1181]
+                - generic [ref=e1185]: Retail R299.00
+              - generic [ref=e1189]:
+                - text: "Members:"
+                - generic [ref=e1190]: R239.20
+          - generic [ref=e1192]:
+            - link "Verdant Heart Pendant" [ref=e1193] [cursor=pointer]:
+              - /url: "#/product/SPV-1764228959453"
+              - img "Verdant Heart Pendant" [ref=e1194]
+            - button [ref=e1195] [cursor=pointer]:
+              - img [ref=e1196]
+            - generic [ref=e1198]:
+              - generic [ref=e1199]:
+                - paragraph [ref=e1200]: Yellow Collection
+                - button "View Options" [ref=e1201] [cursor=pointer]:
+                  - img [ref=e1202]
+              - link "Verdant Heart Pendant" [ref=e1205] [cursor=pointer]:
+                - /url: "#/product/SPV-1764228959453"
+                - heading "Verdant Heart Pendant" [level=3] [ref=e1206]
+              - generic [ref=e1207]:
+                - generic [ref=e1208]:
+                  - img [ref=e1209]
+                  - generic [ref=e1211]: "4.8"
+                  - generic [ref=e1212]: (25)
+                - generic [ref=e1214]: Low Stock
+              - generic [ref=e1215]:
+                - generic [ref=e1216]:
+                  - generic [ref=e1217]: RRP R599.00
+                  - button [ref=e1218] [cursor=pointer]:
+                    - img [ref=e1219]
+                - generic [ref=e1223]: Retail R299.00
+              - generic [ref=e1227]:
+                - text: "Members:"
+                - generic [ref=e1228]: R239.20
+          - generic [ref=e1230]:
+            - link "Enchanted Copper Bloom Pendant" [ref=e1231] [cursor=pointer]:
+              - /url: "#/product/SPV-1764228767199"
+              - img "Enchanted Copper Bloom Pendant" [ref=e1232]
+            - button [ref=e1233] [cursor=pointer]:
+              - img [ref=e1234]
+            - generic [ref=e1236]:
+              - generic [ref=e1237]:
+                - paragraph [ref=e1238]: Colorfull
+                - button "View Options" [ref=e1239] [cursor=pointer]:
+                  - img [ref=e1240]
+              - link "Enchanted Copper Bloom Pendant" [ref=e1243] [cursor=pointer]:
+                - /url: "#/product/SPV-1764228767199"
+                - heading "Enchanted Copper Bloom Pendant" [level=3] [ref=e1244]
+              - generic [ref=e1245]:
+                - generic [ref=e1246]:
+                  - img [ref=e1247]
+                  - generic [ref=e1249]: "4.9"
+                  - generic [ref=e1250]: (25)
+                - generic [ref=e1252]: Low Stock
+              - generic [ref=e1253]:
+                - generic [ref=e1254]:
+                  - generic [ref=e1255]: RRP R599.00
+                  - button [ref=e1256] [cursor=pointer]:
+                    - img [ref=e1257]
+                - generic [ref=e1261]: Retail R299.00
+              - generic [ref=e1265]:
+                - text: "Members:"
+                - generic [ref=e1266]: R239.20
+          - generic [ref=e1268]:
+            - link "Aegean Bloom Pendant" [ref=e1269] [cursor=pointer]:
+              - /url: "#/product/SPV-1764228640379"
+              - img "Aegean Bloom Pendant" [ref=e1270]
+            - button [ref=e1271] [cursor=pointer]:
+              - img [ref=e1272]
+            - generic [ref=e1274]:
+              - generic [ref=e1275]:
+                - paragraph [ref=e1276]: Blue Collection
+                - button "View Options" [ref=e1277] [cursor=pointer]:
+                  - img [ref=e1278]
+              - link "Aegean Bloom Pendant" [ref=e1281] [cursor=pointer]:
+                - /url: "#/product/SPV-1764228640379"
+                - heading "Aegean Bloom Pendant" [level=3] [ref=e1282]
+              - generic [ref=e1283]:
+                - generic [ref=e1284]:
+                  - img [ref=e1285]
+                  - generic [ref=e1287]: "4.9"
+                  - generic [ref=e1288]: (25)
+                - generic [ref=e1290]: Low Stock
+              - generic [ref=e1291]:
+                - generic [ref=e1292]:
+                  - generic [ref=e1293]: RRP R599.00
+                  - button [ref=e1294] [cursor=pointer]:
+                    - img [ref=e1295]
+                - generic [ref=e1299]: Retail R299.00
+              - generic [ref=e1303]:
+                - text: "Members:"
+                - generic [ref=e1304]: R239.20
+          - generic [ref=e1306]:
+            - link "Mystic Violet Heart Pendant" [ref=e1307] [cursor=pointer]:
+              - /url: "#/product/SPV-1764228379783"
+              - img "Mystic Violet Heart Pendant" [ref=e1308]
+            - button [ref=e1309] [cursor=pointer]:
+              - img [ref=e1310]
+            - generic [ref=e1312]:
+              - generic [ref=e1313]:
+                - paragraph [ref=e1314]: Purple Collection
+                - button "View Options" [ref=e1315] [cursor=pointer]:
+                  - img [ref=e1316]
+              - link "Mystic Violet Heart Pendant" [ref=e1319] [cursor=pointer]:
+                - /url: "#/product/SPV-1764228379783"
+                - heading "Mystic Violet Heart Pendant" [level=3] [ref=e1320]
+              - generic [ref=e1321]:
+                - generic [ref=e1322]:
+                  - img [ref=e1323]
+                  - generic [ref=e1325]: "4.9"
+                  - generic [ref=e1326]: (25)
+                - generic [ref=e1328]: Low Stock
+              - generic [ref=e1329]:
+                - generic [ref=e1330]:
+                  - generic [ref=e1331]: RRP R599.00
+                  - button [ref=e1332] [cursor=pointer]:
+                    - img [ref=e1333]
+                - generic [ref=e1337]: Retail R299.00
+              - generic [ref=e1341]:
+                - text: "Members:"
+                - generic [ref=e1342]: R239.20
+          - generic [ref=e1344]:
+            - link "Crimson Embrace Pendant" [ref=e1345] [cursor=pointer]:
+              - /url: "#/product/SPV-1764226645607"
+              - img "Crimson Embrace Pendant" [ref=e1346]
+            - button [ref=e1347] [cursor=pointer]:
+              - img [ref=e1348]
+            - generic [ref=e1350]:
+              - generic [ref=e1351]:
+                - paragraph [ref=e1352]: Red Collection
+                - button "View Options" [ref=e1353] [cursor=pointer]:
+                  - img [ref=e1354]
+              - link "Crimson Embrace Pendant" [ref=e1357] [cursor=pointer]:
+                - /url: "#/product/SPV-1764226645607"
+                - heading "Crimson Embrace Pendant" [level=3] [ref=e1358]
+              - generic [ref=e1359]:
+                - generic [ref=e1360]:
+                  - img [ref=e1361]
+                  - generic [ref=e1363]: "4.8"
+                  - generic [ref=e1364]: (25)
+                - generic [ref=e1366]: Low Stock
+              - generic [ref=e1367]:
+                - generic [ref=e1368]:
+                  - generic [ref=e1369]: RRP R599.00
+                  - button [ref=e1370] [cursor=pointer]:
+                    - img [ref=e1371]
+                - generic [ref=e1375]: Retail R299.00
+              - generic [ref=e1379]:
+                - text: "Members:"
+                - generic [ref=e1380]: R239.20
+          - generic [ref=e1382]:
+            - link "Veridian Whisper Pendant" [ref=e1383] [cursor=pointer]:
+              - /url: "#/product/SPV-1763849690610"
+              - img "Veridian Whisper Pendant" [ref=e1384]
+            - button [ref=e1385] [cursor=pointer]:
+              - img [ref=e1386]
+            - generic [ref=e1388]:
+              - generic [ref=e1389]:
+                - paragraph [ref=e1390]: Green Collection
+                - button "View Options" [ref=e1391] [cursor=pointer]:
+                  - img [ref=e1392]
+              - link "Veridian Whisper Pendant" [ref=e1395] [cursor=pointer]:
+                - /url: "#/product/SPV-1763849690610"
+                - heading "Veridian Whisper Pendant" [level=3] [ref=e1396]
+              - generic [ref=e1397]:
+                - generic [ref=e1398]:
+                  - img [ref=e1399]
+                  - generic [ref=e1401]: "4.9"
+                  - generic [ref=e1402]: (25)
+                - generic [ref=e1404]: Low Stock
+              - generic [ref=e1405]:
+                - generic [ref=e1406]:
+                  - generic [ref=e1407]: RRP R599.00
+                  - button [ref=e1408] [cursor=pointer]:
+                    - img [ref=e1409]
+                - generic [ref=e1413]: Retail R299.00
+              - generic [ref=e1417]:
+                - text: "Members:"
+                - generic [ref=e1418]: R239.20
+          - generic [ref=e1420]:
+            - link "Cosmic Radiance Pendant" [ref=e1421] [cursor=pointer]:
+              - /url: "#/product/SPV-1763849140042"
+              - img "Cosmic Radiance Pendant" [ref=e1422]
+            - button [ref=e1423] [cursor=pointer]:
+              - img [ref=e1424]
+            - generic [ref=e1426]:
+              - generic [ref=e1427]:
+                - paragraph [ref=e1428]: Colorfull
+                - button "View Options" [ref=e1429] [cursor=pointer]:
+                  - img [ref=e1430]
+              - link "Cosmic Radiance Pendant" [ref=e1433] [cursor=pointer]:
+                - /url: "#/product/SPV-1763849140042"
+                - heading "Cosmic Radiance Pendant" [level=3] [ref=e1434]
+              - generic [ref=e1435]:
+                - generic [ref=e1436]:
+                  - img [ref=e1437]
+                  - generic [ref=e1439]: "4.9"
+                  - generic [ref=e1440]: (25)
+                - generic [ref=e1442]: Low Stock
+              - generic [ref=e1443]:
+                - generic [ref=e1444]:
+                  - generic [ref=e1445]: RRP R599.00
+                  - button [ref=e1446] [cursor=pointer]:
+                    - img [ref=e1447]
+                - generic [ref=e1451]: Retail R299.00
+              - generic [ref=e1455]:
+                - text: "Members:"
+                - generic [ref=e1456]: R239.20
+          - generic [ref=e1458]:
+            - link "Mystic Glow Pendant" [ref=e1459] [cursor=pointer]:
+              - /url: "#/product/SPV-1763848891353"
+              - img "Mystic Glow Pendant" [ref=e1460]
+            - button [ref=e1461] [cursor=pointer]:
+              - img [ref=e1462]
+            - generic [ref=e1464]:
+              - generic [ref=e1465]:
+                - paragraph [ref=e1466]: Colorfull
+                - button "View Options" [ref=e1467] [cursor=pointer]:
+                  - img [ref=e1468]
+              - link "Mystic Glow Pendant" [ref=e1471] [cursor=pointer]:
+                - /url: "#/product/SPV-1763848891353"
+                - heading "Mystic Glow Pendant" [level=3] [ref=e1472]
+              - generic [ref=e1473]:
+                - generic [ref=e1474]:
+                  - img [ref=e1475]
+                  - generic [ref=e1477]: "4.8"
+                  - generic [ref=e1478]: (25)
+                - generic [ref=e1480]: Low Stock
+              - generic [ref=e1481]:
+                - generic [ref=e1482]:
+                  - generic [ref=e1483]: RRP R599.00
+                  - button [ref=e1484] [cursor=pointer]:
+                    - img [ref=e1485]
+                - generic [ref=e1489]: Retail R299.00
+              - generic [ref=e1493]:
+                - text: "Members:"
+                - generic [ref=e1494]: R239.20
+          - generic [ref=e1496]:
+            - link "Veridian Oasis Pendant" [ref=e1497] [cursor=pointer]:
+              - /url: "#/product/SPV-1763830303988"
+              - img "Veridian Oasis Pendant" [ref=e1498]
+            - button [ref=e1499] [cursor=pointer]:
+              - img [ref=e1500]
+            - generic [ref=e1502]:
+              - generic [ref=e1503]:
+                - paragraph [ref=e1504]: Blue Collection
+                - button "View Options" [ref=e1505] [cursor=pointer]:
+                  - img [ref=e1506]
+              - link "Veridian Oasis Pendant" [ref=e1509] [cursor=pointer]:
+                - /url: "#/product/SPV-1763830303988"
+                - heading "Veridian Oasis Pendant" [level=3] [ref=e1510]
+              - generic [ref=e1511]:
+                - generic [ref=e1512]:
+                  - img [ref=e1513]
+                  - generic [ref=e1515]: "4.9"
+                  - generic [ref=e1516]: (25)
+                - generic [ref=e1518]: Low Stock
+              - generic [ref=e1519]:
+                - generic [ref=e1520]:
+                  - generic [ref=e1521]: RRP R599.00
+                  - button [ref=e1522] [cursor=pointer]:
+                    - img [ref=e1523]
+                - generic [ref=e1527]: Retail R299.00
+              - generic [ref=e1531]:
+                - text: "Members:"
+                - generic [ref=e1532]: R239.20
+          - generic [ref=e1534]:
+            - link "Obsidian Heart Embrace Pendant" [ref=e1535] [cursor=pointer]:
+              - /url: "#/product/SPV-1763829939341"
+              - img "Obsidian Heart Embrace Pendant" [ref=e1536]
+            - button [ref=e1537] [cursor=pointer]:
+              - img [ref=e1538]
+            - generic [ref=e1540]:
+              - generic [ref=e1541]:
+                - paragraph [ref=e1542]: Black Collection
+                - button "View Options" [ref=e1543] [cursor=pointer]:
+                  - img [ref=e1544]
+              - link "Obsidian Heart Embrace Pendant" [ref=e1547] [cursor=pointer]:
+                - /url: "#/product/SPV-1763829939341"
+                - heading "Obsidian Heart Embrace Pendant" [level=3] [ref=e1548]
+              - generic [ref=e1549]:
+                - generic [ref=e1550]:
+                  - img [ref=e1551]
+                  - generic [ref=e1553]: "4.8"
+                  - generic [ref=e1554]: (25)
+                - generic [ref=e1556]: Low Stock
+              - generic [ref=e1557]:
+                - generic [ref=e1558]:
+                  - generic [ref=e1559]: RRP R599.00
+                  - button [ref=e1560] [cursor=pointer]:
+                    - img [ref=e1561]
+                - generic [ref=e1565]: Retail R299.00
+              - generic [ref=e1569]:
+                - text: "Members:"
+                - generic [ref=e1570]: R239.20
+          - generic [ref=e1572]:
+            - link "Aura Heart Pendant" [ref=e1573] [cursor=pointer]:
+              - /url: "#/product/SPV-1763828654851"
+              - img "Aura Heart Pendant" [ref=e1574]
+            - button [ref=e1575] [cursor=pointer]:
+              - img [ref=e1576]
+            - generic [ref=e1578]:
+              - generic [ref=e1579]:
+                - paragraph [ref=e1580]: White & Pearl Collection
+                - button "View Options" [ref=e1581] [cursor=pointer]:
+                  - img [ref=e1582]
+              - link "Aura Heart Pendant" [ref=e1585] [cursor=pointer]:
+                - /url: "#/product/SPV-1763828654851"
+                - heading "Aura Heart Pendant" [level=3] [ref=e1586]
+              - generic [ref=e1587]:
+                - generic [ref=e1588]:
+                  - img [ref=e1589]
+                  - generic [ref=e1591]: "4.9"
+                  - generic [ref=e1592]: (25)
+                - generic [ref=e1594]: Low Stock
+              - generic [ref=e1595]:
+                - generic [ref=e1596]:
+                  - generic [ref=e1597]: RRP R599.00
+                  - button [ref=e1598] [cursor=pointer]:
+                    - img [ref=e1599]
+                - generic [ref=e1603]: Retail R299.00
+              - generic [ref=e1607]:
+                - text: "Members:"
+                - generic [ref=e1608]: R239.20
+          - generic [ref=e1610]:
+            - link "Luminous Aurora Pendant" [ref=e1611] [cursor=pointer]:
+              - /url: "#/product/SPV-1763827544346"
+              - img "Luminous Aurora Pendant" [ref=e1612]
+            - button [ref=e1613] [cursor=pointer]:
+              - img [ref=e1614]
+            - generic [ref=e1616]:
+              - generic [ref=e1617]:
+                - paragraph [ref=e1618]: White & Pearl Collection
+                - button "View Options" [ref=e1619] [cursor=pointer]:
+                  - img [ref=e1620]
+              - link "Luminous Aurora Pendant" [ref=e1623] [cursor=pointer]:
+                - /url: "#/product/SPV-1763827544346"
+                - heading "Luminous Aurora Pendant" [level=3] [ref=e1624]
+              - generic [ref=e1625]:
+                - generic [ref=e1626]:
+                  - img [ref=e1627]
+                  - generic [ref=e1629]: "5.0"
+                  - generic [ref=e1630]: (0)
+                - generic [ref=e1632]: Low Stock
+              - generic [ref=e1633]:
+                - generic [ref=e1634]:
+                  - generic [ref=e1635]: RRP R599.00
+                  - button [ref=e1636] [cursor=pointer]:
+                    - img [ref=e1637]
+                - generic [ref=e1641]: Retail R299.00
+              - generic [ref=e1645]:
+                - text: "Members:"
+                - generic [ref=e1646]: R239.20
+          - generic [ref=e1648]:
+            - link "Veridian Whirlwind Copper Pendant" [ref=e1649] [cursor=pointer]:
+              - /url: "#/product/SPV-1763826088765"
+              - img "Veridian Whirlwind Copper Pendant" [ref=e1650]
+            - button [ref=e1651] [cursor=pointer]:
+              - img [ref=e1652]
+            - generic [ref=e1654]:
+              - generic [ref=e1655]:
+                - paragraph [ref=e1656]: Green Collection
+                - button "View Options" [ref=e1657] [cursor=pointer]:
+                  - img [ref=e1658]
+              - link "Veridian Whirlwind Copper Pendant" [ref=e1661] [cursor=pointer]:
+                - /url: "#/product/SPV-1763826088765"
+                - heading "Veridian Whirlwind Copper Pendant" [level=3] [ref=e1662]
+              - generic [ref=e1663]:
+                - generic [ref=e1664]:
+                  - img [ref=e1665]
+                  - generic [ref=e1667]: "4.9"
+                  - generic [ref=e1668]: (25)
+                - generic [ref=e1670]: Low Stock
+              - generic [ref=e1671]:
+                - generic [ref=e1672]:
+                  - generic [ref=e1673]: RRP R599.00
+                  - button [ref=e1674] [cursor=pointer]:
+                    - img [ref=e1675]
+                - generic [ref=e1679]: Retail R299.00
+              - generic [ref=e1683]:
+                - text: "Members:"
+                - generic [ref=e1684]: R239.20
+          - generic [ref=e1686]:
+            - link "Enchanted Aqua Heart Pendant" [ref=e1687] [cursor=pointer]:
+              - /url: "#/product/SPV-1763825946392"
+              - img "Enchanted Aqua Heart Pendant" [ref=e1688]
+            - button [ref=e1689] [cursor=pointer]:
+              - img [ref=e1690]
+            - generic [ref=e1692]:
+              - generic [ref=e1693]:
+                - paragraph [ref=e1694]: Blue Collection
+                - button "View Options" [ref=e1695] [cursor=pointer]:
+                  - img [ref=e1696]
+              - link "Enchanted Aqua Heart Pendant" [ref=e1699] [cursor=pointer]:
+                - /url: "#/product/SPV-1763825946392"
+                - heading "Enchanted Aqua Heart Pendant" [level=3] [ref=e1700]
+              - generic [ref=e1701]:
+                - generic [ref=e1702]:
+                  - img [ref=e1703]
+                  - generic [ref=e1705]: "4.8"
+                  - generic [ref=e1706]: (25)
+                - generic [ref=e1708]: Low Stock
+              - generic [ref=e1709]:
+                - generic [ref=e1710]:
+                  - generic [ref=e1711]: RRP R599.00
+                  - button [ref=e1712] [cursor=pointer]:
+                    - img [ref=e1713]
+                - generic [ref=e1717]: Retail R299.00
+              - generic [ref=e1721]:
+                - text: "Members:"
+                - generic [ref=e1722]: R239.20
+          - generic [ref=e1724]:
+            - link "Copper Aura Heart Pendant" [ref=e1725] [cursor=pointer]:
+              - /url: "#/product/SPV-1763825815696"
+              - img "Copper Aura Heart Pendant" [ref=e1726]
+            - button [ref=e1727] [cursor=pointer]:
+              - img [ref=e1728]
+            - generic [ref=e1730]:
+              - generic [ref=e1731]:
+                - paragraph [ref=e1732]: Green Collection
+                - button "View Options" [ref=e1733] [cursor=pointer]:
+                  - img [ref=e1734]
+              - link "Copper Aura Heart Pendant" [ref=e1737] [cursor=pointer]:
+                - /url: "#/product/SPV-1763825815696"
+                - heading "Copper Aura Heart Pendant" [level=3] [ref=e1738]
+              - generic [ref=e1739]:
+                - generic [ref=e1740]:
+                  - img [ref=e1741]
+                  - generic [ref=e1743]: "4.9"
+                  - generic [ref=e1744]: (25)
+                - generic [ref=e1746]: Low Stock
+              - generic [ref=e1747]:
+                - generic [ref=e1748]:
+                  - generic [ref=e1749]: RRP R599.00
+                  - button [ref=e1750] [cursor=pointer]:
+                    - img [ref=e1751]
+                - generic [ref=e1755]: Retail R299.00
+              - generic [ref=e1759]:
+                - text: "Members:"
+                - generic [ref=e1760]: R239.20
+          - generic [ref=e1762]:
+            - link "Crimson Ember Pendant" [ref=e1763] [cursor=pointer]:
+              - /url: "#/product/SPV-1763737389087"
+              - img "Crimson Ember Pendant" [ref=e1764]
+            - button [ref=e1765] [cursor=pointer]:
+              - img [ref=e1766]
+            - generic [ref=e1768]:
+              - generic [ref=e1769]:
+                - paragraph [ref=e1770]: Red Collection
+                - button "View Options" [ref=e1771] [cursor=pointer]:
+                  - img [ref=e1772]
+              - link "Crimson Ember Pendant" [ref=e1775] [cursor=pointer]:
+                - /url: "#/product/SPV-1763737389087"
+                - heading "Crimson Ember Pendant" [level=3] [ref=e1776]
+              - generic [ref=e1777]:
+                - generic [ref=e1778]:
+                  - img [ref=e1779]
+                  - generic [ref=e1781]: "4.8"
+                  - generic [ref=e1782]: (25)
+                - generic [ref=e1784]: Low Stock
+              - generic [ref=e1785]:
+                - generic [ref=e1786]:
+                  - generic [ref=e1787]: RRP R599.00
+                  - button [ref=e1788] [cursor=pointer]:
+                    - img [ref=e1789]
+                - generic [ref=e1793]: Retail R299.00
+              - generic [ref=e1797]:
+                - text: "Members:"
+                - generic [ref=e1798]: R239.20
+      - link "Explore Customized Wire Wrapped Pendants" [ref=e1800] [cursor=pointer]:
+        - /url: "#/customized-wire-wrapped-pendants"
+        - text: Explore Customized Wire Wrapped Pendants
+        - img [ref=e1801]
+      - generic [ref=e1804]:
+        - generic [ref=e1805]:
+          - heading "Rings" [level=2] [ref=e1806]
+          - link "View All" [ref=e1807] [cursor=pointer]:
+            - /url: "#/catalog/ring"
+            - text: View All
+            - img [ref=e1808]
+        - generic [ref=e1812]:
+          - generic [ref=e1814]:
+            - link "Heartfelt Ribbon Ring" [ref=e1815] [cursor=pointer]:
+              - /url: "#/product/SPV-1763716176794"
+              - img "Heartfelt Ribbon Ring" [ref=e1816]
+            - button [ref=e1817] [cursor=pointer]:
+              - img [ref=e1818]
+            - generic [ref=e1820]:
+              - generic [ref=e1821]:
+                - paragraph [ref=e1822]: Pink Collection
+                - button "View Options" [ref=e1823] [cursor=pointer]:
+                  - img [ref=e1824]
+              - link "Heartfelt Ribbon Ring" [ref=e1827] [cursor=pointer]:
+                - /url: "#/product/SPV-1763716176794"
+                - heading "Heartfelt Ribbon Ring" [level=3] [ref=e1828]
+              - generic [ref=e1829]:
+                - generic [ref=e1830]:
+                  - img [ref=e1831]
+                  - generic [ref=e1833]: "4.5"
+                  - generic [ref=e1834]: (20)
+                - generic [ref=e1836]: 856 sold
+              - generic [ref=e1837]:
+                - generic [ref=e1838]:
+                  - generic [ref=e1839]: RRP R195.00
+                  - button [ref=e1840] [cursor=pointer]:
+                    - img [ref=e1841]
+                - generic [ref=e1845]: Retail R186.00
+              - generic [ref=e1849]:
+                - text: "Members:"
+                - generic [ref=e1850]: R148.80
+          - generic [ref=e1852]:
+            - link "Enchanted Forest Teal Bloom Ring" [ref=e1853] [cursor=pointer]:
+              - /url: "#/product/SPV-1763596177626"
+              - img "Enchanted Forest Teal Bloom Ring" [ref=e1854]
+            - button [ref=e1855] [cursor=pointer]:
+              - img [ref=e1856]
+            - generic [ref=e1858]:
+              - generic [ref=e1859]:
+                - paragraph [ref=e1860]: Blue Collection
+                - button "View Options" [ref=e1861] [cursor=pointer]:
+                  - img [ref=e1862]
+              - link "Enchanted Forest Teal Bloom Ring" [ref=e1865] [cursor=pointer]:
+                - /url: "#/product/SPV-1763596177626"
+                - heading "Enchanted Forest Teal Bloom Ring" [level=3] [ref=e1866]
+              - generic [ref=e1867]:
+                - generic [ref=e1868]:
+                  - img [ref=e1869]
+                  - generic [ref=e1871]: "4.8"
+                  - generic [ref=e1872]: (10)
+                - generic [ref=e1874]: 485 sold
+              - generic [ref=e1875]:
+                - generic [ref=e1876]:
+                  - generic [ref=e1877]: RRP R385.00
+                  - button [ref=e1878] [cursor=pointer]:
+                    - img [ref=e1879]
+                - generic [ref=e1883]: Retail R165.00
+              - generic [ref=e1887]:
+                - text: "Members:"
+                - generic [ref=e1888]: R132.00
+      - generic [ref=e1889]:
+        - generic [ref=e1890]:
+          - heading "Bracelets" [level=2] [ref=e1891]
+          - link "View All" [ref=e1892] [cursor=pointer]:
+            - /url: "#/catalog/bracelet"
+            - text: View All
+            - img [ref=e1893]
+        - generic [ref=e1897]:
+          - generic [ref=e1899]:
+            - link "Citron Aura Bracelet" [ref=e1900] [cursor=pointer]:
+              - /url: "#/product/SPV-1764308408963"
+              - img "Citron Aura Bracelet" [ref=e1901]
+            - button [ref=e1902] [cursor=pointer]:
+              - img [ref=e1903]
+            - generic [ref=e1905]:
+              - generic [ref=e1906]:
+                - paragraph [ref=e1907]: Yellow Collection
+                - button "Add to Cart" [ref=e1908] [cursor=pointer]:
+                  - img [ref=e1909]
+              - link "Citron Aura Bracelet" [ref=e1913] [cursor=pointer]:
+                - /url: "#/product/SPV-1764308408963"
+                - heading "Citron Aura Bracelet" [level=3] [ref=e1914]
+              - generic [ref=e1915]:
+                - generic [ref=e1916]:
+                  - img [ref=e1917]
+                  - generic [ref=e1919]: "5.0"
+                  - generic [ref=e1920]: (0)
+                - generic [ref=e1922]: Low Stock
+              - generic [ref=e1923]:
+                - generic [ref=e1924]:
+                  - generic [ref=e1925]: RRP R85.00
+                  - button [ref=e1926] [cursor=pointer]:
+                    - img [ref=e1927]
+                - generic [ref=e1931]: Retail R35.00
+              - generic [ref=e1935]:
+                - text: "Members:"
+                - generic [ref=e1936]: R28.00
+          - generic [ref=e1938]:
+            - link "Blush Radiance Bracelet" [ref=e1939] [cursor=pointer]:
+              - /url: "#/product/SPV-1764231433403"
+              - img "Blush Radiance Bracelet" [ref=e1940]
+            - button [ref=e1941] [cursor=pointer]:
+              - img [ref=e1942]
+            - generic [ref=e1944]:
+              - generic [ref=e1945]:
+                - paragraph [ref=e1946]: Pink Collection
+                - button "Add to Cart" [ref=e1947] [cursor=pointer]:
+                  - img [ref=e1948]
+              - link "Blush Radiance Bracelet" [ref=e1952] [cursor=pointer]:
+                - /url: "#/product/SPV-1764231433403"
+                - heading "Blush Radiance Bracelet" [level=3] [ref=e1953]
+              - generic [ref=e1954]:
+                - generic [ref=e1955]:
+                  - img [ref=e1956]
+                  - generic [ref=e1958]: "5.0"
+                  - generic [ref=e1959]: (0)
+                - generic [ref=e1961]: Low Stock
+              - generic [ref=e1962]:
+                - generic [ref=e1963]:
+                  - generic [ref=e1964]: RRP R85.00
+                  - button [ref=e1965] [cursor=pointer]:
+                    - img [ref=e1966]
+                - generic [ref=e1970]: Retail R35.00
+              - generic [ref=e1974]:
+                - text: "Members:"
+                - generic [ref=e1975]: R28.00
+          - generic [ref=e1977]:
+            - link "Ethereal Dusk Bracelet" [ref=e1978] [cursor=pointer]:
+              - /url: "#/product/SPV-1764231362091"
+              - img "Ethereal Dusk Bracelet" [ref=e1979]
+            - button [ref=e1980] [cursor=pointer]:
+              - img [ref=e1981]
+            - generic [ref=e1983]:
+              - generic [ref=e1984]:
+                - paragraph [ref=e1985]: Colorfull
+                - button "Add to Cart" [ref=e1986] [cursor=pointer]:
+                  - img [ref=e1987]
+              - link "Ethereal Dusk Bracelet" [ref=e1991] [cursor=pointer]:
+                - /url: "#/product/SPV-1764231362091"
+                - heading "Ethereal Dusk Bracelet" [level=3] [ref=e1992]
+              - generic [ref=e1993]:
+                - generic [ref=e1994]:
+                  - img [ref=e1995]
+                  - generic [ref=e1997]: "5.0"
+                  - generic [ref=e1998]: (0)
+                - generic [ref=e2000]: Low Stock
+              - generic [ref=e2001]:
+                - generic [ref=e2002]:
+                  - generic [ref=e2003]: RRP R85.00
+                  - button [ref=e2004] [cursor=pointer]:
+                    - img [ref=e2005]
+                - generic [ref=e2009]: Retail R35.00
+              - generic [ref=e2013]:
+                - text: "Members:"
+                - generic [ref=e2014]: R28.00
+          - generic [ref=e2016]:
+            - link "Serenity Strand Bracelet" [ref=e2017] [cursor=pointer]:
+              - /url: "#/product/SPV-1764231265742"
+              - img "Serenity Strand Bracelet" [ref=e2018]
+            - button [ref=e2019] [cursor=pointer]:
+              - img [ref=e2020]
+            - generic [ref=e2022]:
+              - generic [ref=e2023]:
+                - paragraph [ref=e2024]: Colorfull
+                - button "Add to Cart" [ref=e2025] [cursor=pointer]:
+                  - img [ref=e2026]
+              - link "Serenity Strand Bracelet" [ref=e2030] [cursor=pointer]:
+                - /url: "#/product/SPV-1764231265742"
+                - heading "Serenity Strand Bracelet" [level=3] [ref=e2031]
+              - generic [ref=e2032]:
+                - generic [ref=e2033]:
+                  - img [ref=e2034]
+                  - generic [ref=e2036]: "5.0"
+                  - generic [ref=e2037]: (0)
+                - generic [ref=e2039]: Low Stock
+              - generic [ref=e2040]:
+                - generic [ref=e2041]:
+                  - generic [ref=e2042]: RRP R85.00
+                  - button [ref=e2043] [cursor=pointer]:
+                    - img [ref=e2044]
+                - generic [ref=e2048]: Retail R35.00
+              - generic [ref=e2052]:
+                - text: "Members:"
+                - generic [ref=e2053]: R28.00
+          - generic [ref=e2055]:
+            - link "Rose Quartz Aura Bracelet" [ref=e2056] [cursor=pointer]:
+              - /url: "#/product/SPV-1764231201917"
+              - img "Rose Quartz Aura Bracelet" [ref=e2057]
+            - button [ref=e2058] [cursor=pointer]:
+              - img [ref=e2059]
+            - generic [ref=e2061]:
+              - generic [ref=e2062]:
+                - paragraph [ref=e2063]: Colorfull
+                - button "Add to Cart" [ref=e2064] [cursor=pointer]:
+                  - img [ref=e2065]
+              - link "Rose Quartz Aura Bracelet" [ref=e2069] [cursor=pointer]:
+                - /url: "#/product/SPV-1764231201917"
+                - heading "Rose Quartz Aura Bracelet" [level=3] [ref=e2070]
+              - generic [ref=e2071]:
+                - generic [ref=e2072]:
+                  - img [ref=e2073]
+                  - generic [ref=e2075]: "5.0"
+                  - generic [ref=e2076]: (0)
+                - generic [ref=e2078]: Low Stock
+              - generic [ref=e2079]:
+                - generic [ref=e2080]:
+                  - generic [ref=e2081]: RRP R85.00
+                  - button [ref=e2082] [cursor=pointer]:
+                    - img [ref=e2083]
+                - generic [ref=e2087]: Retail R35.00
+              - generic [ref=e2091]:
+                - text: "Members:"
+                - generic [ref=e2092]: R28.00
+          - generic [ref=e2094]:
+            - link "Aurora Dreamscape Bracelet" [ref=e2095] [cursor=pointer]:
+              - /url: "#/product/SPV-1764231137587"
+              - img "Aurora Dreamscape Bracelet" [ref=e2096]
+            - button [ref=e2097] [cursor=pointer]:
+              - img [ref=e2098]
+            - generic [ref=e2100]:
+              - generic [ref=e2101]:
+                - paragraph [ref=e2102]: Purple Collection
+                - button "Add to Cart" [ref=e2103] [cursor=pointer]:
+                  - img [ref=e2104]
+              - link "Aurora Dreamscape Bracelet" [ref=e2108] [cursor=pointer]:
+                - /url: "#/product/SPV-1764231137587"
+                - heading "Aurora Dreamscape Bracelet" [level=3] [ref=e2109]
+              - generic [ref=e2110]:
+                - generic [ref=e2111]:
+                  - img [ref=e2112]
+                  - generic [ref=e2114]: "5.0"
+                  - generic [ref=e2115]: (0)
+                - generic [ref=e2117]: Low Stock
+              - generic [ref=e2118]:
+                - generic [ref=e2119]:
+                  - generic [ref=e2120]: RRP R85.00
+                  - button [ref=e2121] [cursor=pointer]:
+                    - img [ref=e2122]
+                - generic [ref=e2126]: Retail R35.00
+              - generic [ref=e2130]:
+                - text: "Members:"
+                - generic [ref=e2131]: R28.00
+          - generic [ref=e2133]:
+            - link "Aura Blush Quartz Bracelet" [ref=e2134] [cursor=pointer]:
+              - /url: "#/product/SPV-1764231046609"
+              - img "Aura Blush Quartz Bracelet" [ref=e2135]
+            - button [ref=e2136] [cursor=pointer]:
+              - img [ref=e2137]
+            - generic [ref=e2139]:
+              - generic [ref=e2140]:
+                - paragraph [ref=e2141]: White & Pearl Collection
+                - button "Add to Cart" [ref=e2142] [cursor=pointer]:
+                  - img [ref=e2143]
+              - link "Aura Blush Quartz Bracelet" [ref=e2147] [cursor=pointer]:
+                - /url: "#/product/SPV-1764231046609"
+                - heading "Aura Blush Quartz Bracelet" [level=3] [ref=e2148]
+              - generic [ref=e2149]:
+                - generic [ref=e2150]:
+                  - img [ref=e2151]
+                  - generic [ref=e2153]: "5.0"
+                  - generic [ref=e2154]: (0)
+                - generic [ref=e2156]: Low Stock
+              - generic [ref=e2157]:
+                - generic [ref=e2158]:
+                  - generic [ref=e2159]: RRP R85.00
+                  - button [ref=e2160] [cursor=pointer]:
+                    - img [ref=e2161]
+                - generic [ref=e2165]: Retail R35.00
+              - generic [ref=e2169]:
+                - text: "Members:"
+                - generic [ref=e2170]: R28.00
+          - generic [ref=e2172]:
+            - link "Blush Brilliance Bracelet" [ref=e2173] [cursor=pointer]:
+              - /url: "#/product/SPV-1764230925834"
+              - img "Blush Brilliance Bracelet" [ref=e2174]
+            - button [ref=e2175] [cursor=pointer]:
+              - img [ref=e2176]
+            - generic [ref=e2178]:
+              - generic [ref=e2179]:
+                - paragraph [ref=e2180]: Pink Collection
+                - button "Add to Cart" [ref=e2181] [cursor=pointer]:
+                  - img [ref=e2182]
+              - link "Blush Brilliance Bracelet" [ref=e2186] [cursor=pointer]:
+                - /url: "#/product/SPV-1764230925834"
+                - heading "Blush Brilliance Bracelet" [level=3] [ref=e2187]
+              - generic [ref=e2188]:
+                - generic [ref=e2189]:
+                  - img [ref=e2190]
+                  - generic [ref=e2192]: "5.0"
+                  - generic [ref=e2193]: (0)
+                - generic [ref=e2195]: Low Stock
+              - generic [ref=e2196]:
+                - generic [ref=e2197]:
+                  - generic [ref=e2198]: RRP R85.00
+                  - button [ref=e2199] [cursor=pointer]:
+                    - img [ref=e2200]
+                - generic [ref=e2204]: Retail R35.00
+              - generic [ref=e2208]:
+                - text: "Members:"
+                - generic [ref=e2209]: R28.00
+          - generic [ref=e2211]:
+            - link "Golden Citrine Aura Bracelet" [ref=e2212] [cursor=pointer]:
+              - /url: "#/product/SPV-1764080628029"
+              - img "Golden Citrine Aura Bracelet" [ref=e2213]
+            - button [ref=e2214] [cursor=pointer]:
+              - img [ref=e2215]
+            - generic [ref=e2217]:
+              - generic [ref=e2218]:
+                - paragraph [ref=e2219]: Gold Collection
+                - button "Add to Cart" [ref=e2220] [cursor=pointer]:
+                  - img [ref=e2221]
+              - link "Golden Citrine Aura Bracelet" [ref=e2225] [cursor=pointer]:
+                - /url: "#/product/SPV-1764080628029"
+                - heading "Golden Citrine Aura Bracelet" [level=3] [ref=e2226]
+              - generic [ref=e2227]:
+                - generic [ref=e2228]:
+                  - img [ref=e2229]
+                  - generic [ref=e2231]: "5.0"
+                  - generic [ref=e2232]: (0)
+                - generic [ref=e2234]: Low Stock
+              - generic [ref=e2235]:
+                - generic [ref=e2236]:
+                  - generic [ref=e2237]: RRP R85.00
+                  - button [ref=e2238] [cursor=pointer]:
+                    - img [ref=e2239]
+                - generic [ref=e2243]: Retail R35.00
+              - generic [ref=e2247]:
+                - text: "Members:"
+                - generic [ref=e2248]: R28.00
+      - generic [ref=e2249]:
+        - generic [ref=e2250]:
+          - heading "Stud Earrings" [level=2] [ref=e2251]
+          - link "View All" [ref=e2252] [cursor=pointer]:
+            - /url: "#/catalog/stud"
+            - text: View All
+            - img [ref=e2253]
+        - generic [ref=e2257]:
+          - generic [ref=e2259]:
+            - link "Electric Lime Geometric Studs NEW" [ref=e2260] [cursor=pointer]:
+              - /url: "#/product/SPV-1764828391817"
+              - img "Electric Lime Geometric Studs" [ref=e2261]
+              - generic [ref=e2263]: NEW
+            - button [ref=e2264] [cursor=pointer]:
+              - img [ref=e2265]
+            - generic [ref=e2267]:
+              - generic [ref=e2268]:
+                - paragraph [ref=e2269]: Green Collection
+                - button "View Options" [ref=e2270] [cursor=pointer]:
+                  - img [ref=e2271]
+              - link "Electric Lime Geometric Studs" [ref=e2274] [cursor=pointer]:
+                - /url: "#/product/SPV-1764828391817"
+                - heading "Electric Lime Geometric Studs" [level=3] [ref=e2275]
+              - generic [ref=e2276]:
+                - generic [ref=e2277]:
+                  - img [ref=e2278]
+                  - generic [ref=e2280]: "4.6"
+                  - generic [ref=e2281]: (2)
+                - generic [ref=e2283]: 74 sold
+              - generic [ref=e2284]:
+                - generic [ref=e2285]:
+                  - generic [ref=e2286]: RRP R59.00
+                  - button [ref=e2287] [cursor=pointer]:
+                    - img [ref=e2288]
+                - generic [ref=e2292]: Retail R29.00
+              - generic [ref=e2296]:
+                - text: "Members:"
+                - generic [ref=e2297]: R23.20
+          - generic [ref=e2299]:
+            - link "Vivid Magenta Teddy Studs NEW" [ref=e2300] [cursor=pointer]:
+              - /url: "#/product/SPV-1764827564834"
+              - img "Vivid Magenta Teddy Studs" [ref=e2301]
+              - generic [ref=e2303]: NEW
+            - button [ref=e2304] [cursor=pointer]:
+              - img [ref=e2305]
+            - generic [ref=e2307]:
+              - generic [ref=e2308]:
+                - paragraph [ref=e2309]: Pink Collection
+                - button "View Options" [ref=e2310] [cursor=pointer]:
+                  - img [ref=e2311]
+              - link "Vivid Magenta Teddy Studs" [ref=e2314] [cursor=pointer]:
+                - /url: "#/product/SPV-1764827564834"
+                - heading "Vivid Magenta Teddy Studs" [level=3] [ref=e2315]
+              - generic [ref=e2316]:
+                - generic [ref=e2317]:
+                  - img [ref=e2318]
+                  - generic [ref=e2320]: "5.0"
+                  - generic [ref=e2321]: (0)
+                - generic [ref=e2323]: 15 sold
+              - generic [ref=e2324]:
+                - generic [ref=e2325]:
+                  - generic [ref=e2326]: RRP R59.00
+                  - button [ref=e2327] [cursor=pointer]:
+                    - img [ref=e2328]
+                - generic [ref=e2332]: Retail R29.00
+              - generic [ref=e2336]:
+                - text: "Members:"
+                - generic [ref=e2337]: R23.20
+          - generic [ref=e2339]:
+            - link "Electric Lime Geometric Studs" [ref=e2340] [cursor=pointer]:
+              - /url: "#/product/SPV-1764827442171"
+              - img "Electric Lime Geometric Studs" [ref=e2341]
+            - button [ref=e2342] [cursor=pointer]:
+              - img [ref=e2343]
+            - generic [ref=e2345]:
+              - generic [ref=e2346]:
+                - paragraph [ref=e2347]: Green Collection
+                - button "View Options" [ref=e2348] [cursor=pointer]:
+                  - img [ref=e2349]
+              - link "Electric Lime Geometric Studs" [ref=e2352] [cursor=pointer]:
+                - /url: "#/product/SPV-1764827442171"
+                - heading "Electric Lime Geometric Studs" [level=3] [ref=e2353]
+              - generic [ref=e2354]:
+                - generic [ref=e2355]:
+                  - img [ref=e2356]
+                  - generic [ref=e2358]: "4.4"
+                  - generic [ref=e2359]: (4)
+                - generic [ref=e2361]: 365 sold
+              - generic [ref=e2362]:
+                - generic [ref=e2363]:
+                  - generic [ref=e2364]: RRP R59.00
+                  - button [ref=e2365] [cursor=pointer]:
+                    - img [ref=e2366]
+                - generic [ref=e2370]: Retail R29.00
+              - generic [ref=e2374]:
+                - text: "Members:"
+                - generic [ref=e2375]: R23.20
+          - generic [ref=e2377]:
+            - link "Electric Violet Heart Studs" [ref=e2378] [cursor=pointer]:
+              - /url: "#/product/SPV-1764827239907"
+              - img "Electric Violet Heart Studs" [ref=e2379]
+            - button [ref=e2380] [cursor=pointer]:
+              - img [ref=e2381]
+            - generic [ref=e2383]:
+              - generic [ref=e2384]:
+                - paragraph [ref=e2385]: Purple Collection
+                - button "View Options" [ref=e2386] [cursor=pointer]:
+                  - img [ref=e2387]
+              - link "Electric Violet Heart Studs" [ref=e2390] [cursor=pointer]:
+                - /url: "#/product/SPV-1764827239907"
+                - heading "Electric Violet Heart Studs" [level=3] [ref=e2391]
+              - generic [ref=e2392]:
+                - generic [ref=e2393]:
+                  - img [ref=e2394]
+                  - generic [ref=e2396]: "4.5"
+                  - generic [ref=e2397]: (4)
+                - generic [ref=e2399]: 1856 sold
+              - generic [ref=e2400]:
+                - generic [ref=e2401]:
+                  - generic [ref=e2402]: RRP R59.00
+                  - button [ref=e2403] [cursor=pointer]:
+                    - img [ref=e2404]
+                - generic [ref=e2408]: Retail R29.00
+              - generic [ref=e2412]:
+                - text: "Members:"
+                - generic [ref=e2413]: R23.20
+          - generic [ref=e2415]:
+            - link "Lilac Mist Frosted Heart Studs" [ref=e2416] [cursor=pointer]:
+              - /url: "#/product/SPV-1764826829570"
+              - img "Lilac Mist Frosted Heart Studs" [ref=e2417]
+            - button [ref=e2418] [cursor=pointer]:
+              - img [ref=e2419]
+            - generic [ref=e2421]:
+              - generic [ref=e2422]:
+                - paragraph [ref=e2423]: Purple Collection
+                - button "View Options" [ref=e2424] [cursor=pointer]:
+                  - img [ref=e2425]
+              - link "Lilac Mist Frosted Heart Studs" [ref=e2428] [cursor=pointer]:
+                - /url: "#/product/SPV-1764826829570"
+                - heading "Lilac Mist Frosted Heart Studs" [level=3] [ref=e2429]
+              - generic [ref=e2430]:
+                - generic [ref=e2431]:
+                  - img [ref=e2432]
+                  - generic [ref=e2434]: "4.5"
+                  - generic [ref=e2435]: (5)
+                - generic [ref=e2437]: 96 sold
+              - generic [ref=e2438]:
+                - generic [ref=e2439]:
+                  - generic [ref=e2440]: RRP R59.00
+                  - button [ref=e2441] [cursor=pointer]:
+                    - img [ref=e2442]
+                - generic [ref=e2446]: Retail R29.00
+              - generic [ref=e2450]:
+                - text: "Members:"
+                - generic [ref=e2451]: R23.20
+          - generic [ref=e2453]:
+            - link "Electric Azure Square Studs" [ref=e2454] [cursor=pointer]:
+              - /url: "#/product/SPV-1764815481086"
+              - img "Electric Azure Square Studs" [ref=e2455]
+            - button [ref=e2456] [cursor=pointer]:
+              - img [ref=e2457]
+            - generic [ref=e2459]:
+              - generic [ref=e2460]:
+                - paragraph [ref=e2461]: Blue Collection
+                - button "View Options" [ref=e2462] [cursor=pointer]:
+                  - img [ref=e2463]
+              - link "Electric Azure Square Studs" [ref=e2466] [cursor=pointer]:
+                - /url: "#/product/SPV-1764815481086"
+                - heading "Electric Azure Square Studs" [level=3] [ref=e2467]
+              - generic [ref=e2468]:
+                - generic [ref=e2469]:
+                  - img [ref=e2470]
+                  - generic [ref=e2472]: "4.5"
+                  - generic [ref=e2473]: (4)
+                - generic [ref=e2475]: 745 sold
+              - generic [ref=e2476]:
+                - generic [ref=e2477]:
+                  - generic [ref=e2478]: RRP R59.00
+                  - button [ref=e2479] [cursor=pointer]:
+                    - img [ref=e2480]
+                - generic [ref=e2484]: Retail R29.00
+              - generic [ref=e2488]:
+                - text: "Members:"
+                - generic [ref=e2489]: R23.20
+          - generic [ref=e2491]:
+            - link "Blush Stardust Octagon Studs" [ref=e2492] [cursor=pointer]:
+              - /url: "#/product/SPV-1764815335575"
+              - img "Blush Stardust Octagon Studs" [ref=e2493]
+            - button [ref=e2494] [cursor=pointer]:
+              - img [ref=e2495]
+            - generic [ref=e2497]:
+              - generic [ref=e2498]:
+                - paragraph [ref=e2499]: Pink Collection
+                - button "View Options" [ref=e2500] [cursor=pointer]:
+                  - img [ref=e2501]
+              - link "Blush Stardust Octagon Studs" [ref=e2504] [cursor=pointer]:
+                - /url: "#/product/SPV-1764815335575"
+                - heading "Blush Stardust Octagon Studs" [level=3] [ref=e2505]
+              - generic [ref=e2506]:
+                - generic [ref=e2507]:
+                  - img [ref=e2508]
+                  - generic [ref=e2510]: "4.4"
+                  - generic [ref=e2511]: (5)
+                - generic [ref=e2513]: 785 sold
+              - generic [ref=e2514]:
+                - generic [ref=e2515]:
+                  - generic [ref=e2516]: RRP R59.00
+                  - button [ref=e2517] [cursor=pointer]:
+                    - img [ref=e2518]
+                - generic [ref=e2522]: Retail R29.00
+              - generic [ref=e2526]:
+                - text: "Members:"
+                - generic [ref=e2527]: R23.20
+          - generic [ref=e2529]:
+            - link "Cerulean Scallop Studs" [ref=e2530] [cursor=pointer]:
+              - /url: "#/product/SPV-1764815159963"
+              - img "Cerulean Scallop Studs" [ref=e2531]
+            - button [ref=e2532] [cursor=pointer]:
+              - img [ref=e2533]
+            - generic [ref=e2535]:
+              - generic [ref=e2536]:
+                - paragraph [ref=e2537]: Blue Collection
+                - button "View Options" [ref=e2538] [cursor=pointer]:
+                  - img [ref=e2539]
+              - link "Cerulean Scallop Studs" [ref=e2542] [cursor=pointer]:
+                - /url: "#/product/SPV-1764815159963"
+                - heading "Cerulean Scallop Studs" [level=3] [ref=e2543]
+              - generic [ref=e2544]:
+                - generic [ref=e2545]:
+                  - img [ref=e2546]
+                  - generic [ref=e2548]: "4.5"
+                  - generic [ref=e2549]: (5)
+                - generic [ref=e2551]: 325 sold
+              - generic [ref=e2552]:
+                - generic [ref=e2553]:
+                  - generic [ref=e2554]: RRP R59.00
+                  - button [ref=e2555] [cursor=pointer]:
+                    - img [ref=e2556]
+                - generic [ref=e2560]: Retail R29.00
+              - generic [ref=e2564]:
+                - text: "Members:"
+                - generic [ref=e2565]: R23.20
+          - generic [ref=e2567]:
+            - link "Vivid Magenta Square Studs" [ref=e2568] [cursor=pointer]:
+              - /url: "#/product/SPV-1764814999297"
+              - img "Vivid Magenta Square Studs" [ref=e2569]
+            - button [ref=e2570] [cursor=pointer]:
+              - img [ref=e2571]
+            - generic [ref=e2573]:
+              - generic [ref=e2574]:
+                - paragraph [ref=e2575]: Pink Collection
+                - button "Add to Cart" [ref=e2576] [cursor=pointer]:
+                  - img [ref=e2577]
+              - link "Vivid Magenta Square Studs" [ref=e2581] [cursor=pointer]:
+                - /url: "#/product/SPV-1764814999297"
+                - heading "Vivid Magenta Square Studs" [level=3] [ref=e2582]
+              - generic [ref=e2583]:
+                - generic [ref=e2584]:
+                  - img [ref=e2585]
+                  - generic [ref=e2587]: "4.4"
+                  - generic [ref=e2588]: (5)
+                - generic [ref=e2590]: 458 sold
+              - generic [ref=e2591]:
+                - generic [ref=e2592]:
+                  - generic [ref=e2593]: RRP R59.00
+                  - button [ref=e2594] [cursor=pointer]:
+                    - img [ref=e2595]
+                - generic [ref=e2599]: Retail R29.00
+              - generic [ref=e2603]:
+                - text: "Members:"
+                - generic [ref=e2604]: R23.20
+          - generic [ref=e2606]:
+            - link "Aqua Reverie Heart Studs" [ref=e2607] [cursor=pointer]:
+              - /url: "#/product/SPV-1764230748130"
+              - img "Aqua Reverie Heart Studs" [ref=e2608]
+            - button [ref=e2609] [cursor=pointer]:
+              - img [ref=e2610]
+            - generic [ref=e2612]:
+              - generic [ref=e2613]:
+                - paragraph [ref=e2614]: Blue Collection
+                - button "View Options" [ref=e2615] [cursor=pointer]:
+                  - img [ref=e2616]
+              - link "Aqua Reverie Heart Studs" [ref=e2619] [cursor=pointer]:
+                - /url: "#/product/SPV-1764230748130"
+                - heading "Aqua Reverie Heart Studs" [level=3] [ref=e2620]
+              - generic [ref=e2621]:
+                - generic [ref=e2622]:
+                  - img [ref=e2623]
+                  - generic [ref=e2625]: "4.5"
+                  - generic [ref=e2626]: (5)
+                - generic [ref=e2628]: 568 sold
+              - generic [ref=e2629]:
+                - generic [ref=e2630]:
+                  - generic [ref=e2631]: RRP R59.00
+                  - button [ref=e2632] [cursor=pointer]:
+                    - img [ref=e2633]
+                - generic [ref=e2637]: Retail R29.00
+              - generic [ref=e2641]:
+                - text: "Members:"
+                - generic [ref=e2642]: R23.20
+          - generic [ref=e2644]:
+            - link "Veridian Shimmer Studs" [ref=e2645] [cursor=pointer]:
+              - /url: "#/product/SPV-1764230285090"
+              - img "Veridian Shimmer Studs" [ref=e2646]
+            - button [ref=e2647] [cursor=pointer]:
+              - img [ref=e2648]
+            - generic [ref=e2650]:
+              - generic [ref=e2651]:
+                - paragraph [ref=e2652]: Yellow Collection
+                - button "View Options" [ref=e2653] [cursor=pointer]:
+                  - img [ref=e2654]
+              - link "Veridian Shimmer Studs" [ref=e2657] [cursor=pointer]:
+                - /url: "#/product/SPV-1764230285090"
+                - heading "Veridian Shimmer Studs" [level=3] [ref=e2658]
+              - generic [ref=e2659]:
+                - generic [ref=e2660]:
+                  - img [ref=e2661]
+                  - generic [ref=e2663]: "4.5"
+                  - generic [ref=e2664]: (4)
+                - generic [ref=e2666]: 175 sold
+              - generic [ref=e2667]:
+                - generic [ref=e2668]:
+                  - generic [ref=e2669]: RRP R59.00
+                  - button [ref=e2670] [cursor=pointer]:
+                    - img [ref=e2671]
+                - generic [ref=e2675]: Retail R29.00
+              - generic [ref=e2679]:
+                - text: "Members:"
+                - generic [ref=e2680]: R23.20
+          - generic [ref=e2682]:
+            - link "Lagoon Shimmer Cabochons" [ref=e2683] [cursor=pointer]:
+              - /url: "#/product/SPV-1763849942151"
+              - img "Lagoon Shimmer Cabochons" [ref=e2684]
+            - button [ref=e2685] [cursor=pointer]:
+              - img [ref=e2686]
+            - generic [ref=e2688]:
+              - generic [ref=e2689]:
+                - paragraph [ref=e2690]: Blue Collection
+                - button "View Options" [ref=e2691] [cursor=pointer]:
+                  - img [ref=e2692]
+              - link "Lagoon Shimmer Cabochons" [ref=e2695] [cursor=pointer]:
+                - /url: "#/product/SPV-1763849942151"
+                - heading "Lagoon Shimmer Cabochons" [level=3] [ref=e2696]
+              - generic [ref=e2697]:
+                - generic [ref=e2698]:
+                  - img [ref=e2699]
+                  - generic [ref=e2701]: "4.6"
+                  - generic [ref=e2702]: (20)
+                - generic [ref=e2704]: 348 sold
+              - generic [ref=e2705]:
+                - generic [ref=e2706]:
+                  - generic [ref=e2707]: RRP R59.00
+                  - button [ref=e2708] [cursor=pointer]:
+                    - img [ref=e2709]
+                - generic [ref=e2713]: Retail R29.00
+              - generic [ref=e2717]:
+                - text: "Members:"
+                - generic [ref=e2718]: R23.20
+          - generic [ref=e2720]:
+            - link "Aura Glow Incense & Charm" [ref=e2721] [cursor=pointer]:
+              - /url: "#/product/SPV-1763733488882"
+              - img "Aura Glow Incense & Charm" [ref=e2722]
+            - button [ref=e2723] [cursor=pointer]:
+              - img [ref=e2724]
+            - generic [ref=e2726]:
+              - generic [ref=e2727]:
+                - paragraph [ref=e2728]: Orange Collection
+                - button "View Options" [ref=e2729] [cursor=pointer]:
+                  - img [ref=e2730]
+              - link "Aura Glow Incense & Charm" [ref=e2733] [cursor=pointer]:
+                - /url: "#/product/SPV-1763733488882"
+                - heading "Aura Glow Incense & Charm" [level=3] [ref=e2734]
+              - generic [ref=e2735]:
+                - generic [ref=e2736]:
+                  - img [ref=e2737]
+                  - generic [ref=e2739]: "4.6"
+                  - generic [ref=e2740]: (20)
+                - generic [ref=e2742]: 745 sold
+              - generic [ref=e2743]:
+                - generic [ref=e2744]:
+                  - generic [ref=e2745]: RRP R59.00
+                  - button [ref=e2746] [cursor=pointer]:
+                    - img [ref=e2747]
+                - generic [ref=e2751]: Retail R29.00
+              - generic [ref=e2755]:
+                - text: "Members:"
+                - generic [ref=e2756]: R23.20
+      - generic [ref=e2757]:
+        - generic [ref=e2758]:
+          - heading "Dangle Earrings" [level=2] [ref=e2759]
+          - link "View All" [ref=e2760] [cursor=pointer]:
+            - /url: "#/catalog/dangle"
+            - text: View All
+            - img [ref=e2761]
+        - generic [ref=e2765]:
+          - generic [ref=e2767]:
+            - link "Verdant Glimmer Teardrops" [ref=e2768] [cursor=pointer]:
+              - /url: "#/product/SPV-1764828064311"
+              - img "Verdant Glimmer Teardrops" [ref=e2769]
+            - button [ref=e2770] [cursor=pointer]:
+              - img [ref=e2771]
+            - generic [ref=e2773]:
+              - generic [ref=e2774]:
+                - paragraph [ref=e2775]: Green Collection
+                - button "View Options" [ref=e2776] [cursor=pointer]:
+                  - img [ref=e2777]
+              - link "Verdant Glimmer Teardrops" [ref=e2780] [cursor=pointer]:
+                - /url: "#/product/SPV-1764828064311"
+                - heading "Verdant Glimmer Teardrops" [level=3] [ref=e2781]
+              - generic [ref=e2782]:
+                - generic [ref=e2783]:
+                  - img [ref=e2784]
+                  - generic [ref=e2786]: "4.4"
+                  - generic [ref=e2787]: (5)
+                - generic [ref=e2789]: 359 sold
+              - generic [ref=e2790]:
+                - generic [ref=e2791]:
+                  - generic [ref=e2792]: RRP R120.00
+                  - button [ref=e2793] [cursor=pointer]:
+                    - img [ref=e2794]
+                - generic [ref=e2798]: Retail R59.00
+              - generic [ref=e2802]:
+                - text: "Members:"
+                - generic [ref=e2803]: R47.20
+          - generic [ref=e2805]:
+            - link "Electric Pop Geometric Dangles" [ref=e2806] [cursor=pointer]:
+              - /url: "#/product/SPV-1764814776948"
+              - img "Electric Pop Geometric Dangles" [ref=e2807]
+            - button [ref=e2808] [cursor=pointer]:
+              - img [ref=e2809]
+            - generic [ref=e2811]:
+              - generic [ref=e2812]:
+                - paragraph [ref=e2813]: Pink Collection
+                - button "View Options" [ref=e2814] [cursor=pointer]:
+                  - img [ref=e2815]
+              - link "Electric Pop Geometric Dangles" [ref=e2818] [cursor=pointer]:
+                - /url: "#/product/SPV-1764814776948"
+                - heading "Electric Pop Geometric Dangles" [level=3] [ref=e2819]
+              - generic [ref=e2820]:
+                - generic [ref=e2821]:
+                  - img [ref=e2822]
+                  - generic [ref=e2824]: "4.4"
+                  - generic [ref=e2825]: (5)
+                - generic [ref=e2827]: 658 sold
+              - generic [ref=e2828]:
+                - generic [ref=e2829]:
+                  - generic [ref=e2830]: RRP R120.00
+                  - button [ref=e2831] [cursor=pointer]:
+                    - img [ref=e2832]
+                - generic [ref=e2836]: Retail R59.00
+              - generic [ref=e2840]:
+                - text: "Members:"
+                - generic [ref=e2841]: R47.20
+          - generic [ref=e2843]:
+            - link "Pink Feline Silhouette Dangles" [ref=e2844] [cursor=pointer]:
+              - /url: "#/product/SPV-1763850089742"
+              - img "Pink Feline Silhouette Dangles" [ref=e2845]
+            - button [ref=e2846] [cursor=pointer]:
+              - img [ref=e2847]
+            - generic [ref=e2849]:
+              - generic [ref=e2850]:
+                - paragraph [ref=e2851]: Pink Collection
+                - button "View Options" [ref=e2852] [cursor=pointer]:
+                  - img [ref=e2853]
+              - link "Pink Feline Silhouette Dangles" [ref=e2856] [cursor=pointer]:
+                - /url: "#/product/SPV-1763850089742"
+                - heading "Pink Feline Silhouette Dangles" [level=3] [ref=e2857]
+              - generic [ref=e2858]:
+                - generic [ref=e2859]:
+                  - img [ref=e2860]
+                  - generic [ref=e2862]: "4.6"
+                  - generic [ref=e2863]: (20)
+                - generic [ref=e2865]: 152 sold
+              - generic [ref=e2866]:
+                - generic [ref=e2867]:
+                  - generic [ref=e2868]: RRP R85.00
+                  - button [ref=e2869] [cursor=pointer]:
+                    - img [ref=e2870]
+                - generic [ref=e2874]: Retail R45.00
+              - generic [ref=e2878]:
+                - text: "Members:"
+                - generic [ref=e2879]: R36.00
+          - generic [ref=e2881]:
+            - link "Mystic Mandala Drop Earrings" [ref=e2882] [cursor=pointer]:
+              - /url: "#/product/SPV-1763735940424"
+              - img "Mystic Mandala Drop Earrings" [ref=e2883]
+            - button [ref=e2884] [cursor=pointer]:
+              - img [ref=e2885]
+            - generic [ref=e2887]:
+              - generic [ref=e2888]:
+                - paragraph [ref=e2889]: Purple Collection
+                - button "View Options" [ref=e2890] [cursor=pointer]:
+                  - img [ref=e2891]
+              - link "Mystic Mandala Drop Earrings" [ref=e2894] [cursor=pointer]:
+                - /url: "#/product/SPV-1763735940424"
+                - heading "Mystic Mandala Drop Earrings" [level=3] [ref=e2895]
+              - generic [ref=e2896]:
+                - generic [ref=e2897]:
+                  - img [ref=e2898]
+                  - generic [ref=e2900]: "4.4"
+                  - generic [ref=e2901]: (10)
+                - generic [ref=e2903]: 385 sold
+              - generic [ref=e2904]:
+                - generic [ref=e2905]:
+                  - generic [ref=e2906]: RRP R120.00
+                  - button [ref=e2907] [cursor=pointer]:
+                    - img [ref=e2908]
+                - generic [ref=e2912]: Retail R59.00
+              - generic [ref=e2916]:
+                - text: "Members:"
+                - generic [ref=e2917]: R47.20
+          - generic [ref=e2919]:
+            - link "Emerald Forest Spirit Earrings" [ref=e2920] [cursor=pointer]:
+              - /url: "#/product/SPV-1763735698442"
+              - img "Emerald Forest Spirit Earrings" [ref=e2921]
+            - button [ref=e2922] [cursor=pointer]:
+              - img [ref=e2923]
+            - generic [ref=e2925]:
+              - generic [ref=e2926]:
+                - paragraph [ref=e2927]: Green Collection
+                - button "View Options" [ref=e2928] [cursor=pointer]:
+                  - img [ref=e2929]
+              - link "Emerald Forest Spirit Earrings" [ref=e2932] [cursor=pointer]:
+                - /url: "#/product/SPV-1763735698442"
+                - heading "Emerald Forest Spirit Earrings" [level=3] [ref=e2933]
+              - generic [ref=e2934]:
+                - generic [ref=e2935]:
+                  - img [ref=e2936]
+                  - generic [ref=e2938]: "4.5"
+                  - generic [ref=e2939]: (10)
+                - generic [ref=e2941]: 547 sold
+              - generic [ref=e2942]:
+                - generic [ref=e2943]:
+                  - generic [ref=e2944]: RRP R120.00
+                  - button [ref=e2945] [cursor=pointer]:
+                    - img [ref=e2946]
+                - generic [ref=e2950]: Retail R59.00
+              - generic [ref=e2954]:
+                - text: "Members:"
+                - generic [ref=e2955]: R47.20
+          - generic [ref=e2957]:
+            - link "Radiant Heart Drop Earrings" [ref=e2958] [cursor=pointer]:
+              - /url: "#/product/SPV-1763735477570"
+              - img "Radiant Heart Drop Earrings" [ref=e2959]
+            - button [ref=e2960] [cursor=pointer]:
+              - img [ref=e2961]
+            - generic [ref=e2963]:
+              - generic [ref=e2964]:
+                - paragraph [ref=e2965]: Yellow Collection
+                - button "View Options" [ref=e2966] [cursor=pointer]:
+                  - img [ref=e2967]
+              - link "Radiant Heart Drop Earrings" [ref=e2970] [cursor=pointer]:
+                - /url: "#/product/SPV-1763735477570"
+                - heading "Radiant Heart Drop Earrings" [level=3] [ref=e2971]
+              - generic [ref=e2972]:
+                - generic [ref=e2973]:
+                  - img [ref=e2974]
+                  - generic [ref=e2976]: "4.5"
+                  - generic [ref=e2977]: (20)
+                - generic [ref=e2979]: 658 sold
+              - generic [ref=e2980]:
+                - generic [ref=e2981]:
+                  - generic [ref=e2982]: RRP R120.00
+                  - button [ref=e2983] [cursor=pointer]:
+                    - img [ref=e2984]
+                - generic [ref=e2988]: Retail R59.00
+              - generic [ref=e2992]:
+                - text: "Members:"
+                - generic [ref=e2993]: R47.20
+      - generic [ref=e2996]:
+        - img [ref=e2998]
+        - heading "Unlock VIP Pricing" [level=2] [ref=e3001]
+        - paragraph [ref=e3002]: Join our exclusive membership club to save up to 50% OFF retail prices, receive monthly free gifts, and access members-only collections.
+        - link "View Membership Perks" [ref=e3003] [cursor=pointer]:
+          - /url: "#/membership"
+          - text: View Membership Perks
+          - img [ref=e3004]
+      - generic [ref=e3007]:
+        - generic [ref=e3008]:
+          - heading "Jewelry Sets" [level=2] [ref=e3009]
+          - link "View All" [ref=e3010] [cursor=pointer]:
+            - /url: "#/catalog/sets"
+            - text: View All
+            - img [ref=e3011]
+        - generic [ref=e3015]:
+          - generic [ref=e3017]:
+            - link "Radiant Heartbeat Duo" [ref=e3018] [cursor=pointer]:
+              - /url: "#/product/SPV-1763852084384"
+              - img "Radiant Heartbeat Duo" [ref=e3019]
+            - button [ref=e3020] [cursor=pointer]:
+              - img [ref=e3021]
+            - generic [ref=e3023]:
+              - generic [ref=e3024]:
+                - paragraph [ref=e3025]: Pink Collection
+                - button "Add to Cart" [ref=e3026] [cursor=pointer]:
+                  - img [ref=e3027]
+              - link "Radiant Heartbeat Duo" [ref=e3031] [cursor=pointer]:
+                - /url: "#/product/SPV-1763852084384"
+                - heading "Radiant Heartbeat Duo" [level=3] [ref=e3032]
+              - generic [ref=e3033]:
+                - generic [ref=e3034]:
+                  - img [ref=e3035]
+                  - generic [ref=e3037]: "5.0"
+                  - generic [ref=e3038]: (0)
+                - generic [ref=e3039]:
+                  - generic [ref=e3040]: 796 sold
+                  - generic [ref=e3041]: Low Stock
+              - generic [ref=e3042]:
+                - generic [ref=e3043]:
+                  - generic [ref=e3044]: RRP R150.00
+                  - button [ref=e3045] [cursor=pointer]:
+                    - img [ref=e3046]
+                - generic [ref=e3050]: Retail R99.00
+              - generic [ref=e3054]:
+                - text: "Members:"
+                - generic [ref=e3055]: R79.20
+          - generic [ref=e3057]:
+            - link "Blush Heart Charm Ensemble" [ref=e3058] [cursor=pointer]:
+              - /url: "#/product/SPV-1763851852514"
+              - img "Blush Heart Charm Ensemble" [ref=e3059]
+            - button [ref=e3060] [cursor=pointer]:
+              - img [ref=e3061]
+            - generic [ref=e3063]:
+              - generic [ref=e3064]:
+                - paragraph [ref=e3065]: Pink Collection
+                - button "Add to Cart" [ref=e3066] [cursor=pointer]:
+                  - img [ref=e3067]
+              - link "Blush Heart Charm Ensemble" [ref=e3071] [cursor=pointer]:
+                - /url: "#/product/SPV-1763851852514"
+                - heading "Blush Heart Charm Ensemble" [level=3] [ref=e3072]
+              - generic [ref=e3073]:
+                - generic [ref=e3074]:
+                  - img [ref=e3075]
+                  - generic [ref=e3077]: "4.7"
+                  - generic [ref=e3078]: (20)
+                - generic [ref=e3080]: 328 sold
+              - generic [ref=e3081]:
+                - generic [ref=e3082]:
+                  - generic [ref=e3083]: RRP R150.00
+                  - button [ref=e3084] [cursor=pointer]:
+                    - img [ref=e3085]
+                - generic [ref=e3089]: Retail R99.00
+              - generic [ref=e3093]:
+                - text: "Members:"
+                - generic [ref=e3094]: R79.20
+      - generic [ref=e3095]:
+        - generic [ref=e3096]:
+          - heading "New Arrivals" [level=2] [ref=e3097]
+          - link "View All" [ref=e3098] [cursor=pointer]:
+            - /url: "#/catalog/new"
+            - text: View All
+            - img [ref=e3099]
+        - generic [ref=e3103]:
+          - generic [ref=e3105]:
+            - link "Electric Lime Geometric Studs NEW" [ref=e3106] [cursor=pointer]:
+              - /url: "#/product/SPV-1764828391817"
+              - img "Electric Lime Geometric Studs" [ref=e3107]
+              - generic [ref=e3109]: NEW
+            - button [ref=e3110] [cursor=pointer]:
+              - img [ref=e3111]
+            - generic [ref=e3113]:
+              - generic [ref=e3114]:
+                - paragraph [ref=e3115]: Green Collection
+                - button "View Options" [ref=e3116] [cursor=pointer]:
+                  - img [ref=e3117]
+              - link "Electric Lime Geometric Studs" [ref=e3120] [cursor=pointer]:
+                - /url: "#/product/SPV-1764828391817"
+                - heading "Electric Lime Geometric Studs" [level=3] [ref=e3121]
+              - generic [ref=e3122]:
+                - generic [ref=e3123]:
+                  - img [ref=e3124]
+                  - generic [ref=e3126]: "4.6"
+                  - generic [ref=e3127]: (2)
+                - generic [ref=e3129]: 74 sold
+              - generic [ref=e3130]:
+                - generic [ref=e3131]:
+                  - generic [ref=e3132]: RRP R59.00
+                  - button [ref=e3133] [cursor=pointer]:
+                    - img [ref=e3134]
+                - generic [ref=e3138]: Retail R29.00
+              - generic [ref=e3142]:
+                - text: "Members:"
+                - generic [ref=e3143]: R23.20
+          - generic [ref=e3145]:
+            - link "Vivid Magenta Teddy Studs NEW" [ref=e3146] [cursor=pointer]:
+              - /url: "#/product/SPV-1764827564834"
+              - img "Vivid Magenta Teddy Studs" [ref=e3147]
+              - generic [ref=e3149]: NEW
+            - button [ref=e3150] [cursor=pointer]:
+              - img [ref=e3151]
+            - generic [ref=e3153]:
+              - generic [ref=e3154]:
+                - paragraph [ref=e3155]: Pink Collection
+                - button "View Options" [ref=e3156] [cursor=pointer]:
+                  - img [ref=e3157]
+              - link "Vivid Magenta Teddy Studs" [ref=e3160] [cursor=pointer]:
+                - /url: "#/product/SPV-1764827564834"
+                - heading "Vivid Magenta Teddy Studs" [level=3] [ref=e3161]
+              - generic [ref=e3162]:
+                - generic [ref=e3163]:
+                  - img [ref=e3164]
+                  - generic [ref=e3166]: "5.0"
+                  - generic [ref=e3167]: (0)
+                - generic [ref=e3169]: 15 sold
+              - generic [ref=e3170]:
+                - generic [ref=e3171]:
+                  - generic [ref=e3172]: RRP R59.00
+                  - button [ref=e3173] [cursor=pointer]:
+                    - img [ref=e3174]
+                - generic [ref=e3178]: Retail R29.00
+              - generic [ref=e3182]:
+                - text: "Members:"
+                - generic [ref=e3183]: R23.20
+  - generic:
+    - generic:
+      - button:
+        - img
+      - generic:
+        - img
+      - generic:
+        - generic: Emily in Texas just unlocked The Secret Vault.
+        - generic: Just now
+  - contentinfo [ref=e3184]:
+    - generic [ref=e3186]:
+      - generic [ref=e3187]:
+        - heading "About" [level=3] [ref=e3188]
+        - list [ref=e3189]:
+          - listitem [ref=e3190] [cursor=pointer]: Our Story
+          - listitem [ref=e3191] [cursor=pointer]: Careers
+          - listitem [ref=e3192] [cursor=pointer]: Press
+      - generic [ref=e3193]:
+        - heading "Support" [level=3] [ref=e3194]
+        - list [ref=e3195]:
+          - listitem [ref=e3196] [cursor=pointer]: Contact Us
+          - listitem [ref=e3197] [cursor=pointer]: Shipping
+          - listitem [ref=e3198] [cursor=pointer]: Returns
+          - listitem [ref=e3199] [cursor=pointer]:
+            - generic [ref=e3200]:
+              - img [ref=e3201]
+              - text: Download App v1.0.0
+```

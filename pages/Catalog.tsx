@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
@@ -15,6 +13,8 @@ const Catalog: React.FC = () => {
   const [filterColor, setFilterColor] = useState<string>('');
   const [filterCollection, setFilterCollection] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -22,6 +22,7 @@ const Catalog: React.FC = () => {
     setFilterColor('');
     setFilterCollection('');
     setSortBy('newest');
+    setCurrentPage(1); // Reset to first page when type changes
   }, [type]);
 
   const { title, baseProducts } = useMemo(() => {
@@ -108,6 +109,14 @@ const Catalog: React.FC = () => {
       return result;
   }, [baseProducts, filterPromo, filterColor, filterCollection, sortBy]);
 
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredProducts.slice(start, end);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
   return (
     <div className="space-y-8 pb-12 min-h-screen">
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4">
@@ -189,7 +198,7 @@ const Catalog: React.FC = () => {
        </div>
 
        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {filteredProducts.map(product => (
+          {paginatedProducts.map(product => (
              <ProductCard key={product.id} product={product} />
           ))}
        </div>
@@ -200,6 +209,30 @@ const Catalog: React.FC = () => {
              <button onClick={() => { setFilterPromo(false); setFilterColor(''); setFilterCollection(''); }} className="mt-4 text-pink-500 font-bold hover:underline">
                 Clear Filters
              </button>
+          </div>
+       )}
+
+       {totalPages > 1 && (
+          <div className="flex flex-col md:flex-row items-center justify-between text-sm text-gray-400 mt-8">
+             <div>
+                Page {currentPage} of {totalPages}
+             </div>
+             <div className="flex gap-2">
+                <button
+                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                   className="bg-black border border-gray-700 rounded px-3 py-1 hover:bg-gray-800 transition-colors disabled:opacity-50"
+                   disabled={currentPage === 1}
+                >
+                   Previous
+                </button>
+                <button
+                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                   className="bg-black border border-gray-700 rounded px-3 py-1 hover:bg-gray-800 transition-colors disabled:opacity-50"
+                   disabled={currentPage === totalPages}
+                >
+                   Next
+                </button>
+             </div>
           </div>
        )}
     </div>

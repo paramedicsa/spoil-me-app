@@ -1,0 +1,41 @@
+appId: com.spoilme.app
+---
+- name: Install and Launch App
+  app.install: /tmp/downloads/spoilme.apk
+- name: Launch App
+  app.launch: com.spoilme.app
+- name: Verify Launch
+  assertVisible: "Welcome to SpoilMe" # Or "Login"
+
+- name: Registered User 1 Login
+  inputText: registered_user_1@example.com
+  inputText: password123
+  tapOn: "Login"
+- name: Verify Login
+  assertVisible: "Main Feed" # Or user profile icon
+
+- name: Navigate to Post Spoiler
+  tapOn: "+" # Or "Post" tab
+- name: Fill Spoiler Details
+  inputText: "Test Spoiler - Matrix Resurrections Plot Twist - ${Date.now()}"
+  inputText: "Neo was actually a program all along! Just kidding, it's about the blue pill."
+  tapOn: "Movie" # Selector for media type
+- name: Submit Spoiler
+  tapOn: "Submit Spoiler"
+- name: Verify Post
+  assertVisible: "Spoiler Posted!" # Or check feed for title/description
+
+- name: Guest User Restart and Verify
+  app.restart: com.spoilme.app
+  scrollUntilVisible: "Test Spoiler - Matrix Resurrections Plot Twist - ${Date.now()}"
+  assertVisible: "Test Spoiler - Matrix Resurrections Plot Twist - ${Date.now()}"
+  assertVisible: "Neo was actually a program all along! Just kidding, it's about the blue pill."
+
+- name: Registered User 2 Login and Verify Deletion
+  app.launch: com.spoilme.app
+  inputText: registered_user_2@example.com
+  inputText: password123
+  tapOn: "Login"
+  assertVisible: "Main Feed"
+  scrollUntilVisible: "Test Spoiler - Matrix Resurrections Plot Twist - ${Date.now()}"
+  assertNotVisible: "Test Spoiler - Matrix Resurrections Plot Twist - ${Date.now()}"

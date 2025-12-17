@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     return {
       // Use default pre-bundling behavior (let Vite optimize dependencies)
       server: {
-        port: 3000,
+        port: 3002,
         host: '0.0.0.0',
       },
       plugins: [],

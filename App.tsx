@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, useContext, useLayoutEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
 import Layout from './components/Layout';
@@ -25,7 +25,31 @@ import WeeklyWinners from './pages/WeeklyWinners'; // NEW
 import AdminWinners from './pages/admin/AdminWinners'; // NEW
 import AdminExpenses from './pages/admin/AdminExpenses'; // NEW
 import AdminOrders from './pages/admin/AdminOrders'; // NEW
+import Terms from './pages/Terms';
 import { Download, Smartphone, X, Zap, Ticket } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { FileOpener } from '@capacitor-community/file-opener';
+import { App as CapApp } from '@capacitor/app';
+import { useAppUpdate } from './src/hooks/useAppUpdate';
+import UpdateNotification from './components/UpdateNotification';
+import AdminVault from './pages/admin/AdminVault';
+import Vault from './pages/Vault';
+import MemberManagement from './pages/admin/MemberManagement';
+import UsersManagement from './pages/admin/UsersManagement'; // NEW
+import AffiliateLandingPage from './pages/AffiliateLandingPage';
+import StoreBuilder from './pages/affiliate/StoreBuilder';
+import Notifications from './pages/Notifications';
+import { initializePushNotifications } from './utils/pushNotifications';
+import AdminPush from './pages/admin/AdminPush';
+import CustomizedWireWrappedPendants from './pages/CustomizedWireWrappedPendants';
+import CustomPendantManager from './pages/admin/CustomPendantManager';
+import CustomPendantBuilder from './pages/CustomPendantBuilder';
+import AdminArtists from './pages/admin/AdminArtists'; // NEW
+import ArtistPartnershipPage from './pages/ArtistPartnership'; // NEW
+import AdminAdPricing from './pages/admin/AdminAdPricing'; // NEW
+
 
 // App Download Prompt Component
 const AppDownloadPrompt: React.FC<{ onClose: () => void }> = ({ onClose }) => (
@@ -82,45 +106,98 @@ const VoucherHandler: React.FC = () => {
 };
 
 const App: React.FC = () => {
+
   return (
     <StoreProvider>
-      <HashRouter>
-        <VoucherHandler />
-        <InstallPWA />
-        <Routes>
-          {/* Storefront Routes */}
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="collections/:categoryName" element={<Collection />} /> 
-            <Route path="catalog/:type" element={<Catalog />} />
-            <Route path="product/:id" element={<ProductDetail />} />
-            <Route path="cart" element={<Cart />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="membership" element={<Membership />} />
-            <Route path="earn-rewards" element={<EarnRewards />} />
-            <Route path="affiliate-program" element={<AffiliateProgram />} />
-            <Route path="gift-cards" element={<GiftCards />} />
-            <Route path="weekly-winners" element={<WeeklyWinners />} /> {/* NEW */}
-            <Route path="login" element={<Login />} />
-          </Route>
-
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="products" element={<AdminProducts />} />
-            <Route path="orders" element={<AdminOrders />} />
-            <Route path="categories" element={<AdminCategories />} />
-            <Route path="gift-cards" element={<AdminGiftCards />} />
-            <Route path="social" element={<AdminSocial />} />
-            <Route path="affiliates" element={<AdminAffiliates />} />
-            <Route path="winners" element={<AdminWinners />} />
-            <Route path="expenses" element={<AdminExpenses />} /> {/* NEW */}
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </HashRouter>
+      <AppContent />
     </StoreProvider>
+  );
+};
+
+const AppContent: React.FC = () => {
+  const { isLoading, user } = useStore();
+  const { updateAvailable, isDownloading, performUpdate, dismissUpdate } = useAppUpdate();
+
+  useEffect(() => {
+    // Only run if user ID exists and we haven't run it yet
+    if (user?.id) {
+      initializePushNotifications(user.id);
+    }
+  }, [user?.id]); // Only depend on the string UID, not the whole object
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <HashRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <VoucherHandler />
+      <InstallPWA />
+      {updateAvailable && (
+        <UpdateNotification
+          version={updateAvailable.version}
+          isDownloading={isDownloading}
+          onUpdate={performUpdate}
+          onDismiss={dismissUpdate}
+        />
+      )}
+      <Routes>
+        {/* Storefront Routes */}
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Home />} />
+          <Route path="collections/:categoryName" element={<Collection />} />
+          <Route path="catalog/:type" element={<Catalog />} />
+          <Route path="product/:id" element={<ProductDetail />} />
+          <Route path="cart" element={<Cart />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="membership" element={<Membership />} />
+          <Route path="earn-rewards" element={<EarnRewards />} />
+          <Route path="affiliate-program" element={<AffiliateProgram />} />
+          <Route path="gift-cards" element={<GiftCards />} />
+          <Route path="weekly-winners" element={<WeeklyWinners />} /> {/* NEW */}
+          <Route path="login" element={<Login />} />
+          <Route path="terms" element={<Terms />} /> {/* NEW */}
+          <Route path="vault" element={<Vault />} /> {/* NEW */}
+          <Route path="vip/:affiliateCode" element={<AffiliateLandingPage />} />
+          <Route path="notifications" element={<Notifications />} /> {/* NEW */}
+          <Route path="customized-wire-wrapped-pendants" element={<CustomizedWireWrappedPendants />} />
+          <Route path="customized-wire-wrapped-pendants/:id" element={<CustomPendantBuilder />} /> {/* NEW */}
+          <Route path="artist-partnership" element={<ArtistPartnershipPage />} /> {/* NEW */}
+        </Route>
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="products" element={<AdminProducts />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="categories" element={<AdminCategories />} />
+          <Route path="gift-cards" element={<AdminGiftCards />} />
+          <Route path="social" element={<AdminSocial />} />
+          <Route path="affiliates" element={<AdminAffiliates />} />
+          <Route path="winners" element={<AdminWinners />} />
+          <Route path="expenses" element={<AdminExpenses />} /> {/* NEW */}
+          <Route path="vault" element={<AdminVault />} /> {/* NEW */}
+          <Route path="members" element={<MemberManagement />} /> {/* NEW */}
+          <Route path="users" element={<UsersManagement />} /> {/* NEW */}
+          <Route path="affiliate/store-builder" element={<StoreBuilder />} />
+          <Route path="notifications" element={<AdminPush />} /> {/* NEW */}
+          <Route path="custom-pendant-manager" element={<CustomPendantManager />} /> {/* NEW */}
+          <Route path="artists" element={<AdminArtists />} />
+          <Route path="ad-pricing" element={<AdminAdPricing />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </HashRouter>
   );
 };
 

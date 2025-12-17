@@ -1,12 +1,45 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /products/{allPaths=**} {
-    allow read; // Public read access for product images
-    allow write: if request.auth != null && request.auth.token.admin == true; // Only authenticated users can write
-    }
+    // Public read access for all files
     match /{allPaths=**} {
-    allow read, write: if request.auth != null && request.auth.token.admin == true; // Only authenticated users can write
+      allow read: if true;
+    }
+
+    // Artist application images - users can upload to their own folder
+    match /artist_applications/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'spoilmevintagediy@gmail.com'
+      );
+    }
+
+    // Product images and other files - admin write access
+    match /products/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'spoilmevintagediy@gmail.com'
+      );
+      allow delete: if request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'spoilmevintagediy@gmail.com'
+      );
+    }
+
+    // Default admin-only access for other files
+    match /{allPaths=**} {
+      allow write: if request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'spoilmevintagediy@gmail.com'
+      );
+      allow delete: if request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'spoilmevintagediy@gmail.com'
+      );
     }
   }
 }

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Spoil Me Vintage</string>
-    <string name="title_activity_main">Spoil Me Vintage</string>
-    <string name="package_name">com.spoilme</string>
-    <string name="custom_url_scheme">com.spoilme</string>
+    <string name="app_name">spoil-me-vintage</string>
+    <string name="title_activity_main">spoil-me-vintage</string>
+    <string name="package_name">com.appspoilme</string>
+    <string name="custom_url_scheme">com.appspoilme</string>
 </resources>

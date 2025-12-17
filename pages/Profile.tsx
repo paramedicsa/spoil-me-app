@@ -1,68 +1,42 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Award, DollarSign, Copy, ShoppingBag, LogOut, MessageSquare, Star, X, Gift, Send, Sparkles, PenTool, ArrowRight, Smartphone, CheckCircle, HelpCircle, ShoppingCart, Share2, MessageCircle, Bell } from 'lucide-react';
+import { Award, DollarSign, Copy, ShoppingBag, LogOut, HelpCircle, ShoppingCart, Share2, MessageCircle, X, User } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { useNavigate, Link } from 'react-router-dom';
-import { Notification } from '../types';
+import { handleImageError } from '../utils/imageUtils';
 
 const Profile: React.FC = () => {
-  const { user, products, logout, submitReview } = useStore();
+  const { user, products, logout, currency, closeAccount } = useStore();
   const navigate = useNavigate();
-  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [showLoyaltyHelp, setShowLoyaltyHelp] = useState(false);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewContent, setReviewContent] = useState('');
+  const [showCloseAccountModal, setShowCloseAccountModal] = useState(false);
+  const [closeAccountReason, setCloseAccountReason] = useState('');
 
-  const wishlistProducts = products.filter(p => user.wishlist.includes(p.id));
-  
-  // Filter notifications
-  const pendingReviews = user.notifications.filter(n => n.type === 'review_request' && !n.isRead);
-  const giftNotifications = user.notifications.filter(n => n.type === 'gift_ready'); // Gifts I sent
-  const receivedGifts = user.notifications.filter(n => n.type === 'gift_received'); // Gifts I received
-  const systemNotifications = user.notifications.filter(n => (n.type === 'system' || n.type === 'affiliate_msg') && !n.isRead);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
-  const handleSubmitReview = async () => {
-     if (!selectedNotification || !selectedNotification.productId) return;
-     
-     await submitReview(selectedNotification.productId, reviewRating, reviewContent, selectedNotification.id);
-     
-     // Reset
-     setReviewContent('');
-     setReviewRating(5);
-     setSelectedNotification(null);
-     alert("Review submitted! You earned 100 Loyalty Points.");
-  };
-
-  const handleSendGiftWhatsApp = (notif: Notification) => {
-      if (!notif.voucherData) return;
-      const { code, amount, meta } = notif.voucherData;
-      
-      const appLink = `${window.location.origin}/#/?voucher=${code}`;
-      const text = `Hey ${meta.recipientName}! 🎁\n\n${meta.senderName} sent you a Spoil Me Vintage Gift Voucher worth R${amount}!\n\n"${meta.message}"\n\nRedeem it here:\n${appLink}`;
-      const phone = meta.whatsappNumber ? meta.whatsappNumber.replace(/[^0-9]/g, '') : '';
-      
-      const url = phone 
-        ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
-        : `https://wa.me/?text=${encodeURIComponent(text)}`;
-      
-      window.open(url, '_blank');
-  };
-
-  const handleRedeemGift = (code: string) => {
-      // Redirect to home with voucher param which App.tsx listens for and applies
-      window.location.href = `/#/?voucher=${code}`;
-  };
+  const wishlistProducts = products.filter(p => (user.wishlist || []).includes(p.id));
 
   if (!user.email) {
      navigate('/login');
      return null;
   }
+
+  const pointsPerSpend = currency === 'ZAR' ? 'R10' : '$3';
+  const discountRate = currency === 'ZAR' ? 'R1.00' : '$0.50';
+  const minRedemption = currency === 'ZAR' ? 'R10' : '$5';
+  const maxNonMember = currency === 'ZAR' ? 'R100 (10,000 pts)' : '$50 (10,000 pts)';
+  const maxNonMemberShort = currency === 'ZAR' ? 'R100' : '$50';
+
+  const handleCloseAccount = async () => {
+    try {
+      await closeAccount(closeAccountReason);
+      setShowCloseAccountModal(false);
+      alert('Sorry to see you go. Your account will be deleted within 24 hours.');
+      logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Error closing account:', error);
+      alert('Failed to close account. Please try again.');
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 relative">
@@ -89,7 +63,7 @@ const Profile: React.FC = () => {
                         <div>
                            <h4 className="font-bold text-white">Earn Points</h4>
                            <p className="text-xs text-gray-400 mt-1">
-                              Get <span className="text-green-400">1 Point for every R10</span> spent on products.
+                              Get <span className="text-green-400">1 Point for every {pointsPerSpend}</span> spent on products.
                            </p>
                            <p className="text-xs text-gray-400 mt-1">
                               Get <span className="text-green-400">100 Points</span> for every verified review.
@@ -105,10 +79,10 @@ const Profile: React.FC = () => {
                         <div>
                            <h4 className="font-bold text-white">Redeem for Discounts</h4>
                            <p className="text-xs text-gray-400 mt-1">
-                              100 Points = <span className="text-white font-bold">R1.00 Discount</span>.
+                              100 Points = <span className="text-white font-bold">{discountRate} Discount</span>.
                            </p>
                            <p className="text-xs text-gray-400 mt-1">
-                              Minimum redemption is 1000 Points (R10).
+                              Minimum redemption is 1000 Points ({minRedemption}).
                            </p>
                         </div>
                     </div>
@@ -118,8 +92,8 @@ const Profile: React.FC = () => {
                            <Award size={14} /> Membership Rule
                         </h4>
                         <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                           Non-members can redeem up to <strong>R100 (10,000 pts)</strong> per order. 
-                           To redeem more than R100 at once, you must be a <Link to="/membership" className="text-purple-400 underline">Basic Member</Link> or higher.
+                           Non-members can redeem up to <strong>{maxNonMember}</strong> per order.
+                           To redeem more than {maxNonMemberShort} at once, you must be a <Link to="/membership" className="text-purple-400 underline">Basic Member</Link> or higher.
                         </p>
                     </div>
                  </div>
@@ -134,270 +108,108 @@ const Profile: React.FC = () => {
          </div>
       )}
 
-      {/* Review Modal */}
-      {selectedNotification && (
+      {/* Close Account Modal */}
+      {showCloseAccountModal && (
          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedNotification(null)} />
-            <div className="bg-zinc-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full relative z-10 shadow-2xl animate-in zoom-in-95 duration-200">
-               <button onClick={() => setSelectedNotification(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white">
-                  <X size={20} />
-               </button>
-               
-               <h3 className="text-xl font-bold text-white mb-1">Write a Review</h3>
-               <p className="text-xs text-gray-400 mb-4">For: <span className="text-cyan-400 font-semibold">{selectedNotification.productName}</span></p>
-               
-               <div className="space-y-4">
-                  <div>
-                     <label className="block text-sm font-medium text-gray-300 mb-2">Rating</label>
-                     <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map(star => (
-                           <button key={star} onClick={() => setReviewRating(star)} className="text-yellow-400 hover:scale-110 transition-transform">
-                              <Star size={28} fill={star <= reviewRating ? "currentColor" : "none"} />
-                           </button>
-                        ))}
-                     </div>
-                  </div>
-                  
-                  <div>
-                     <label className="block text-sm font-medium text-gray-300 mb-2">Your Review</label>
-                     <textarea 
-                        rows={4}
-                        className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-pink-500 focus:border-pink-500"
-                        placeholder="What did you think of the product?"
-                        value={reviewContent}
-                        onChange={e => setReviewContent(e.target.value)}
-                     ></textarea>
-                  </div>
+             <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setShowCloseAccountModal(false)} />
+             <div className="bg-zinc-900 border border-red-500 rounded-2xl p-6 max-w-md w-full relative z-10 shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-200">
+                 <button onClick={() => setShowCloseAccountModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">
+                    <X size={20} />
+                 </button>
 
-                  <button 
-                    onClick={handleSubmitReview}
-                    disabled={!reviewContent.trim()}
-                    className="w-full py-3 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                  >
-                     Submit & Earn 100 Points
-                  </button>
-               </div>
-            </div>
+                 <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-red-900/50 rounded-full border border-red-500 text-red-300">
+                       <LogOut size={24} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white">Close Account</h3>
+                 </div>
+
+                 <div className="space-y-4 text-sm text-gray-300">
+                    <p className="text-red-400 font-semibold">Are you sure you want to close your account?</p>
+                    <p className="text-gray-400">This action cannot be undone. Your account and all associated data will be permanently deleted within 24 hours.</p>
+
+                    <div>
+                       <label className="block text-xs text-gray-500 uppercase tracking-wider mb-2">Please tell us why you're leaving (optional)</label>
+                       <textarea
+                          className="w-full p-3 bg-black border border-gray-700 rounded-lg text-white text-sm focus:border-red-500 outline-none resize-none"
+                          rows={3}
+                          placeholder="Help us improve our service..."
+                          value={closeAccountReason}
+                          onChange={(e) => setCloseAccountReason(e.target.value)}
+                       />
+                    </div>
+                 </div>
+
+                 <div className="flex gap-3 mt-6">
+                    <button
+                       onClick={() => setShowCloseAccountModal(false)}
+                       className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-colors"
+                    >
+                       Cancel
+                    </button>
+                    <button
+                       onClick={handleCloseAccount}
+                       className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-colors"
+                    >
+                       Close Account
+                    </button>
+                 </div>
+             </div>
          </div>
       )}
 
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center text-[22px] font-bold text-cyan-400 border border-gray-700 shadow-[0_0_10px_rgba(34,211,238,0.3)]">
-            {user.name.charAt(0)}
-          </div>
-          <div>
-            <h1 className="text-[22px] font-bold text-white">{user.name}</h1>
-            <p className="text-gray-400 text-sm">{user.email}</p>
-            {user.isAdmin && <span className="text-xs text-pink-500 font-bold bg-pink-900/20 px-2 py-1 rounded mt-1 inline-block">ADMIN ACCESS</span>}
-          </div>
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex-1"></div>
+        <div className="text-center flex-1">
+          <h1 className="text-[28px] font-cherry text-white">Welcome, {user.name || user.firstName || 'User'}</h1>
+          <p className="text-[14px] font-architects text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-yellow-400 italic">
+            Your personal vault of timeless treasures—because ordinary is not your style.
+          </p>
         </div>
-        
-        <button 
-          onClick={handleLogout}
-          className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-gray-300 rounded-lg border border-gray-700 transition-colors text-sm"
-        >
-          <LogOut size={16} /> Sign Out
-        </button>
+        <div className="flex-1 flex justify-end">
+          <button
+            onClick={() => {
+              logout();
+              navigate('/');
+            }}
+            className="p-3 bg-zinc-800 hover:bg-zinc-700 border border-gray-700 rounded-full transition-colors text-gray-400 hover:text-red-400"
+            title="Logout"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </div>
 
-      {/* --- NOTIFICATIONS SECTION --- */}
-      
-      {/* 0. SYSTEM & AFFILIATE UPDATES (NEW) */}
-      {systemNotifications.length > 0 && (
-          <div className="bg-zinc-900/50 border border-gray-800 rounded-2xl p-6 animate-in slide-in-from-bottom-4 mb-8">
-             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Bell size={20} className="text-yellow-400" /> Updates ({systemNotifications.length})
-             </h2>
-             <div className="space-y-4">
-                {systemNotifications.map(notif => (
-                   <div key={notif.id} className="bg-black p-4 rounded-xl border border-gray-800 shadow-sm">
-                       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                          <div>
-                             <h4 className="text-white font-bold text-sm">{notif.title}</h4>
-                             <p className="text-xs text-gray-400 mt-1 leading-relaxed">{notif.message}</p>
-                             <p className="text-[10px] text-gray-600 mt-2">{new Date(notif.date).toLocaleDateString()}</p>
-                          </div>
-                          {notif.type === 'affiliate_msg' && (
-                              <Link 
-                                  to="/affiliate-program" 
-                                  className="shrink-0 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap flex items-center gap-2"
-                              >
-                                  Open Dashboard <ArrowRight size={12} />
-                              </Link>
-                          )}
-                       </div>
-                   </div>
-                ))}
-             </div>
-          </div>
-      )}
+      {/* Loyalty Program Card - Moved to top */}
+      <div className="bg-gradient-to-br from-purple-900 to-pink-900 border border-purple-700 rounded-2xl p-6 text-white shadow-[0_0_20px_rgba(168,85,247,0.2)] relative overflow-hidden mb-8">
 
-      {/* 1. GIFTS RECEIVED */}
-      {receivedGifts.length > 0 && (
-          <div className="bg-gradient-to-r from-zinc-900 to-black border border-cyan-500/30 rounded-2xl p-6 animate-in slide-in-from-bottom-4 mb-8">
-             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Gift size={20} className="text-cyan-400" /> My Gift Collection ({receivedGifts.length})
-             </h2>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {receivedGifts.map(notif => (
-                   <div key={notif.id} className="bg-zinc-900/80 p-4 rounded-xl border border-gray-800 space-y-4 shadow-lg">
-                       <div className="flex justify-between items-start">
-                          <div>
-                             <h4 className="text-white font-bold">Gift from {notif.voucherData?.meta.senderName}</h4>
-                             <p className="text-xs text-gray-500">Received: {new Date(notif.date).toLocaleDateString()}</p>
-                          </div>
-                          <div className="px-2 py-1 bg-cyan-900/20 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold rounded uppercase">
-                             Ready to Use
-                          </div>
-                       </div>
+        {/* Help Button */}
+        <button
+          onClick={() => setShowLoyaltyHelp(true)}
+          className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white/80 hover:text-white z-10"
+        >
+           <HelpCircle size={18} />
+        </button>
 
-                       {/* HERO CARD PREVIEW MINI */}
-                       <div 
-                            className="relative aspect-[1.586/1] rounded-lg overflow-hidden text-white border border-gray-700 bg-black"
-                       >
-                            <div className="absolute inset-0 bg-gradient-to-br from-black via-zinc-900 to-black"></div>
-                            <div className="relative h-full p-4 flex flex-col justify-between z-10">
-                                <div className="flex justify-between items-start">
-                                    <span className="font-cherry text-sm text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-400">SV</span>
-                                    <span className="text-lg font-bold text-white font-architects">R{notif.voucherData?.amount}</span>
-                                </div>
-                                <div className="text-center">
-                                    <p className="font-architects text-sm text-gray-200 italic line-clamp-2">"{notif.voucherData?.meta.message}"</p>
-                                </div>
-                                <div className="flex justify-between text-[8px] text-gray-500 uppercase">
-                                    <span>To You</span>
-                                    <span className="font-mono text-cyan-400 text-[10px]">{notif.voucherData?.code}</span>
-                                </div>
-                            </div>
-                       </div>
-                       
-                       <button 
-                         onClick={() => notif.voucherData && handleRedeemGift(notif.voucherData.code)}
-                         className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg group"
-                       >
-                           <CheckCircle size={16} /> Redeem Now <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                       </button>
-                   </div>
-                ))}
-             </div>
-          </div>
-      )}
-
-      {/* 2. Gift Ready Notifications (SENT BY ME) */}
-      {giftNotifications.length > 0 && (
-          <div className="bg-zinc-900/50 border border-pink-500/30 rounded-2xl p-6 animate-in slide-in-from-bottom-4 mb-8">
-             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Send size={20} className="text-pink-500" /> Ready to Send ({giftNotifications.length})
-             </h2>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {giftNotifications.map(notif => (
-                   <div key={notif.id} className="bg-black p-4 rounded-xl border border-gray-800 space-y-4">
-                       <div className="flex justify-between items-start">
-                          <div>
-                             <h4 className="text-white font-bold">Gift Voucher for {notif.voucherData?.meta.recipientName}</h4>
-                             <p className="text-xs text-gray-500">Created: {new Date(notif.date).toLocaleDateString()}</p>
-                          </div>
-                          <div className="px-2 py-1 bg-green-900/20 border border-green-500/30 text-green-400 text-[10px] font-bold rounded uppercase">
-                             Paid & Active
-                          </div>
-                       </div>
-
-                       {/* HERO CARD PREVIEW MINI */}
-                       <div 
-                            className="relative aspect-[1.586/1] rounded-lg overflow-hidden text-white border border-gray-700 bg-zinc-900"
-                       >
-                            <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-black to-zinc-900"></div>
-                            <div className="relative h-full p-4 flex flex-col justify-between z-10">
-                                <div className="flex justify-between items-start">
-                                    <span className="font-cherry text-sm text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-400">SV</span>
-                                    <span className="text-lg font-bold text-white font-architects">R{notif.voucherData?.amount}</span>
-                                </div>
-                                <div className="text-center">
-                                    <p className="font-architects text-sm text-gray-200 italic line-clamp-2">"{notif.voucherData?.meta.message}"</p>
-                                </div>
-                                <div className="flex justify-between text-[8px] text-gray-500 uppercase">
-                                    <span>For: {notif.voucherData?.meta.recipientName}</span>
-                                    <span>By: {notif.voucherData?.meta.senderName}</span>
-                                </div>
-                            </div>
-                       </div>
-                       
-                       <div className="flex items-center gap-2 pt-2">
-                           <button 
-                             onClick={() => handleSendGiftWhatsApp(notif)}
-                             className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg"
-                           >
-                               <Send size={16} /> Send on WhatsApp
-                           </button>
-                       </div>
-                       <p className="text-[10px] text-gray-500 text-center">
-                          Clicking will open WhatsApp with the voucher image/link pre-filled.
-                       </p>
-                   </div>
-                ))}
-             </div>
-          </div>
-      )}
-
-      {/* 3. Pending Reviews Notifications */}
-      {pendingReviews.length > 0 && (
-         <div className="bg-zinc-900/50 border border-gray-800 rounded-2xl p-6 animate-in slide-in-from-bottom-4">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-               <MessageSquare size={20} className="text-cyan-400" /> Pending Reviews ({pendingReviews.length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               {pendingReviews.map(notif => (
-                  <div key={notif.id} className="bg-black p-4 rounded-xl border border-gray-800 flex gap-4 items-center">
-                     {notif.productImage && (
-                        <img src={notif.productImage} alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-700" onError={(e) => { console.warn('Image failed to load in Profile notification:', (e.currentTarget as HTMLImageElement).src); (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/64'; }} />
-                     )}
-                     <div className="flex-1">
-                        <h4 className="text-white font-medium text-sm line-clamp-1">{notif.productName}</h4>
-                        <p className="text-xs text-gray-400 mt-1">Share your thoughts honestly!</p>
-                        <p className="text-xs text-purple-400 font-bold mt-1">+100 Points Reward</p>
-                     </div>
-                     <button 
-                       onClick={() => setSelectedNotification(notif)}
-                       className="px-4 py-2 bg-zinc-800 hover:bg-pink-600 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap border border-gray-700 hover:border-pink-500"
-                     >
-                        Review Now
-                     </button>
-                  </div>
-               ))}
-            </div>
-         </div>
-      )}
+        <div className="flex justify-between items-start mb-8">
+           <div>
+             <h2 className="text-lg font-semibold text-white">Loyalty Balance</h2>
+             <p className="text-xs text-white flex items-center gap-1 mt-1"><ShoppingCart size={10}/> 1 pt per {pointsPerSpend} spent</p>
+             <p className="text-xs text-white flex items-center gap-1"><MessageCircle size={10}/> 100 pts per review</p>
+             <p className="text-xs text-white flex items-center gap-1"><Share2 size={10}/> 50 pts per share</p>
+           </div>
+           <Award size={28} className="text-pink-300 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)] mr-8" />
+        </div>
+        <div className="text-[22px] font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-white to-pink-200">{user.loyaltyPoints || 0} <span className="text-lg font-normal opacity-80 text-white">Points</span></div>
+        <div className="mt-4 text-xs bg-black/30 p-3 rounded-lg border border-white/10">
+           {(user.loyaltyPoints || 0) >= 1000
+             ? `You have ${currency === 'ZAR' ? 'R' : '$'}${(Math.floor((user.loyaltyPoints || 0) / 1000) * (currency === 'ZAR' ? 10 : 5)).toFixed(2)} off available for your next order!`
+             : `${1000 - (user.loyaltyPoints || 0)} more points needed for a ${currency === 'ZAR' ? 'R10' : '$5'} voucher.`
+           }
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Loyalty Program Card */}
-        <div className="bg-gradient-to-br from-purple-900 to-pink-900 border border-purple-700 rounded-2xl p-6 text-white shadow-[0_0_20px_rgba(168,85,247,0.2)] relative overflow-hidden">
-          
-          {/* Help Button */}
-          <button 
-            onClick={() => setShowLoyaltyHelp(true)}
-            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors text-white/80 hover:text-white z-10"
-          >
-             <HelpCircle size={18} />
-          </button>
-
-          <div className="flex justify-between items-start mb-8">
-             <div>
-               <h2 className="text-lg font-semibold opacity-90 text-purple-200">Loyalty Balance</h2>
-               <p className="text-xs opacity-75 flex items-center gap-1 mt-1"><ShoppingCart size={10}/> 1 pt per R10 spent</p>
-               <p className="text-xs opacity-75 flex items-center gap-1"><MessageCircle size={10}/> 100 pts per review</p>
-               <p className="text-xs opacity-75 flex items-center gap-1"><Share2 size={10}/> 50 pts per share</p>
-             </div>
-             <Award size={28} className="text-pink-300 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)] mr-8" />
-          </div>
-          <div className="text-[22px] font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-white to-pink-200">{user.loyaltyPoints} <span className="text-lg font-normal opacity-80 text-white">Points</span></div>
-          <div className="mt-4 text-xs bg-black/30 p-3 rounded-lg border border-white/10">
-             {user.loyaltyPoints >= 1000 
-               ? `You have R${(Math.floor(user.loyaltyPoints / 1000) * 10).toFixed(2)} off available for your next order!`
-               : `${1000 - user.loyaltyPoints} more points needed for a R10 voucher.`
-             }
-          </div>
-        </div>
 
         {/* Partnership Program Card (Renamed from Affiliate) */}
         <div className="bg-zinc-900 rounded-2xl p-6 border border-gray-800 shadow-sm">
@@ -420,7 +232,7 @@ const Profile: React.FC = () => {
              
              <div className="flex justify-between items-center">
                 <span className="text-gray-400 text-sm">Total Earnings</span>
-                <span className="text-lg font-bold text-green-400">R{user.affiliateEarnings.toFixed(2)}</span>
+                <span className="text-lg font-bold text-green-400">R{(user.affiliateEarnings || 0).toFixed(2)}</span>
              </div>
              
              <Link 
@@ -429,6 +241,39 @@ const Profile: React.FC = () => {
              >
                View Dashboard
              </Link>
+          </div>
+        </div>
+
+        {/* Account Management Card */}
+        <div className="bg-zinc-900 rounded-2xl p-6 border border-gray-800 shadow-sm">
+          <div className="flex justify-between items-start mb-6">
+             <div>
+               <h2 className="text-lg font-semibold text-white">Account Management</h2>
+               <p className="text-xs text-gray-500">Manage your account settings</p>
+             </div>
+             <User size={28} className="text-blue-400 drop-shadow-[0_0_5px_rgba(59,130,246,0.6)]" />
+          </div>
+
+          <div className="space-y-4">
+             <div className="bg-black p-3 rounded-lg border border-gray-700">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-xs text-gray-500 block uppercase">Account Status</span>
+                    <span className="font-medium text-green-400">Active</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500 block">Member Since</span>
+                    <span className="text-sm text-white">{new Date(user.createdAt || Date.now()).toLocaleDateString()}</span>
+                  </div>
+                </div>
+             </div>
+
+             <button
+                onClick={() => setShowCloseAccountModal(true)}
+                className="w-full py-3 border border-red-500/50 text-red-400 rounded-lg font-semibold hover:bg-red-900/30 transition-colors text-sm"
+             >
+               Close Account
+             </button>
           </div>
         </div>
       </div>

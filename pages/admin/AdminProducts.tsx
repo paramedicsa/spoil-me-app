@@ -1,11 +1,12 @@
-
 import React, { useState, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { auth } from '../../firebaseConfig';
 import { Product, PackagingItem, Review } from '../../types';
 import { Plus, Edit2, Trash2, Sparkles, Save, X, Link as LinkIcon, Tag, MessageSquare, Star, Gift, Clock, Package, ExternalLink, AlertTriangle, Crown, Percent, Truck, RefreshCw, Upload, Loader2, Camera, Check, Info, Bot, DollarSign, BarChart3, Search, Filter, Layers, ImagePlus, Smartphone, FileDown, Bookmark, Gem } from 'lucide-react';
 import { generateProductDescription, generateProductMetadataFromImage, generateSouthAfricanReviews, generateUniquePendantReviews } from '../../services/geminiService';
 import { storage } from '../../firebaseConfig';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { handleImageError } from '../../utils/imageUtils';
 
 // Chain Length Descriptions from Firestore
 const CHAIN_OPTIONS = {
@@ -24,7 +25,7 @@ const DEFAULT_EARRING_PRESETS = [
 ];
 
 const AdminProducts: React.FC = () => {
-  const { products, addProduct, updateProduct, deleteProduct, categories, packagingPresets, materialPresets, savePackagingPreset, saveMaterialPreset, deleteMaterialPreset } = useStore();
+  const { products, addProduct, updateProduct, deleteProduct, categories, packagingPresets, materialPresets, savePackagingPreset, saveMaterialPreset, deleteMaterialPreset, dbConnectionError, login, manualWinner, setManualWinner } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -40,7 +41,14 @@ const AdminProducts: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterColor, setFilterColor] = useState('');
   const [filterPromo, setFilterPromo] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('');
+
+  // --- BULK EDIT STATE ---
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [isBulkEditing, setIsBulkEditing] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState<{ price?: number; priceUSD?: number; compareAtPrice?: number; compareAtPriceUSD?: number }>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -54,8 +62,11 @@ const AdminProducts: React.FC = () => {
     description: '',
     whenAndHowToWear: '',
     price: 0,
+    priceUSD: 0,
     compareAtPrice: 0,
+    compareAtPriceUSD: 0,
     memberPrice: 0,
+    memberPriceUSD: 0,
     costPrice: 0,
     shippingCost: 0,
     packaging: [],
@@ -97,7 +108,8 @@ const AdminProducts: React.FC = () => {
     promoExpiresAt: '',
     promoBasicMemberPrice: 0,
     promoPremiumMemberPrice: 0,
-    promoDeluxeMemberPrice: 0
+    promoDeluxeMemberPrice: 0,
+    isSoldOut: false
   };
 
   const [formData, setFormData] = useState<Product>(initialFormState);
@@ -118,6 +130,15 @@ const AdminProducts: React.FC = () => {
   // COMBINED PRESETS FOR EARRINGS
   const allEarringPresets = [...DEFAULT_EARRING_PRESETS, ...materialPresets];
 
+  // Auto-calculate member prices when retail price changes
+  React.useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      memberPrice: parseFloat((prev.price * 0.8).toFixed(2)),
+      memberPriceUSD: parseFloat((prev.priceUSD * 0.8).toFixed(2))
+    }));
+  }, [formData.price, formData.priceUSD]);
+
   const handleAddNew = () => {
     setFormData({
       ...initialFormState,
@@ -131,12 +152,15 @@ const AdminProducts: React.FC = () => {
   };
 
   const handleEdit = (product: Product) => {
-    setFormData({
+    const updatedProduct = {
       ...initialFormState,
       ...product,
       // Ensure fallbacks for robust editing
       compareAtPrice: product.compareAtPrice || 0,
-      memberPrice: product.memberPrice || 0,
+      compareAtPriceUSD: product.compareAtPriceUSD || 0,
+      priceUSD: product.priceUSD || 0,
+      memberPrice: product.price ? parseFloat((product.price * 0.8).toFixed(2)) : (product.memberPrice || 0),
+      memberPriceUSD: product.priceUSD ? parseFloat((product.priceUSD * 0.8).toFixed(2)) : (product.memberPriceUSD || 0),
       costPrice: product.costPrice || 0,
       shippingCost: product.shippingCost || 0,
       soldCount: product.soldCount || 0,
@@ -159,7 +183,8 @@ const AdminProducts: React.FC = () => {
       colors: product.colors || [],
       isFeaturedJewelryBox: product.isFeaturedJewelryBox || false,
       isFeaturedPerfumeHolder: product.isFeaturedPerfumeHolder || false
-    });
+    };
+    setFormData(updatedProduct);
     setIsEditing(true);
     setActiveTab('general');
     setRawReviews('');
@@ -205,10 +230,12 @@ const AdminProducts: React.FC = () => {
             ...formData,
             images: processedImages,
             price: Number(formData.price),
+            priceUSD: Number(formData.priceUSD),
             stock: Number(formData.stock),
             soldCount: Number(formData.soldCount),
             compareAtPrice: Number(formData.compareAtPrice || 0),
             memberPrice: Number(formData.memberPrice || 0),
+            memberPriceUSD: Number(formData.memberPriceUSD || 0),
             costPrice: Number(formData.costPrice || 0),
             shippingCost: Number(formData.shippingCost || 0),
             giftValue: Number(formData.giftValue || 0),
@@ -243,6 +270,17 @@ const AdminProducts: React.FC = () => {
             await deleteProduct(id);
         } catch (error) {
             alert("Failed to delete product.");
+        }
+    }
+  };
+
+  const handleMarkAsSold = async (product: Product) => {
+    if(window.confirm(`Mark "${product.name}" as sold? This will set stock to 0.`)) {
+        try {
+            const updatedProduct = { ...product, stock: 0 };
+            await updateProduct(updatedProduct);
+        } catch (error) {
+            alert("Failed to mark product as sold.");
         }
     }
   };
@@ -302,14 +340,18 @@ const AdminProducts: React.FC = () => {
      if (!formData.name) { alert("Please enter a product name first."); return; }
      setIsGeneratingReviews(true);
      const newReviews = await generateSouthAfricanReviews(formData.name, reviewGenCount);
-     if (newReviews.length > 0) { setFormData(prev => ({ ...prev, reviews: [...(prev.reviews || []), ...newReviews] })); }
+     if (newReviews.length > 0) {
+       setFormData(prev => ({ ...prev, reviews: [...(prev.reviews || []), ...newReviews] }));
+     }
      setIsGeneratingReviews(false);
   };
   
   const handleGenerateUniqueReviews = async () => {
     setIsGeneratingReviews(true);
     const newReviews = await generateUniquePendantReviews(25);
-    if (newReviews.length > 0) { setFormData(prev => ({ ...prev, reviews: [...(prev.reviews || []), ...newReviews] })); }
+    if (newReviews.length > 0) {
+      setFormData(prev => ({ ...prev, reviews: [...(prev.reviews || []), ...newReviews] }));
+    }
     setIsGeneratingReviews(false);
   };
 
@@ -453,24 +495,71 @@ const AdminProducts: React.FC = () => {
   const retailProfit = formData.price - totalDeductions;
   const memberProfit = (formData.memberPrice || 0) - totalDeductions;
   
+  // Compute unique categories from products
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  const uniqueTypes = Array.from(new Set(products.map(p => p.type).filter(Boolean)));
+
   const filteredProducts = products.filter(p => {
      const searchLower = searchTerm.toLowerCase();
      return (p.name.toLowerCase().includes(searchLower) || p.code.toLowerCase().includes(searchLower)) &&
             (filterType ? p.type === filterType : true) &&
             (filterCategory ? p.category === filterCategory : true) &&
-            (filterPromo ? (p.promoPrice && p.promoPrice > 0) : true);
+            (filterColor ? p.colors?.includes(filterColor) : true) &&
+            (filterPromo ? (p.promoPrice && p.promoPrice > 0) : true) &&
+            (filterStatus ? p.status === filterStatus : true);
   });
 
   return (
-    <div className="space-y-6 text-[22px]">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-[22px] font-bold text-white">Product Management</h1>
+        <h1 className="text-2xl font-bold text-white">Product Management</h1>
         {!isEditing && (
           <button onClick={handleAddNew} className="bg-pink-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-pink-500 shadow-lg transition-colors text-sm">
             <Plus size={18} /> Add Product
           </button>
         )}
       </div>
+
+      {/* Show DB connection error banner to admins when relevant */}
+      {dbConnectionError && (
+        <div className="bg-yellow-900/20 border-l-4 border-yellow-500 text-yellow-300 p-3 rounded mb-4">
+           <div className="flex items-start justify-between">
+             <div>
+               <div className="font-bold">Firestore Warning</div>
+               <div className="text-xs mt-1">{dbConnectionError}</div>
+               <div className="text-xs mt-1">Changes may be saved locally only. Fix authentication or Firestore rules to persist remotely.</div>
+             </div>
+             <div className="flex flex-col gap-2 ml-4">
+               <div className="text-xs text-gray-200 mb-1">Auth: {auth?.currentUser?.email || 'not signed in'}</div>
+               <button onClick={async () => {
+                   try {
+                     await login('spoilmevintagediy@gmail.com', 'admin@spoilme');
+                     alert('Attempted admin sign-in — check console for result.');
+                   } catch (err) { console.error('Admin sign-in attempt failed:', err); alert('Sign-in failed — check console.'); }
+                 }} className="px-3 py-1 bg-yellow-600 text-black rounded font-semibold text-sm">Sign in as admin</button>
+               <button onClick={async () => {
+                    try {
+                      // If editing, try to push current formData, otherwise no-op
+                      if (isEditing) {
+                        if (products.some(p => p.id === formData.id)) {
+                          await updateProduct(formData);
+                        } else {
+                          await addProduct(formData);
+                        }
+                        alert('Retry attempted — check console for Firestore response.');
+                      } else {
+                        alert('No active product being edited to retry.');
+                      }
+                    } catch (err) {
+                      console.error('Retry push failed:', err);
+                      alert('Retry failed — check console.');
+                    }
+                  }} className="px-3 py-1 bg-yellow-600 text-black rounded font-semibold text-sm">Retry push</button>
+               <button onClick={() => { navigator.clipboard?.writeText(JSON.stringify(localStorage.getItem('spv_products'))); alert('Local products JSON copied to clipboard'); }} className="px-3 py-1 bg-zinc-800 text-white rounded text-sm">Copy local backup</button>
+             </div>
+           </div>
+        </div>
+      )}
 
       {!isEditing && (
          <div className="bg-zinc-900 p-4 rounded-xl border border-gray-800 flex flex-wrap gap-4 items-center">
@@ -484,14 +573,15 @@ const AdminProducts: React.FC = () => {
                 <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
                    value={filterType} onChange={e => setFilterType(e.target.value)}>
                    <option value="">All Types</option>
+                   <option value="Ring">Rings</option>
                    <option value="Stud">Stud Earrings</option>
                    <option value="Dangle">Dangle Earrings</option>
-                   <option value="Ring">Rings</option>
                    <option value="Pendant">Pendants</option>
                    <option value="Bracelet">Bracelets</option>
                    <option value="Watch">Watches</option>
                    <option value="Jewelry Box">Jewelry Boxes</option>
                    <option value="Perfume Holder">Perfume Holders</option>
+                   <option value="Other">Other</option>
                 </select>
              </div>
              <div className="relative">
@@ -499,16 +589,68 @@ const AdminProducts: React.FC = () => {
                 <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
                    value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
                    <option value="">All Collections</option>
-                   {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                   {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+             </div>
+             <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
+                   value={filterColor} onChange={e => setFilterColor(e.target.value)}>
+                   <option value="">All Colors</option>
+                   {Array.from(new Set(products.flatMap(p => p.colors || []))).map(color => <option key={color} value={color}>{color}</option>)}
                 </select>
              </div>
              <button onClick={() => setFilterPromo(!filterPromo)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all flex items-center gap-2 ${filterPromo ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-black border-gray-700 text-gray-400 hover:bg-zinc-800'}`}>
                 <Tag size={16} /> {filterPromo ? 'Promotions Active' : 'Show Promotions'}
              </button>
-             {(searchTerm || filterType || filterCategory || filterPromo) && (
-                <button onClick={() => { setSearchTerm(''); setFilterType(''); setFilterCategory(''); setFilterPromo(false); }} className="px-3 py-2 text-xs text-gray-500 hover:text-white underline decoration-dotted">Reset Filters</button>
+             {/* --- STATUS FILTER DROPDOWN --- */}
+             <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
+                   value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                   <option value="">All Statuses</option>
+                   <option value="draft">Draft</option>
+                   <option value="published">Published</option>
+                </select>
+             </div>
+             {(searchTerm || filterType || filterCategory || filterColor || filterPromo || filterStatus) && (
+                <button onClick={() => { setSearchTerm(''); setFilterType(''); setFilterCategory(''); setFilterColor(''); setFilterPromo(false); setFilterStatus(''); }} className="px-3 py-2 text-xs text-gray-500 hover:text-white underline decoration-dotted">Reset Filters</button>
              )}
+         </div>
+      )}
+
+      {/* Bulk Selection by Type */}
+      {!isEditing && uniqueTypes.length > 0 && (
+         <div className="bg-zinc-900 p-4 rounded-xl border border-gray-800">
+             <h3 className="text-white font-bold mb-3 flex items-center gap-2"><Filter size={18} className="text-cyan-400" /> Bulk Select by Type</h3>
+             <div className="flex flex-wrap gap-2">
+                {uniqueTypes.map(type => (
+                   <button key={type} onClick={() => {
+                      const typeProducts = filteredProducts.filter(p => p.type === type).map(p => p.id);
+                      const allSelected = typeProducts.every(id => selectedProducts.includes(id));
+                      if (allSelected) {
+                         setSelectedProducts(selectedProducts.filter(id => !typeProducts.includes(id)));
+                      } else {
+                         setSelectedProducts([...new Set([...selectedProducts, ...typeProducts])]);
+                      }
+                   }} className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all flex items-center gap-2 ${filteredProducts.filter(p => p.type === type).every(p => selectedProducts.includes(p.id)) ? 'bg-cyan-900/30 border-cyan-500 text-cyan-400' : 'bg-black border-gray-700 text-gray-400 hover:bg-zinc-800'}`}>
+                      {type} ({filteredProducts.filter(p => p.type === type).length})
+                   </button>
+                ))}
+                {selectedProducts.length > 0 && (
+                   <button onClick={() => setSelectedProducts([])} className="px-3 py-2 text-xs text-gray-500 hover:text-white underline decoration-dotted">Clear All</button>
+                )}
+             </div>
+         </div>
+      )}
+
+      {!isEditing && selectedProducts.length > 0 && (
+         <div className="bg-zinc-900 p-4 rounded-xl border border-gray-800 flex items-center justify-between">
+             <span className="text-white text-sm">{selectedProducts.length} product(s) selected</span>
+             <button onClick={() => setIsBulkEditing(true)} className="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-500 flex items-center gap-2">
+                <Edit2 size={16} /> Bulk Edit Prices
+             </button>
          </div>
       )}
 
@@ -572,21 +714,21 @@ const AdminProducts: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-400 mb-1">Product Type</label>
                       <select className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
                          value={formData.type} onChange={(e: any) => setFormData({...formData, type: e.target.value})}>
+                         <option value="Ring">Rings</option>
                          <option value="Stud">Stud Earrings</option>
                          <option value="Dangle">Dangle Earrings</option>
-                         <option value="Ring">Ring</option>
-                         <option value="Pendant">Pendant / Necklace</option>
-                         <option value="Bracelet">Bracelet</option>
-                         <option value="Watch">Watch</option>
-                         <option value="Jewelry Box">Jewelry Box</option>
-                         <option value="Perfume Holder">Perfume Holder</option>
+                         <option value="Pendant">Pendants</option>
+                         <option value="Bracelet">Bracelets</option>
+                         <option value="Watch">Watches</option>
+                         <option value="Jewelry Box">Jewelry Boxes</option>
+                         <option value="Perfume Holder">Perfume Holders</option>
                          <option value="Other">Other</option>
                       </select>
                    </div>
                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-1">Made By</label>
-                      <select className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                         value={formData.madeBy} onChange={e => setFormData({...formData, madeBy: e.target.value})}>
+                     <label className="block text-sm font-medium text-gray-400 mb-1">Made By</label>
+                     <select className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                        value={formData.madeBy} onChange={e => setFormData({...formData, madeBy: e.target.value})}>
                          <option value="Spoil Me Vintage">Spoil Me Vintage (Handmade)</option>
                          <option value="Outsourced">Outsourced</option>
                       </select>
@@ -605,46 +747,47 @@ const AdminProducts: React.FC = () => {
               <div className="space-y-8 animate-in fade-in">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="space-y-4">
-                      <h3 className="text-white font-bold flex items-center gap-2 border-b border-gray-800 pb-2"><DollarSign size={18} className="text-green-400" /> Sales Prices</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                           <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (R) *</label>
-                           <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm font-bold text-green-400" 
-                              value={formData.price} onChange={e => updateRetailPrice(parseFloat(e.target.value) || 0)} />
-                        </div>
-                        <div>
-                           <label className="block text-sm font-medium text-gray-400 mb-1">RRP (Comparison)</label>
-                           <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm" 
-                              value={formData.compareAtPrice || ''} onChange={e => setFormData({...formData, compareAtPrice: parseFloat(e.target.value) || 0})} />
-                        </div>
+                      <h3 className="text-white font-bold flex items-center gap-2 border-b border-gray-800 pb-2"><DollarSign size={18} className="text-green-400" /> South African Rand (ZAR)</h3>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (R) *</label>
+                         <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm font-bold text-green-400"
+                            value={formData.price} onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})} />
                       </div>
-                      <div className="p-4 bg-purple-900/10 border border-purple-500/30 rounded-lg">
-                         <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-bold text-purple-400 flex items-center gap-2"><Crown size={16} /> Member Price</label>
-                            <span className="text-[10px] bg-purple-600/20 text-purple-300 border border-purple-500/50 px-2 py-1 rounded font-bold">20% OFF</span>
-                         </div>
-                         <input type="number" className="w-full p-2 bg-zinc-900/50 border border-purple-500/30 rounded-md text-gray-400 text-sm font-bold cursor-not-allowed" 
-                            value={formData.memberPrice || ''} readOnly disabled />
+                      <div className="flex gap-2">
+                         <button onClick={() => setFormData({...formData, priceUSD: parseFloat((formData.price / 29).toFixed(2))})} className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg">Convert to USD</button>
+                         <button onClick={() => setFormData({...formData, priceUSD: 0})} className="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs font-bold rounded-lg">Reset USD</button>
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-400 mb-1">Member Price (R)</label>
+                         <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm font-bold text-purple-400"
+                            value={formData.memberPrice || ''} readOnly />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-400 mb-1">RRP (R)</label>
+                         <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                            value={formData.compareAtPrice || ''} onChange={e => setFormData({...formData, compareAtPrice: parseFloat(e.target.value) || 0})} />
                       </div>
                    </div>
                    <div className="space-y-4">
-                      <h3 className="text-white font-bold flex items-center gap-2 border-b border-gray-800 pb-2"><Truck size={18} className="text-red-400" /> Cost & Shipping</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <label className="block text-sm font-medium text-red-400/80 mb-1">Product Cost (R)</label>
-                            <input type="number" className="w-full p-2 bg-black border border-red-900/30 rounded-md text-white text-sm" 
-                               value={formData.costPrice || 0} onChange={e => setFormData({...formData, costPrice: parseFloat(e.target.value) || 0})} />
-                         </div>
-                         <div>
-                            <label className="block text-sm font-medium text-red-400/80 mb-1">Shipping In (R)</label>
-                            <input type="number" className="w-full p-2 bg-black border border-red-900/30 rounded-md text-white text-sm" 
-                               value={formData.shippingCost || 0} onChange={e => setFormData({...formData, shippingCost: parseFloat(e.target.value) || 0})} />
-                         </div>
+                      <h3 className="text-white font-bold flex items-center gap-2 border-b border-gray-800 pb-2"><DollarSign size={18} className="text-yellow-400" /> United States Dollar (USD)</h3>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (USD) *</label>
+                         <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm font-bold text-yellow-400"
+                            value={formData.priceUSD} onChange={e => setFormData({...formData, priceUSD: parseFloat(e.target.value) || 0})} />
+                      </div>
+                      <div className="flex gap-2">
+                         <button onClick={() => setFormData({...formData, price: parseFloat((formData.priceUSD * 29).toFixed(2))})} className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg">Convert to R</button>
+                         <button onClick={() => setFormData({...formData, price: 0})} className="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs font-bold rounded-lg">Reset R</button>
                       </div>
                       <div>
-                         <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2"><LinkIcon size={14} /> Back Office / Supplier Link</label>
-                         <input type="text" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm" 
-                            value={formData.backOfficeLink} onChange={e => setFormData({...formData, backOfficeLink: e.target.value})} />
+                         <label className="block text-sm font-medium text-gray-400 mb-1">Member Price (USD)</label>
+                         <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm font-bold text-purple-400"
+                            value={formData.memberPriceUSD || ''} readOnly />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-400 mb-1">RRP (USD)</label>
+                         <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                            value={formData.compareAtPriceUSD || ''} onChange={e => setFormData({...formData, compareAtPriceUSD: parseFloat(e.target.value) || 0})} />
                       </div>
                    </div>
                 </div>
@@ -748,6 +891,22 @@ const AdminProducts: React.FC = () => {
                      <label className="block text-sm font-medium text-gray-400 mb-1">Sold Count</label>
                      <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm" 
                         value={formData.soldCount} onChange={e => setFormData({...formData, soldCount: parseInt(e.target.value) || 0})} />
+                   </div>
+                   <div className="col-span-3">
+                     <label className="inline-flex items-center gap-2 mt-2">
+                         <input
+                           type="checkbox"
+                           checked={!!formData.isSoldOut}
+                           onChange={e => {
+                             const checked = e.target.checked;
+                             // If admin marks as sold, set stock to 0 immediately so UI and persistence reflect sold state
+                             setFormData(prev => ({ ...prev, isSoldOut: checked, stock: checked ? 0 : prev.stock }));
+                           }}
+                           className="form-checkbox h-4 w-4 text-red-600 bg-black border-gray-600"
+                         />
+                         <span className="text-sm text-white font-bold">Mark as "Sorry Just SOLD out!" (Persistent)</span>
+                     </label>
+                     <p className="text-xs text-gray-400 mt-1">When checked, this product will display a "Sorry Just SOLD out!" badge to customers regardless of stock. Only uncheck to make it available again.</p>
                    </div>
                 </div>
 
@@ -1020,8 +1179,8 @@ const AdminProducts: React.FC = () => {
                                             <p className="text-xs text-gray-400 italic">"{review.content}"</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => startEditingReview(review)} className="text-gray-500 hover:text-cyan-400"><Edit2 size={14} /></button>
-                                            <button onClick={() => handleRemoveReview(review.id)} className="text-gray-600 hover:text-red-400"><Trash2 size={14} /></button>
+                                            <button onClick={() => startEditingReview(review)} className="p-2 text-gray-400 hover:text-cyan-400"><Edit2 size={16} /></button>
+                                            <button onClick={() => handleRemoveReview(review.id)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16} /></button>
                                         </div>
                                     </div>
                                 )}
@@ -1043,7 +1202,7 @@ const AdminProducts: React.FC = () => {
                             <div className="bg-zinc-900 p-6 rounded-xl border border-gray-800">
                                 <h3 className="font-bold text-white flex items-center gap-2 mb-4"><Tag size={18} className="text-cyan-400" /> Non-Member Promo</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-xs text-gray-500 uppercase mb-1">Promotional Price (R)</label><input type="number" className="w-full p-3 bg-black border border-gray-700 rounded-lg text-white font-bold" value={formData.promoPrice || ''} onChange={e => setFormData({...formData, promoPrice: parseFloat(e.target.value) || 0})} /></div>
+                                    <div><label className="block text-xs text-gray-500 uppercase mb-1">Promotional Price (R)</label><input type="number" className="w-full p-3 bg-black border border-gray-700 rounded-lg text-white text-sm font-bold" value={formData.promoPrice || ''} onChange={e => setFormData({...formData, promoPrice: parseFloat(e.target.value) || 0})} /></div>
                                     <div><label className="block text-xs text-gray-500 uppercase mb-1">Discount (%)</label><div className="relative"><input type="number" className="w-full p-3 bg-black border border-gray-700 rounded-lg text-white" value={((formData.price - (formData.promoPrice || 0))/formData.price * 100).toFixed(0)} readOnly /><Percent size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" /></div></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1091,11 +1250,14 @@ const AdminProducts: React.FC = () => {
                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-2">
                        {formData.images.filter(img => img !== '').map((img, idx) => (
                            <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-800 bg-black">
-                               <img src={img} alt="" className="w-full h-full object-cover" onError={(e) => { console.warn('Image failed to load in AdminProducts gallery:', (e.currentTarget as HTMLImageElement).src); }} />
+                               <img src={img} alt="" className="w-full h-full object-cover" onError={handleImageError} />
                                <button onClick={() => handleRemoveImage(idx)} className="absolute top-1 right-1 bg-black/60 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all"><X size={12} /></button>
                            </div>
                        ))}
-                       <div onClick={() => uploadInputRef.current?.click()} className="aspect-square rounded-lg border border-dashed border-gray-700 bg-zinc-900/30 flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-zinc-800 hover:border-gray-500 transition-all"><Plus size={24} /><span className="text-[10px] mt-1">Add Image</span></div>
+                       <div onClick={() => uploadInputRef.current?.click()} className="aspect-square rounded-lg border border-dashed border-gray-700 bg-zinc-900/30 flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-zinc-800 hover:border-gray-500 transition-all">
+                           <Plus size={24} />
+                           <span className="text-[10px] mt-1">Add Image</span>
+                       </div>
                    </div>
                    <div className="flex gap-2">
                       <input type="file" accept="image/*" multiple ref={uploadInputRef} className="hidden" onChange={handleAdditionalImageUpload} />
@@ -1118,16 +1280,20 @@ const AdminProducts: React.FC = () => {
         <div className="bg-zinc-900 rounded-xl border border-gray-800 shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-950 border-b border-gray-800 text-gray-400 font-medium">
-              <tr><th className="p-4">Product</th><th className="p-4">Type</th><th className="p-4">SKU</th><th className="p-4">Price</th><th className="p-4">Stock</th><th className="p-4 text-right">Actions</th></tr>
+              <tr><th className="p-4"><input type="checkbox" checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0} onChange={(e) => { if (e.target.checked) setSelectedProducts(filteredProducts.map(p => p.id)); else setSelectedProducts([]); }} className="rounded bg-black border-gray-600" /></th><th className="p-4">Product</th><th className="p-4">Type</th><th className="p-4">SKU</th><th className="p-4">Price (R)</th><th className="p-4">Price (USD)</th><th className="p-4">Stock</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {filteredProducts.map(product => (
                 <tr key={product.id} className="hover:bg-zinc-800/50 group transition-colors">
-                  <td className="p-4 flex items-center gap-3"><img src={product.images[0] || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded bg-black object-cover border border-gray-800" alt="" onError={(e) => { console.warn('Image failed to load in AdminProducts list:', (e.currentTarget as HTMLImageElement).src); }} /><div><span className="font-medium text-gray-200 block">{product.name}</span><span className="text-xs text-gray-500">{product.category}</span></div></td>
+                  <td className="p-4"><input type="checkbox" checked={selectedProducts.includes(product.id)} onChange={(e) => { if (e.target.checked) setSelectedProducts([...selectedProducts, product.id]); else setSelectedProducts(selectedProducts.filter(id => id !== product.id)); }} className="rounded bg-black border-gray-600" /></td>
+                  <td className="p-4 flex items-center gap-3"><img src={product.images[0] || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded bg-black object-cover border border-gray-800" alt="" onError={handleImageError} />
+                  <div><span className="font-medium text-gray-200 block">{product.name}</span><span className="text-xs text-gray-500">{product.category}</span></div></td>
                   <td className="p-4 text-gray-400">{product.type}</td>
                   <td className="p-4 text-gray-500 font-mono text-xs">{product.code}</td>
-                  <td className="p-4 font-medium text-green-400">R{product.price.toFixed(2)}</td>
+                  <td className="p-4 font-medium text-green-400">R{(product.price ? product.price.toFixed(2) : '0.00')}</td>
+                  <td className="p-4 font-medium text-yellow-400">$ {(product.priceUSD ? product.priceUSD.toFixed(2) : '0.00')}</td>
                   <td className="p-4 text-gray-300">{product.stock}</td>
+                  <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${product.status === 'published' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>{product.status}</span></td>
                   <td className="p-4 text-right"><div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEdit(product)} className="p-2 text-gray-400 hover:text-cyan-400"><Edit2 size={16} /></button><button onClick={() => handleDelete(product.id)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16} /></button></div></td>
                 </tr>
               ))}
@@ -1135,6 +1301,108 @@ const AdminProducts: React.FC = () => {
           </table>
         </div>
       )}
+
+      {/* Floating quick action so admins can always open the editor and access tabs */}
+      {!isEditing && (
+        <div className="fixed right-6 bottom-6 z-50">
+          <button onClick={handleAddNew} title="Add Product" className="w-14 h-14 flex items-center justify-center rounded-full bg-pink-600 hover:bg-pink-500 text-white shadow-lg">
+            <Plus size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Edit Modal */}
+      {isBulkEditing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-zinc-900 p-6 rounded-xl border border-gray-800 max-w-md w-full mx-4">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Edit2 size={18} className="text-cyan-400" /> Bulk Edit Prices</h3>
+            <p className="text-gray-400 text-sm mb-4">Update prices for {selectedProducts.length} selected product(s). Leave fields empty to keep current values.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (R)</label>
+                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={bulkEditData.price || ''} onChange={e => setBulkEditData({...bulkEditData, price: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (USD)</label>
+                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={bulkEditData.priceUSD || ''} onChange={e => setBulkEditData({...bulkEditData, priceUSD: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">RRP (R)</label>
+                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={bulkEditData.compareAtPrice || ''} onChange={e => setBulkEditData({...bulkEditData, compareAtPrice: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">RRP (USD)</label>
+                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={bulkEditData.compareAtPriceUSD || ''} onChange={e => setBulkEditData({...bulkEditData, compareAtPriceUSD: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => { setIsBulkEditing(false); setBulkEditData({}); }} className="px-4 py-2 text-gray-400 hover:bg-gray-800 rounded-lg transition-colors text-sm">Cancel</button>
+              <button onClick={async () => {
+                try {
+                  for (const productId of selectedProducts) {
+                    const product = products.find(p => p.id === productId);
+                    if (product) {
+                      const updatedProduct = {
+                        ...product,
+                        price: bulkEditData.price !== undefined ? bulkEditData.price : product.price,
+                        priceUSD: bulkEditData.priceUSD !== undefined ? bulkEditData.priceUSD : product.priceUSD,
+                        compareAtPrice: bulkEditData.compareAtPrice !== undefined ? bulkEditData.compareAtPrice : product.compareAtPrice,
+                        compareAtPriceUSD: bulkEditData.compareAtPriceUSD !== undefined ? bulkEditData.compareAtPriceUSD : product.compareAtPriceUSD,
+                        memberPrice: bulkEditData.price !== undefined ? parseFloat((bulkEditData.price * 0.8).toFixed(2)) : product.memberPrice,
+                        memberPriceUSD: bulkEditData.priceUSD !== undefined ? parseFloat((bulkEditData.priceUSD * 0.8).toFixed(2)) : product.memberPriceUSD
+                      };
+                      await updateProduct(updatedProduct);
+                    }
+                  }
+                  setSelectedProducts([]);
+                  setIsBulkEditing(false);
+                  setBulkEditData({});
+                  alert('Bulk update completed successfully!');
+                } catch (error) {
+                  console.error('Bulk update failed:', error);
+                  alert('Bulk update failed. Please check console.');
+                }
+              }} className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 flex items-center gap-2 shadow transition-colors text-sm font-semibold">
+                <Save size={18} /> Update Prices
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL WINNER OVERRIDE SECTION */}
+      <div className="bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-500/30 p-6 rounded-xl mt-6">
+         <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Crown size={18} className="text-yellow-400" /> Manual Winner Override</h3>
+         <p className="text-gray-400 text-sm mb-4">Override the current week's winner for social proof notifications. Leave empty to use auto-generated winners.</p>
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+               <label className="block text-sm font-medium text-gray-400 mb-1">Winner Name</label>
+               <input type="text" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={manualWinner?.name || ''} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, name: e.target.value } : { name: e.target.value, prize: 500, currency: 'ZAR' as const })} placeholder="e.g. John Doe" />
+            </div>
+            <div>
+               <label className="block text-sm font-medium text-gray-400 mb-1">Prize Amount</label>
+               <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={manualWinner?.prize || ''} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, prize: parseFloat(e.target.value) || 0 } : { name: '', prize: parseFloat(e.target.value) || 0, currency: 'ZAR' as const })} placeholder="500" />
+            </div>
+            <div>
+               <label className="block text-sm font-medium text-gray-400 mb-1">Currency</label>
+               <select className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                  value={manualWinner?.currency || 'ZAR'} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, currency: e.target.value as 'ZAR' | 'USD' } : { name: '', prize: 500, currency: e.target.value as 'ZAR' | 'USD' })}>
+                  <option value="ZAR">ZAR (R)</option>
+                  <option value="USD">USD ($)</option>
+               </select>
+            </div>
+         </div>
+         <div className="flex justify-end gap-3 mt-4">
+            <button onClick={() => setManualWinner(null)} className="px-4 py-2 text-gray-400 hover:bg-gray-800 rounded-lg transition-colors text-sm">Clear Override</button>
+            <button onClick={() => alert('Manual winner set!')} className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors text-sm">Set Winner</button>
+         </div>
+      </div>
     </div>
   );
 };

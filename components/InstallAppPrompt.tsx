@@ -10,7 +10,7 @@ interface Props {
   playStoreUrl?: string; // optional Play Store URL if you switch later
 }
 
-const DEFAULT_APK = 'https://spoilme-edee0.web.app/Spoil-Me-Vintage-0.1.apk';
+const VERSION_URL = 'https://spoilme-edee0.web.app/version.json';
 
 const isMobile = () => {
   if (typeof navigator === 'undefined') return false;
@@ -18,59 +18,96 @@ const isMobile = () => {
   return /Android|iPhone|iPad|iPod/i.test(ua);
 };
 
-export default function InstallAppPrompt({ apkUrl = DEFAULT_APK, playStoreUrl }: Props) {
+export default function InstallAppPrompt({ apkUrl = '', playStoreUrl }: Props) {
   const [show, setShow] = useState(false);
+  const [isUpdate, setIsUpdate] = useState(false);
+  const [latestApkUrl, setLatestApkUrl] = useState(apkUrl);
 
   useEffect(() => {
     if (!isMobile()) return;
-    const dismissed = localStorage.getItem('appPromptDismissed');
-    if (!dismissed) setShow(true);
+    const isNative = (window as any).Capacitor?.isNativePlatform?.();
+    setIsUpdate(isNative);
+
+    const checkForUpdate = async () => {
+      try {
+        console.log('Checking for update...');
+        const response = await fetch(VERSION_URL);
+        const data = await response.json();
+        console.log('Fetched data:', data);
+        const latestVersion = data.version;
+        const storedVersion = localStorage.getItem('appVersion') || '0.1';
+        console.log('Latest version:', latestVersion, 'Stored version:', storedVersion);
+        if (latestVersion !== storedVersion) {
+          console.log('New version detected, showing update banner');
+          setLatestApkUrl(data.apkUrl);
+          setShow(true);
+          localStorage.setItem('appVersion', latestVersion);
+        } else {
+          console.log('No new version');
+          const dismissed = isNative ? localStorage.getItem('updatePromptDismissed') : localStorage.getItem('installPromptDismissed');
+          if (!dismissed) setShow(true);
+        }
+      } catch (error) {
+        console.error('Failed to check for update:', error);
+        // Fallback to default behavior
+        const dismissed = isNative ? localStorage.getItem('updatePromptDismissed') : localStorage.getItem('installPromptDismissed');
+        if (!dismissed) setShow(true);
+      }
+    };
+
+    checkForUpdate();
   }, []);
 
   if (!show) return null;
 
   const onDismiss = () => {
-    localStorage.setItem('appPromptDismissed', String(Date.now()));
+    const key = isUpdate ? 'updatePromptDismissed' : 'installPromptDismissed';
+    localStorage.setItem(key, String(Date.now()));
     setShow(false);
   };
 
   const onDownload = () => {
     // Open APK URL in browser
-    window.location.href = apkUrl;
+    window.location.href = latestApkUrl;
+    if (!isUpdate) onDismiss();
   };
 
   const onInstallInApp = async () => {
     try {
       // @ts-ignore
       if ((window as any).Capacitor && (window as any).Capacitor.isNativePlatform && (window as any).Capacitor.isNativePlatform()) {
-        await downloadAndInstall(apkUrl);
+        await downloadAndInstall(latestApkUrl);
       } else {
         // Otherwise open in browser
-        window.open(apkUrl, '_blank');
+        window.open(latestApkUrl, '_blank');
       }
     } catch (e) {
       console.error('Updater error', e);
-      window.open(apkUrl, '_blank');
+      window.open(latestApkUrl, '_blank');
     }
-    onDismiss();
+    if (!isUpdate) onDismiss();
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onDismiss} />
-      <div className="relative bg-zinc-900 rounded-xl p-6 w-[92%] max-w-md text-gray-100">
-        <h3 className="text-lg font-bold mb-2">Make your experience better — download the app</h3>
-        <p className="text-sm text-gray-300 mb-4">Get faster checkout, push notifications, and a native experience.</p>
-        <div className="flex gap-3">
-          {playStoreUrl ? (
-            <a className="px-4 py-2 bg-cyan-500 text-black rounded font-semibold" href={playStoreUrl}>Get it on Google Play</a>
-          ) : (
-            <button onClick={onDownload} className="px-4 py-2 bg-green-500 text-black rounded font-semibold">Download APK</button>
-          )}
-
-          <button onClick={onInstallInApp} className="px-4 py-2 bg-blue-600 text-white rounded font-semibold">Open installer</button>
-
-          <button onClick={onDismiss} className="px-4 py-2 ring-1 ring-gray-700 rounded text-gray-300">Maybe later</button>
+    <div className="fixed bottom-0 left-0 w-full bg-zinc-900 border-t border-gray-800 p-3 z-40 animate-in slide-in-from-bottom-5 duration-300">
+      <div className="max-w-7xl mx-auto flex items-center gap-4">
+        <div className="p-2 bg-cyan-900/20 text-cyan-500 rounded-full border border-cyan-500/30">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-white">
+            Update available - Get the latest features!
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onInstallInApp} className="px-4 py-2 bg-green-500 text-black rounded font-semibold text-sm">
+            Install Update
+          </button>
+          <button onClick={onDismiss} className="px-4 py-2 ring-1 ring-gray-700 rounded text-gray-300 text-sm">
+            Later
+          </button>
         </div>
       </div>
     </div>

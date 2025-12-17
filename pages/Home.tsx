@@ -1,13 +1,14 @@
-
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import ProductCard from '../components/ProductCard';
+import WinnerAnimation from '../components/WinnerAnimation';
+import WinnerCarousel from '../components/WinnerCarousel';
 import { ArrowRight, Clock, Gift, TrendingUp, Sparkles, ChevronLeft, ChevronRight, CreditCard, Crown, Award, Box, Droplet, Trophy } from 'lucide-react';
-import { ResolvedImage } from '@/utils/imageUtils';
+import { ResolvedImage, handleImageError, getFallbackImage } from '@/utils/imageUtils';
 import { Link } from 'react-router-dom';
 
 const Home: React.FC = () => {
-  const { products, categories, specials, user, memberCount, weeklyWinners } = useStore();
+  const { products, categories, specials, user, memberCount, weeklyWinners, currency: curr } = useStore();
   const bestSellersRef = useRef<HTMLDivElement>(null);
   const ringsRef = useRef<HTMLDivElement>(null);
   const braceletsRef = useRef<HTMLDivElement>(null);
@@ -18,7 +19,17 @@ const Home: React.FC = () => {
   const watchesRef = useRef<HTMLDivElement>(null);
   const boxesRef = useRef<HTMLDivElement>(null);
   const perfumeRef = useRef<HTMLDivElement>(null);
-  
+  const newArrivalsRef = useRef<HTMLDivElement>(null);
+
+  const [spotsFlash, setSpotsFlash] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSpotsFlash(prev => !prev);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const bestSellers = products.filter(p => p.isBestSeller);
   const rings = products.filter(p => p.type === 'Ring' || p.isFeaturedRing);
   const bracelets = products.filter(p => p.type === 'Bracelet' || p.isFeaturedBracelet);
@@ -29,8 +40,18 @@ const Home: React.FC = () => {
   const watches = products.filter(p => p.type === 'Watch' || p.isFeaturedWatch);
   const boxes = products.filter(p => p.type === 'Jewelry Box' || p.isFeaturedJewelryBox);
   const perfumes = products.filter(p => p.type === 'Perfume Holder' || p.isFeaturedPerfumeHolder);
+  const newArrivals = products.filter(p => p.isNewArrival);
 
-  const spotsLeft = 800 - memberCount;
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+  const monthSeed = month + year * 12;
+  const startingSpots = 23 + (monthSeed % 3); // 23, 24, or 25
+  const dayOfMonth = now.getDate();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const progress = (dayOfMonth - 1) / (totalDays - 1);
+  const totalSpots = startingSpots - progress * (startingSpots - 2);
+  const spotsLeft = Math.max(2, Math.floor(totalSpots));
 
   const scroll = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
@@ -83,7 +104,7 @@ const Home: React.FC = () => {
       >
         {/* Spoil Me Package Hero Section */}
         <section className="relative bg-zinc-900 text-white">
-          <div className={`absolute top-2 right-2 text-xs font-bold px-3 py-1 rounded-full border shadow-md z-20 ${spotsLeft <= 20 ? 'bg-red-600 border-red-400 text-white animate-pulse' : 'bg-black/50 border-cyan-500/50 text-cyan-300'}`}>
+          <div className={`absolute top-2 right-2 text-xs font-bold px-3 py-1 rounded-full border shadow-md z-20 bg-red-600 border-red-400 text-red-500 ${spotsFlash ? 'animate-pulse' : ''}`}>
             {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
           </div>
 
@@ -93,19 +114,22 @@ const Home: React.FC = () => {
             <div className="max-w-3xl mx-auto text-center space-y-4">
               
               <div className="space-y-1">
-                  <p className="text-sm font-bold text-cyan-400">🎁 Spoil Me Package</p>
                   <h2 className="font-cherry text-3xl text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-cyan-400 drop-shadow-lg py-1">
-                    Join the club… Win weekly.
+                    🎁 The Spoil Me Club
                   </h2>
-                  <p className="text-sm text-gray-300">All for just R19/month — cancel whenever you want!</p>
+                  <p className="text-sm text-gray-300">Join for just R19 / $2 per month. Cancel anytime.</p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center items-center text-sm text-gray-200">
+                    <span>✅ Get a R25 / $3 Voucher instantly.</span>
+                    <span>✅ Automatic entry into the Weekly R500 Drop.</span>
+                  </div>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <Link to="/membership" className="px-5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-semibold transition-all hover:shadow-[0_0_20px_rgba(236,72,153,0.6)] flex items-center justify-center gap-2 text-xs">
-                  Join Now <ArrowRight size={14} />
+                  [ JOIN THE CLUB ] <ArrowRight size={14} />
                 </Link>
                 <Link to="/weekly-winners" className="px-5 py-2.5 border border-gray-500 hover:border-cyan-400 hover:text-cyan-400 hover:bg-cyan-950/30 text-gray-300 rounded-lg font-semibold transition-all text-xs flex items-center justify-center gap-2">
-                  View This Week's Winners <Trophy size={14} />
+                  [ View Past Winners ] <Trophy size={14} />
                 </Link>
               </div>
             </div>
@@ -113,20 +137,7 @@ const Home: React.FC = () => {
         </section>
 
         {/* Winners Marquee */}
-        {weeklyWinners.length > 0 && (
-          <section className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 py-3 overflow-hidden border-t-2 border-cyan-500/50">
-            <div className="flex animate-marquee whitespace-nowrap" style={{ animationDuration: '40s' }}>
-              {[...weeklyWinners, ...weeklyWinners].map((winner, index) => (
-                <div key={index} className="flex items-center mx-6">
-                  <Trophy size={16} className="text-amber-700 mr-3 shrink-0" />
-                  <span className="text-sm text-black font-bold tracking-wide">{winner.name}</span>
-                  <span className="text-xs text-zinc-700 font-medium mx-2">won</span>
-                  <span className="text-sm font-extrabold text-black">R{winner.prize.toFixed(2)}!</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        <WinnerCarousel />
       </div>
 
       {/* Best Sellers Section */}
@@ -171,6 +182,32 @@ const Home: React.FC = () => {
         </section>
       )}
 
+      {/* The Secret Vault Section */}
+      <section className="relative">
+        <div className="bg-gradient-to-r from-purple-900 via-pink-900 to-purple-900 rounded-2xl p-8 border-4 border-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.3)]">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <Crown className="text-yellow-400 animate-pulse" size={48} />
+              <h2 className="font-cherry text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-pink-400 to-cyan-400 drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]">
+                THE SECRET VAULT
+              </h2>
+              <Crown className="text-yellow-400 animate-pulse" size={48} />
+            </div>
+            <p className="font-architects text-lg md:text-xl text-gray-200 max-w-2xl mx-auto">
+              Exclusive Clearance & Samples for Deluxe Members. Unlock massive discounts on vintage treasures!
+            </p>
+            <Link
+              to="/vault"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold rounded-full shadow-lg transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(250,204,21,0.6)]"
+            >
+              <Crown size={24} />
+              Enter The Vault
+              <ArrowRight size={20} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Categories */}
       <section>
         <div className="flex justify-between items-end mb-6">
@@ -194,7 +231,7 @@ const Home: React.FC = () => {
                             boxShadow: '0 0 15px 3px rgba(220, 38, 38, 0.6)' // Red Shadow for Red Collection
                         }}
                     >
-                        <ResolvedImage src={cat.image} alt={cat.name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" fallback="https://via.placeholder.com/600" onError={(e) => { console.warn('Image failed to load in Home category:', (e.currentTarget as HTMLImageElement).src); (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/600'; }} />
+                        <ResolvedImage src={cat.image} alt={cat.name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" fallback={getFallbackImage(600)} onError={handleImageError} />
                         <div className="absolute bottom-0 left-0 p-1.5 md:p-4 w-full bg-gradient-to-t from-black/80 to-transparent">
                           <h3 className="font-handwriting text-xl md:text-3xl font-bold mb-0.5 md:mb-1 text-white drop-shadow-md truncate">
                             {cat.name}
@@ -210,7 +247,7 @@ const Home: React.FC = () => {
             return (
               <div key={cat.id} className="relative aspect-[4/5] md:aspect-square cursor-pointer overflow-hidden transition-all duration-300 rounded-lg md:rounded-xl border border-gray-800 bg-zinc-900 hover:border-gray-600 group">
                 <Link to={collectionLink} className="block w-full h-full relative">
-                  <ResolvedImage src={cat.image} alt={cat.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" fallback="https://via.placeholder.com/600" onError={(e) => { console.warn('Image failed to load in Home category alt:', (e.currentTarget as HTMLImageElement).src); (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/600'; }} />
+                  <ResolvedImage src={cat.image} alt={cat.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" fallback={getFallbackImage(600)} onError={handleImageError} />
                   <div className="absolute bottom-0 left-0 p-1.5 md:p-4 w-full bg-gradient-to-t from-black/80 to-transparent">
                     <h3 className="font-handwriting text-xl md:text-3xl font-bold mb-0.5 md:mb-1 text-white drop-shadow-md truncate">
                       {cat.name}
@@ -303,6 +340,13 @@ const Home: React.FC = () => {
             </div>
         </section>
       )}
+
+      {/* Link to Customized Wire Wrapped Pendants */}
+      <div className="mb-6">
+        <Link to="/customized-wire-wrapped-pendants" className="text-cyan-400 font-medium text-sm hover:text-cyan-300 flex items-center gap-1 transition-colors">
+          Explore Customized Wire Wrapped Pendants <ArrowRight size={14} />
+        </Link>
+      </div>
 
       {/* Rings Section */}
       {rings.length > 0 && (
@@ -448,7 +492,7 @@ const Home: React.FC = () => {
                 onClick={() => scroll(danglesRef, 'left')}
                 className="md:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/dangles:opacity-100 transition-opacity focus:opacity-100"
             >
-                <ChevronRight size={20} />
+                <ChevronLeft size={20} />
             </button>
             <button 
                 onClick={() => scroll(danglesRef, 'right')}
@@ -548,6 +592,12 @@ const Home: React.FC = () => {
                     onClick={() => scroll(boxesRef, 'left')}
                     className="md:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/boxes:opacity-100 transition-opacity focus:opacity-100"
                 >
+                    <ChevronLeft size={20} />
+                </button>
+                <button
+                    onClick={() => scroll(boxesRef, 'right')}
+                    className="md:hidden absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/boxes:opacity-100 transition-opacity focus:opacity-100"
+                >
                     <ChevronRight size={20} />
                 </button>
 
@@ -581,6 +631,12 @@ const Home: React.FC = () => {
                 <button 
                     onClick={() => scroll(perfumeRef, 'left')}
                     className="md:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/perfumes:opacity-100 transition-opacity focus:opacity-100"
+                >
+                    <ChevronLeft size={20} />
+                </button>
+                <button
+                    onClick={() => scroll(perfumeRef, 'right')}
+                    className="md:hidden absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/perfumes:opacity-100 transition-opacity focus:opacity-100"
                 >
                     <ChevronRight size={20} />
                 </button>
@@ -640,6 +696,75 @@ const Home: React.FC = () => {
             </div>
         </section>
       )}
+
+      {/* New Arrivals Section */}
+      {newArrivals.length > 0 && (
+        <section id="new-arrivals" className="mt-12">
+            <div className="flex justify-between items-end mb-6">
+                <h2 className="font-cherry text-[22px] font-bold text-white border-l-4 border-green-500 pl-4 inline-block">
+                New Arrivals
+                </h2>
+                <Link to="/catalog/new" className="text-cyan-400 font-medium text-sm hover:text-cyan-300 flex items-center gap-1 transition-colors">
+                    View All <ArrowRight size={14} />
+                </Link>
+            </div>
+
+            <div className="relative group/newarrivals">
+            {/* Mobile Arrows */}
+            <button
+                onClick={() => scroll(newArrivalsRef, 'left')}
+                className="md:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/newarrivals:opacity-100 transition-opacity focus:opacity-100"
+            >
+                <ChevronLeft size={20} />
+            </button>
+            <button
+                onClick={() => scroll(newArrivalsRef, 'right')}
+                className="md:hidden absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/70 text-white rounded-full shadow-lg backdrop-blur-sm border border-gray-700 opacity-0 group-hover/newarrivals:opacity-100 transition-opacity focus:opacity-100"
+            >
+                <ChevronRight size={20} />
+            </button>
+
+            {/* Scroll Container */}
+            <div
+                ref={newArrivalsRef}
+                className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-4 md:overflow-visible no-scrollbar scroll-smooth"
+            >
+                {newArrivals.map(product => (
+                <div key={product.id} className="min-w-[calc(50%-8px)] snap-start md:min-w-0">
+                    <ProductCard product={product} />
+                </div>
+                ))}
+            </div>
+            </div>
+        </section>
+      )}
+
+      {/* Artist Partnership Section */}
+      <section className="relative">
+        <div className="bg-gradient-to-r from-yellow-900 via-orange-900 to-yellow-900 rounded-2xl p-8 border-4 border-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.3)]">
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <Crown className="text-yellow-400 animate-pulse" size={48} />
+              <h2 className="font-cherry text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-pink-400 to-cyan-400 drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]">
+                JOIN OUR ARTIST NETWORK
+              </h2>
+              <Crown className="text-yellow-400 animate-pulse" size={48} />
+            </div>
+            <p className="font-architects text-lg md:text-xl text-gray-200 max-w-2xl mx-auto">
+              Are you a jewelry artist? Showcase your unique creations to over 7,000 collectors worldwide. Only 1% commission on sales!
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link
+                to="/artist-partnership"
+                className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold rounded-full shadow-lg transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(250,204,21,0.6)]"
+              >
+                Start Your Shop <ArrowRight size={18} />
+              </Link>
+              <p className="text-sm text-gray-300">Starting from {curr === 'ZAR' ? 'R19' : '$1.50'} / month</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

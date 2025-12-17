@@ -1,0 +1,55 @@
+import { AdPackage } from '../types';
+
+export const adPackages: AdPackage[] = [
+  {
+    id: 'flash_24h',
+    name: '⚡ 24h Flash',
+    durationHours: 24,
+    priceZAR: 29.00,
+    priceUSD: 2.00,
+    placement: 'Top of Category',
+    strategy: 'The "Quick Test". Perfect for launching a new item to see if it gets traction.',
+    tier: 'flash',
+  },
+  {
+    id: 'pulse_3d',
+    name: '✨ 3-Day Pulse',
+    durationHours: 72,
+    priceZAR: 59.00,
+    priceUSD: 3.50,
+    placement: 'Top of Category + "Trending" Badge',
+    strategy: 'The "Weekend Warrior". Ideal for boosting visibility Fri-Sun.',
+    tier: 'pulse',
+  },
+  {
+    id: 'icon_7d',
+    name: '💎 Weekly Icon',
+    durationHours: 168,
+    priceZAR: 119.00,
+    priceUSD: 7.00,
+    placement: 'Top of Category + Search Priority',
+    strategy: 'The "Steady Seller". Keeps the item visible for a full week cycle.',
+    tier: 'icon',
+  },
+  {
+    id: 'spotlight_24h',
+    name: '🔥 Homepage Spotlight',
+    durationHours: 24,
+    priceZAR: 149.00,
+    priceUSD: 9.00,
+    placement: 'Homepage Top Rail',
+    strategy: 'The "Launch Event". Maximum eyeballs for one day to sell out fast.',
+    tier: 'spotlight',
+  },
+  {
+    id: 'crown_3d',
+    name: '👑 The Crown Jewel',
+    durationHours: 72,
+    priceZAR: 349.00,
+    priceUSD: 20.00,
+    placement: 'Homepage Top Rail + Category Pin',
+    strategy: 'The "Prestige". Complete dominance of the app for 3 days. (Limit 10 Slots)',
+    tier: 'crown',
+  },
+];
+

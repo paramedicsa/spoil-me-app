@@ -1,93 +1,64 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { useStore } from '../context/StoreContext';
-import { CheckCircle, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, X, Crown, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useStore } from '../context/StoreContext';
 
-// --- DATASETS ---
+// --- GLOBAL NOTIFICATIONS DATASET ---
 
-const NAMES_SA = [
-    "Thandi", "Jessica", "Precious", "Elize", "Zanele", "Sarah", "Nosipho", "Annelie", 
-    "Busi", "Nicole", "Lindiwe", "Megan", "Nompumelelo", "Bianca", "Ayanda", "Michelle",
-    "Gugulethu", "Chantelle", "Siphesihle", "Debbie", "Refilwe", "Karen"
+const WINNER_NOTIFICATIONS = [
+  // South African winners
+  "Anja P. from Pretoria just won R500!",
+  "Thandi M. from Sandton just won R500!",
+  "Bianca S. from Cape Town just won R500!",
+  "Lerato K. from Soweto just won R500!",
+  // International winners
+  "Sarah J. from Texas just won $30!",
+  "Emily R. from New York just won $30!",
+  "Sophie C. from London just won $30!",
+  "Jessica H. from Florida just won $30!"
 ];
 
-const NAMES_INDIAN = ["Priya", "Meera", "Anjali", "Deepa", "Lakshmi"]; // 1% target
-const NAMES_ASIAN = ["Wei", "Li", "Mei", "Yuki", "Jin"]; // 1% target
-
-const SURNAMES_SA = [
-    "Dlamini", "Botha", "Nkosi", "Nel", "Khumalo", "Van Der Merwe", "Molefe", "Smith", 
-    "Mthembu", "Coetzee", "Ngcobo", "Fourie", "Mkhize", "Van Wyk", "Zulu", "Kruger"
-];
-const SURNAMES_INDIAN = ["Naidoo", "Patel", "Govender", "Chetty", "Singh"];
-const SURNAMES_ASIAN = ["Chen", "Wang", "Lee", "Zhang", "Liu"];
-
-const LOCATIONS = [
-    "Sandton", "Cape Town", "Durban North", "Centurion", "Paarl", "Soweto", 
-    "Umhlanga", "Bloemfontein", "Stellenbosch", "George", "Ballito", "Benoni",
-    "Midrand", "Somerset West", "Port Elizabeth", "Pretoria East"
+const VAULT_NOTIFICATIONS = [
+  // South African vault access
+  "Lerato in Sandton just unlocked The Secret Vault.",
+  "Thandi in Durban just unlocked The Secret Vault.",
+  "Johan in Cape Town just unlocked The Secret Vault.",
+  "Bianca in Pretoria just unlocked The Secret Vault.",
+  // International vault access
+  "Jessica in New York just unlocked The Secret Vault.",
+  "Emily in Texas just unlocked The Secret Vault.",
+  "Ashley in California just unlocked The Secret Vault.",
+  "Sarah in Florida just unlocked The Secret Vault.",
+  "Sophie in London just unlocked The Secret Vault.",
+  "Emma in Manchester just unlocked The Secret Vault."
 ];
 
 const SocialProofPopup: React.FC = () => {
-  const { products } = useStore();
+  const { weeklyWinners, currency } = useStore();
   const [isVisible, setIsVisible] = useState(false);
-  const [currentNotif, setCurrentNotif] = useState<{
-      img?: string;
-      name: string;
-      location: string;
-      productName: string;
-      productId: string;
-      timeAgo: string;
-  } | null>(null);
-
-  // Filter eligible products: Stock > 1 AND Sold > 150
-  const eligibleProducts = useMemo(() => {
-      return products.filter(p => p.stock > 1 && (p.soldCount || 0) > 150);
-  }, [products]);
+  const [currentMessage, setCurrentMessage] = useState<string>('');
+  const [messageType, setMessageType] = useState<'winner' | 'vault'>('winner');
 
   useEffect(() => {
-      if (eligibleProducts.length === 0) return;
-
       let timeoutId: ReturnType<typeof setTimeout>;
 
       const triggerPopup = () => {
-          // 1. Select Random Product
-          const randomProduct = eligibleProducts[Math.floor(Math.random() * eligibleProducts.length)];
-          
-          // 2. Generate Identity (Weighted)
-          const rand = Math.random();
-          let firstName = "";
-          let surname = "";
+          // 60% chance for winner notifications, 40% for vault notifications
+          const isWinnerMessage = Math.random() < 0.6;
 
-          if (rand > 0.99) { 
-              // 1% Asian
-              firstName = NAMES_ASIAN[Math.floor(Math.random() * NAMES_ASIAN.length)];
-              surname = SURNAMES_ASIAN[Math.floor(Math.random() * SURNAMES_ASIAN.length)];
-          } else if (rand > 0.98) {
-              // 1% Indian
-              firstName = NAMES_INDIAN[Math.floor(Math.random() * NAMES_INDIAN.length)];
-              surname = SURNAMES_INDIAN[Math.floor(Math.random() * SURNAMES_INDIAN.length)];
+          if (isWinnerMessage && weeklyWinners.length > 0) {
+              // Show winner notification
+              const randomWinner = weeklyWinners[Math.floor(Math.random() * weeklyWinners.length)];
+              const prizeText = randomWinner.currency === 'ZAR' ? `R${randomWinner.prize}` : `$${randomWinner.prize}`;
+              const message = `${randomWinner.name} just won ${prizeText} in the Weekly Draw!`;
+              setCurrentMessage(message);
+              setMessageType('winner');
           } else {
-              // 98% SA General
-              firstName = NAMES_SA[Math.floor(Math.random() * NAMES_SA.length)];
-              surname = SURNAMES_SA[Math.floor(Math.random() * SURNAMES_SA.length)];
+              // Show vault access notification
+              const vaultMessage = VAULT_NOTIFICATIONS[Math.floor(Math.random() * VAULT_NOTIFICATIONS.length)];
+              setCurrentMessage(vaultMessage);
+              setMessageType('vault');
           }
-
-          const location = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
-          const timeAgo = `${Math.floor(Math.random() * 59) + 1} minutes ago`;
-
-          // 3. Construct Data
-          // Rule: Pendants & Bracelets = No Image.
-          const isNoImage = randomProduct.type === 'Pendant' || randomProduct.type === 'Bracelet';
-
-          setCurrentNotif({
-              img: isNoImage ? undefined : randomProduct.images[0],
-              name: `${firstName} ${surname.charAt(0)}.`, // Obfuscate surname slightly for privacy feel
-              location,
-              productName: randomProduct.name,
-              productId: randomProduct.id,
-              timeAgo
-          });
 
           setIsVisible(true);
 
@@ -96,8 +67,8 @@ const SocialProofPopup: React.FC = () => {
               setIsVisible(false);
           }, 6000);
 
-          // Re-trigger after random interval (20s - 45s)
-          const nextInterval = Math.floor(Math.random() * (45000 - 20000 + 1) + 20000);
+          // Re-trigger after random interval (20s - 40s)
+          const nextInterval = Math.floor(Math.random() * (40000 - 20000 + 1) + 20000);
           timeoutId = setTimeout(triggerPopup, nextInterval);
       };
 
@@ -106,9 +77,9 @@ const SocialProofPopup: React.FC = () => {
       timeoutId = setTimeout(triggerPopup, initialDelay);
 
       return () => clearTimeout(timeoutId);
-  }, [eligibleProducts]);
+  }, [weeklyWinners, currency]);
 
-  if (!currentNotif) return null;
+  if (!currentMessage) return null;
 
   return (
     <div 
@@ -125,31 +96,26 @@ const SocialProofPopup: React.FC = () => {
                 <X size={12} />
             </button>
 
-            {/* Image (Conditional) */}
-            {currentNotif.img ? (
-                <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-gray-700 bg-black">
-                    <img src={currentNotif.img} alt="Product" className="w-full h-full object-cover" onError={(e) => { console.warn('Image failed to load in SocialProofPopup:', (e.currentTarget as HTMLImageElement).src); (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/200'; }} />
-                </div>
-            ) : (
-                <div className="w-16 h-16 shrink-0 rounded-lg border border-purple-500/30 bg-purple-900/20 flex items-center justify-center">
-                    <span className="font-cherry text-xs text-purple-400 text-center leading-none">Unique<br/>Find</span>
-                </div>
-            )}
+            {/* Icon */}
+            <div className={`w-8 h-8 shrink-0 rounded-full border flex items-center justify-center ${
+                messageType === 'winner'
+                    ? 'border-yellow-500/30 bg-yellow-900/20'
+                    : 'border-purple-500/30 bg-purple-900/20'
+            }`}>
+                {messageType === 'winner' ? (
+                    <Trophy size={16} className="text-yellow-400" />
+                ) : (
+                    <Crown size={16} className="text-purple-400" />
+                )}
+            </div>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-xs font-bold text-white truncate">{currentNotif.name}</span>
-                    <span className="text-[9px] text-gray-400">in {currentNotif.location}</span>
+                <div className="text-xs text-gray-200 leading-tight">
+                    {currentMessage}
                 </div>
-                <div className="flex items-center gap-1 text-[9px] text-green-400 font-bold uppercase tracking-wide mb-1">
-                    <CheckCircle size={10} /> Verified Purchase
-                </div>
-                <Link to={`/product/${currentNotif.productId}`} className="block text-xs text-gray-300 hover:text-pink-500 transition-colors truncate line-clamp-2 leading-tight">
-                    {currentNotif.productName}
-                </Link>
                 <div className="text-[9px] text-gray-500 mt-1">
-                    {currentNotif.timeAgo}
+                    Just now
                 </div>
             </div>
         </div>

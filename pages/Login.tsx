@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
@@ -18,7 +16,12 @@ const Login: React.FC = () => {
     
     const success = await login(email, password);
     if (success) {
-      navigate('/admin');
+      // Check if user is admin and navigate accordingly
+      if (email === 'spoilmevintagediy@gmail.com') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } else {
       setError('Invalid credentials. Please check your email and password.');
     }

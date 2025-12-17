@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Trash2, Plus, Minus, CreditCard, ArrowRight, ShieldCheck, Check, Mail, Lock, Eye, EyeOff, User, Calendar, Truck } from 'lucide-react';
@@ -9,12 +8,12 @@ import ShippingProgressBar from '../components/ShippingProgressBar';
 import { Order } from '../types';
 
 const Cart: React.FC = () => {
-  const { cart, removeFromCart, updateCartQuantity, getCartTotal, user, appliedVoucher, setAppliedVoucher, applyExternalVoucher, updateUserAddress, setIsStickyProgressBarVisible, checkout, clearCart, register, login } = useStore();
+  const { cart, removeFromCart, updateCartQuantity, getCartTotal, user, appliedVoucher, setAppliedVoucher, applyExternalVoucher, updateUserAddress, setIsStickyProgressBarVisible, checkout, clearCart, register, login, currency } = useStore();
   const navigate = useNavigate();
   
   // State for shipping info from child component
   const [shippingInfo, setShippingInfo] = useState({
-    method: 'pudo' as 'pudo' | 'paxi' | 'door',
+    method: 'pudo' as 'pudo' | 'paxi' | 'door' | 'international',
     cost: 60, // Default cost
     details: ''
   });
@@ -22,6 +21,9 @@ const Cart: React.FC = () => {
   // Voucher Input
   const [voucherInput, setVoucherInput] = useState('');
   const [voucherError, setVoucherError] = useState('');
+
+  // Loyalty Points Redemption
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   // Checkout & Auth
   const payFastRef = useRef<PayFastFormHandle>(null);
@@ -88,7 +90,21 @@ const Cart: React.FC = () => {
   
   if (discountAmount > cartTotal) discountAmount = cartTotal;
 
-  const finalTotal = cartTotal + shippingCost - discountAmount;
+  // Store Credit Calculation
+  let creditUsed = 0;
+  const subtotalAfterDiscount = cartTotal - discountAmount;
+  if (user?.storeCredit && user.storeCredit > 0 && user.creditCurrency === currency) {
+    creditUsed = Math.min(subtotalAfterDiscount, user.storeCredit);
+  }
+
+  // Loyalty Points Redemption Calculation
+  let loyaltyDiscount = 0;
+  if (pointsToRedeem > 0) {
+    const discountPer100Points = currency === 'ZAR' ? 1 : 0.5;
+    loyaltyDiscount = (pointsToRedeem / 100) * discountPer100Points;
+  }
+
+  const finalTotal = cartTotal + shippingCost - discountAmount - creditUsed - loyaltyDiscount;
 
   const handleApplyVoucher = () => {
       setVoucherError('');
@@ -127,7 +143,8 @@ const Cart: React.FC = () => {
             total: finalTotal,
             shippingMethod: shippingInfo.method,
             shippingDetails: shippingInfo.details,
-            shippingCost: shippingCost
+            shippingCost: shippingCost,
+            pointsToRedeem
         });
         setOrderToPay(createdOrder);
     } catch(error) {
@@ -166,6 +183,14 @@ const Cart: React.FC = () => {
       }
   };
 
+
+  const getCurrencySymbol = () => currency === 'ZAR' ? 'R' : '$';
+  const getPrice = (zarPrice: number, usdPrice?: number) => currency === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+
+  const pointsPerSpend = currency === 'ZAR' ? 'R10' : '$3';
+  const discountRate = currency === 'ZAR' ? 'R1.00' : '$0.50';
+  const minRedemption = currency === 'ZAR' ? 'R10' : '$5';
+  const maxNonMemberShort = currency === 'ZAR' ? 'R100' : '$50';
 
   if (cart.length === 0) {
     return (
@@ -279,7 +304,7 @@ const Cart: React.FC = () => {
                                 </button>
                             </div>
                             <div className="font-bold text-white">
-                                R{((item.price + (item.selectedMaterialModifier || 0)) * item.quantity).toFixed(2)}
+                                {getCurrencySymbol()}{((getPrice(item.price, item.priceUSD || item.price) + (item.selectedMaterialModifier || 0)) * item.quantity).toFixed(2)}
                             </div>
                           </div>
                       </div>
@@ -305,23 +330,35 @@ const Cart: React.FC = () => {
               <div className="space-y-2 text-sm text-gray-400 mb-4 pb-4 border-b border-gray-800">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span className="text-white">R{cartTotal.toFixed(2)}</span>
+                    <span className="text-white">{getCurrencySymbol()}{cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping</span>
-                    <span className="text-white">{isFreeShippingEligible ? <span className="text-green-400">FREE</span> : `R${shippingCost.toFixed(2)}`}</span>
+                    <span className="text-white">{isFreeShippingEligible ? <span className="text-green-400">FREE</span> : `${getCurrencySymbol()}${shippingCost.toFixed(2)}`}</span>
                   </div>
                   {discountAmount > 0 && (
                       <div className="flex justify-between text-green-400">
                         <span>Discount</span>
-                        <span>-R{discountAmount.toFixed(2)}</span>
+                        <span>-{getCurrencySymbol()}{discountAmount.toFixed(2)}</span>
                       </div>
+                  )}
+                  {creditUsed > 0 && (
+                    <div className="flex justify-between text-green-400">
+                      <span>Store Credit</span>
+                      <span>-{getCurrencySymbol()}{creditUsed.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {loyaltyDiscount > 0 && (
+                    <div className="flex justify-between text-purple-400">
+                      <span>Loyalty Discount</span>
+                      <span>-{getCurrencySymbol()}{loyaltyDiscount.toFixed(2)}</span>
+                    </div>
                   )}
               </div>
 
               <div className="flex justify-between items-end mb-6">
                   <span className="text-gray-300 font-bold">Total</span>
-                  <span className="text-2xl font-bold text-white">R{finalTotal.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-white">{getCurrencySymbol()}{finalTotal.toFixed(2)}</span>
               </div>
 
               {!appliedVoucher ? (
@@ -345,7 +382,36 @@ const Cart: React.FC = () => {
               )}
               {voucherError && <p className="text-xs text-red-400 mb-4">{voucherError}</p>}
 
-              <button 
+              {/* Loyalty Points Redemption */}
+              {user.email && user.loyaltyPoints >= 1000 && (
+                <div className="bg-purple-900/20 border border-purple-500/30 p-4 rounded-lg mb-4">
+                  <h4 className="text-sm font-bold text-purple-300 mb-2">Redeem Loyalty Points</h4>
+                  <p className="text-xs text-gray-400 mb-3">100 points = {discountRate} discount. Min 1000 points ({minRedemption}). {user.isMember ? '' : `Non-members: max ${maxNonMemberShort} per order.`}</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={Math.min(user.loyaltyPoints, user.isMember ? user.loyaltyPoints : 10000)}
+                      step="100"
+                      value={pointsToRedeem}
+                      onChange={e => setPointsToRedeem(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="flex-1 bg-black border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Points to redeem"
+                    />
+                    <button
+                      onClick={() => setPointsToRedeem(Math.min(user.loyaltyPoints, user.isMember ? user.loyaltyPoints : 10000))}
+                      className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded text-sm"
+                    >
+                      Max
+                    </button>
+                  </div>
+                  {pointsToRedeem > 0 && (
+                    <p className="text-xs text-purple-400 mt-2">Discount: {getCurrencySymbol()}{(pointsToRedeem / 100).toFixed(2)}</p>
+                  )}
+                </div>
+              )}
+
+              <button
                   onClick={handleCheckout}
                   className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
               >

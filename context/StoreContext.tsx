@@ -1,11 +1,11 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 // Fix: Added Winner and Order to import
-import { Product, Category, CartItem, User, SpecialOffer, Voucher, Notification, VoucherMeta, AffiliateLeaderboardItem, PackagingItem, EarringMaterial, AffiliateStats, ShippingAddress, Winner, Order } from '../types';
+import { Product, Category, CartItem, User, SpecialOffer, Voucher, Notification, VoucherMeta, AffiliateLeaderboardItem, PackagingItem, EarringMaterial, AffiliateStats, ShippingAddress, Winner, Order, VaultItem, CommissionRecord, AffiliatePayout, AffiliateMilestone } from '../types';
 import { INITIAL_USER, INITIAL_SPECIALS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../constants';
-import { db, storage } from '../firebaseConfig';
-import { getDownloadURL, ref as sRef } from 'firebase/storage';
-import { 
+import { db, storage, auth, app } from '../firebaseConfig';
+import { getDownloadURL, ref as sRef, getStorage } from 'firebase/storage';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import {
   collection, 
   onSnapshot, 
   doc, 
@@ -17,7 +17,9 @@ import {
   getDocs,
   where,
   arrayUnion,
-  getDoc
+  getDoc,
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 
 interface StoreContextType {
@@ -35,6 +37,10 @@ interface StoreContextType {
   setIsStickyProgressBarVisible: (isVisible: boolean) => void;
   orders: Order[];
   
+  // Currency
+  currency: 'ZAR' | 'USD';
+  toggleCurrency: () => void;
+
   // Presets
   packagingPresets: PackagingItem[];
   materialPresets: EarringMaterial[];
@@ -59,10 +65,10 @@ interface StoreContextType {
   updateCartQuantity: (productId: string, quantity: number, options?: Partial<CartItem>) => void;
   clearCart: () => void;
   toggleWishlist: (productId: string) => void;
-  checkout: (orderData: Omit<Order, 'id' | 'orderNumber' | 'date' | 'customerName' | 'customerEmail' | 'status'>) => Promise<Order>;
+  checkout: (orderData: Omit<Order, 'id' | 'orderNumber' | 'date' | 'customerName' | 'customerEmail' | 'status'> & { pointsToRedeem?: number }) => Promise<Order>;
   submitReview: (productId: string, rating: number, content: string, notificationId: string) => Promise<void>;
   shareProduct: (productId: string) => void;
-  claimSocialReward: (platform: 'tiktok' | 'twitter' | 'whatsapp' | 'facebook', handle?: string) => Promise<void>;
+  claimSocialReward: (platform: 'tiktok' | 'twitter' | 'whatsapp' | 'facebook' | 'pinterest', handle?: string) => Promise<void>;
   addSystemNotification: (title: string, message: string, type?: 'system' | 'review_request' | 'affiliate_msg') => void;
   processGiftVoucherPurchase: (amount: number, meta: VoucherMeta) => Promise<void>;
   
@@ -77,6 +83,9 @@ interface StoreContextType {
   updateAffiliateTier: (userId: string, newRate: number) => Promise<void>;
   assignAffiliateParent: (childId: string, parentId: string) => Promise<void>;
   
+  // Artist Actions
+  applyForArtist: (data: { name: string; surname: string; artistTradeName?: string; contactNumber: string; email: string; productImages: string[] }) => Promise<void>;
+
   // Admin Actions
   addProduct: (product: Product) => Promise<void>;
   updateProduct: (product: Product) => Promise<void>;
@@ -103,6 +112,14 @@ interface StoreContextType {
 
   // Helpers
   getCartTotal: () => number;
+
+  // Admin Winner Override
+  manualWinner: Winner | null;
+  setManualWinner: (winner: Winner | null) => void;
+  auth: any;
+
+  // Account Management
+  closeAccount: (reason: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -143,27 +160,24 @@ const sanitizeFirestoreData = (data: any, seen = new WeakSet()): any => {
        return new Date(data.seconds * 1000 + data.nanoseconds / 1000000).toISOString();
   }
 
-  // STRICT OBJECT FILTERING
-  // If the object is a complex class instance (like Firebase internal classes Q$1, Sa, etc.), 
-  // we typically want to avoid it unless we know it's safe.
-  // We check if the prototype is Object or null (plain object) OR if it's a standard array.
+  // --- FIX: COMMENTED OUT OVERLY AGGRESSIVE PROTOTYPE CHECK ---
+  /*
   const proto = Object.getPrototypeOf(data);
   if (proto && proto !== Object.prototype && proto !== null) {
-      // It is a class instance. 
-      // If it's a known safe class, fine. If it's a Firebase internal, SKIP IT.
-      // For now, we skip unknown class instances to prevent the crash.
-      return null; 
+      // It is a class instance.
+      return null;
   }
+  */
 
   const sanitized: any = {};
   for (const key in data) {
       // Exclude internal Firebase keys and complex objects we don't need in LocalStorage
       if (
-          key.startsWith('_') || 
-          key === 'auth' || 
-          key === 'firestore' || 
-          key === 'app' || 
-          key === 'metadata' || 
+          key.startsWith('_') ||
+          key === 'auth' ||
+          key === 'firestore' ||
+          key === 'app' ||
+          key === 'metadata' ||
           key === 'proactiveRefresh' ||
           key === 'providerData' ||
           key === 'stsTokenManager'
@@ -179,14 +193,14 @@ const sanitizeFirestoreData = (data: any, seen = new WeakSet()): any => {
 
 const generateMonthlyLeaderboard = (): AffiliateLeaderboardItem[] => {
     const names = [
-        "Thandiwe Zulu", "Jessica Nel", "Precious Khumalo", 
-        "Sarah Van Der Merwe", "Amahle Dlamini", "Chloe Naidoo", 
+        "Thandiwe Zulu", "Jessica Nel", "Precious Khumalo",
+        "Sarah Van Der Merwe", "Amahle Dlamini", "Chloe Naidoo",
         "Nicole Botha", "Zanele Mthembu", "Ashley Smith", "Bianca Fourie"
     ];
-    
+
     const now = new Date();
-    const seed = now.getFullYear() * 100 + now.getMonth(); 
-    
+    const seed = now.getFullYear() * 100 + now.getMonth();
+
     const seededRandom = (s: number) => {
         let t = s += 0x6D2B79F5;
         t = Math.imul(t ^ t >>> 15, t | 1);
@@ -206,17 +220,17 @@ const generateMonthlyLeaderboard = (): AffiliateLeaderboardItem[] => {
 
     // Set top score specifically as requested
     items[0].sales = 28561.68;
-    
+
     let currentScore = 28561.68;
-    
+
     for (let i = 1; i < items.length; i++) {
         const r = seededRandom(seed + i);
-        const drop = 1500 + (r * 3500); 
+        const drop = 1500 + (r * 3500);
         const cents = Math.floor(seededRandom(seed + i + 50) * 99) / 100;
-        
+
         currentScore = Math.max(1000, currentScore - drop);
         const finalValue = Math.floor(currentScore) + cents;
-        
+
         items[i].sales = parseFloat(finalValue.toFixed(2));
     }
 
@@ -231,56 +245,109 @@ const generateMonthlyLeaderboard = (): AffiliateLeaderboardItem[] => {
 };
 
 // Fix: Function to generate mock weekly winners
-const generateWeeklyWinners = (): Winner[] => {
-    const names = [
-      "Thandiwe Zulu", "Jessica Nel", "Precious Khumalo", "Sarah Van Der Merwe",
-      "Amahle Dlamini", "Chloe Naidoo", "Nicole Botha", "Zanele Mthembu",
-      "Ashley Smith", "Bianca Fourie", "Elize Venter", "Fayruz Adams",
-      "Gugulethu Mchunu", "Megan Reddy", "Nosipho Cele", "Anelisa Peterson",
-      "Busisiwe Malinga", "Danielle Jacobs", "Fatima Khan", "Isabella Martins",
-      "Liesl Jacobs", "Nomvula Gqola", "Pieterse Van Zyl", "Rethabile Mokoena",
-      "Sibusiso Ndlovu", "Tshegofatso Moloi", "Lerato Pillay", "Anja Pretorius",
-      "Fatima Akoojee", "Mandisa Botha"
-    ];
-    
+const generateWeeklyWinners = (manualWinner: Winner | null): Winner[] => {
     const now = new Date();
-    const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
-    const weekOfYear = Math.ceil(dayOfYear / 7);
-    const seed = now.getFullYear() * 100 + weekOfYear;
-    
-    const seededRandom = (s: number) => {
-        let t = s += 0x6D2B79F5;
-        t = Math.imul(t ^ t >>> 15, t | 1);
-        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const weekNumber = Math.ceil(((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
 
-    const shuffledNames = [...names].sort((a, b) => seededRandom(seed + a.length) - 0.5);
-
-    const winners: Winner[] = [];
-    const prizes = [
-        500, // 1st
-        250, // 2nd
-        200, // 3rd
-        ...Array(7).fill(100), // 4th-10th
-        ...Array(10).fill(50), // 11th-20th
-    ];
-    
-    for (let i = 0; i < prizes.length; i++) {
-      winners.push({
-        rank: i + 1,
-        name: shuffledNames[i],
-        prize: prizes[i]
-      });
+    // If manual winner is set, use it for the current week
+    if (manualWinner) {
+        const previousWeeks = [];
+        for (let i = 3; i >= 1; i--) {
+            const weekIndex = (weekNumber - 1 - i + 52) % 52;
+            previousWeeks.push(YEARLY_WINNERS[weekIndex]);
+        }
+        return [
+            manualWinner,
+            ...previousWeeks.map((winner, index) => ({
+                rank: index + 2,
+                name: winner.name,
+                prize: winner.currency === 'ZAR' ? 500 : 30,
+                currency: winner.currency
+            }))
+        ];
     }
-    return winners;
+
+    // Get current week and previous 3 weeks
+    const weeks = [];
+    for (let i = 3; i >= 0; i--) {
+        const weekIndex = (weekNumber - 1 - i + 52) % 52; // Wrap around year
+        weeks.push(YEARLY_WINNERS[weekIndex]);
+    }
+
+    return weeks.map((winner, index) => ({
+        rank: index + 1,
+        name: winner.name,
+        prize: winner.currency === 'ZAR' ? 500 : 30, // Adjust prize based on currency
+        currency: winner.currency
+    }));
   };
+
+// 52 unique winners for the year
+const YEARLY_WINNERS: { name: string; location: string; currency: 'ZAR' | 'USD' }[] = [
+  // Q1 (January - March)
+  { name: "Anja P.", location: "Pretoria, SA", currency: "ZAR" },
+  { name: "Sarah Jenkins", location: "Texas, USA", currency: "USD" },
+  { name: "Thandi M.", location: "Sandton, SA", currency: "ZAR" },
+  { name: "Sophie Clarke", location: "London, UK", currency: "USD" },
+  { name: "Johan V.", location: "Bloemfontein, SA", currency: "ZAR" },
+  { name: "Emily R.", location: "New York, USA", currency: "USD" },
+  { name: "Priya N.", location: "Durban, SA", currency: "ZAR" },
+  { name: "Isabella G.", location: "Toronto, Canada", currency: "USD" },
+  { name: "Bianca S.", location: "Cape Town, SA", currency: "ZAR" },
+  { name: "Madison L.", location: "Chicago, USA", currency: "USD" },
+  { name: "Lerato K.", location: "Soweto, SA", currency: "ZAR" },
+  { name: "Charlotte B.", location: "Manchester, UK", currency: "USD" },
+  { name: "David W.", location: "Port Elizabeth, SA", currency: "ZAR" },
+  // Q2 (April - June)
+  { name: "Jessica H.", location: "Florida, USA", currency: "USD" },
+  { name: "Zanele T.", location: "Polokwane, SA", currency: "ZAR" },
+  { name: "Olivia M.", location: "Dublin, Ireland", currency: "USD" },
+  { name: "Riaan O.", location: "Paarl, SA", currency: "ZAR" },
+  { name: "Ashley T.", location: "California, USA", currency: "USD" },
+  { name: "Fatima A.", location: "Lenasia, SA", currency: "ZAR" },
+  { name: "Emma W.", location: "Sydney, Australia", currency: "USD" },
+  { name: "Michelle D.", location: "George, SA", currency: "ZAR" },
+  { name: "Grace P.", location: "Ohio, USA", currency: "USD" },
+  { name: "Nandi Z.", location: "East London, SA", currency: "ZAR" },
+  { name: "Mia S.", location: "Berlin, Germany", currency: "USD" },
+  { name: "Chantelle V.", location: "Boksburg, SA", currency: "ZAR" },
+  { name: "Harper C.", location: "Arizona, USA", currency: "USD" },
+  // Q3 (July - September)
+  { name: "Sipho M.", location: "Johannesburg, SA", currency: "ZAR" },
+  { name: "Chloe F.", location: "Bristol, UK", currency: "USD" },
+  { name: "Elize B.", location: "Stellenbosch, SA", currency: "ZAR" },
+  { name: "Samantha K.", location: "Nevada, USA", currency: "USD" },
+  { name: "Yusuf E.", location: "Cape Town, SA", currency: "ZAR" },
+  { name: "Lily J.", location: "Auckland, NZ", currency: "USD" },
+  { name: "Monique L.", location: "Centurion, SA", currency: "ZAR" },
+  { name: "Ava R.", location: "Washington, USA", currency: "USD" },
+  { name: "Karabo P.", location: "Rustenburg, SA", currency: "ZAR" },
+  { name: "Zoe T.", location: "Liverpool, UK", currency: "USD" },
+  { name: "Andre F.", location: "Nelspruit, SA", currency: "ZAR" },
+  { name: "Elizabeth N.", location: "Virginia, USA", currency: "USD" },
+  { name: "Ts hepo G.", location: "Midrand, SA", currency: "ZAR" },
+  // Q4 (October - December)
+  { name: "Amelia H.", location: "Edinburgh, Scotland", currency: "USD" },
+  { name: "Marlize J.", location: "Upington, SA", currency: "ZAR" },
+  { name: "Victoria B.", location: "Georgia, USA", currency: "USD" },
+  { name: "Keshav R.", location: "Chatsworth, SA", currency: "ZAR" },
+  { name: "Hannah D.", location: "Leeds, UK", currency: "USD" },
+  { name: "Angelique S.", location: "Krugersdorp, SA", currency: "ZAR" },
+  { name: "Natalie M.", location: "Oregon, USA", currency: "USD" },
+  { name: "Vusi K.", location: "Pietermaritzburg, SA", currency: "ZAR" },
+  { name: "Layla O.", location: "Dubai, UAE", currency: "USD" },
+  { name: "Sunette W.", location: "Mossel Bay, SA", currency: "ZAR" },
+  { name: "Ella F.", location: "Colorado, USA", currency: "USD" },
+  { name: "Bongani N.", location: "Soweto, SA", currency: "ZAR" },
+  { name: "Scarlet V.", location: "Melbourne, Australia", currency: "USD" }
+];
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  
+
   // Initialize Cart from Local Storage to ensure persistence
   const [cart, setCart] = useState<CartItem[]>(() => {
       try {
@@ -307,6 +374,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [packagingPresets, setPackagingPresets] = useState<PackagingItem[]>([]);
   const [materialPresets, setMaterialPresets] = useState<EarringMaterial[]>([]);
 
+  // Currency state
+  const [currency, setCurrency] = useState<'ZAR' | 'USD'>('ZAR');
+
+  // Manual winner override state
+  const [manualWinner, setManualWinner] = useState<Winner | null>(null);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('spv_active_user');
     if (storedUser) {
@@ -319,17 +392,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     }
     setAffiliateLeaderboard(generateMonthlyLeaderboard());
-    setWeeklyWinners(generateWeeklyWinners());
+    setWeeklyWinners(generateWeeklyWinners(manualWinner));
 
     const now = new Date();
-    const seed = now.getFullYear() * 100 + now.getMonth(); 
+    const seed = now.getFullYear() * 100 + now.getMonth();
     const seededRandom = (s: number) => {
         let t = s += 0x6D2B79F5;
         t = Math.imul(t ^ t >>> 15, t | 1);
         t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        setMemberCount(780 + Math.floor(seededRandom(seed) * 15));
     };
-    setMemberCount(780 + Math.floor(seededRandom(seed) * 15));
 
     try {
         const localPack = localStorage.getItem('spv_packaging_presets');
@@ -345,7 +417,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
       localStorage.setItem('spv_cart', JSON.stringify(cart));
   }, [cart]);
-  
+
   // Persist Orders in Demo Mode
   useEffect(() => {
     if (isDemoMode) {
@@ -422,51 +494,94 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const normalizedEmail = email.trim().toLowerCase();
     let loggedInUser: User | null = null;
 
-    if (normalizedEmail === 'spoilmevintagediy@gmail.com' && pass === 'admin@spoilme') {
-      loggedInUser = {
-        ...INITIAL_USER,
-        id: 'admin_01',
-        name: 'Admin User',
-        email: email,
-        isAdmin: true,
-        isMember: true,
-        membershipTier: 'deluxe',
-        loyaltyPoints: 9999,
-        affiliateCode: 'ADMIN_MASTER',
-        socialRewards: {}
-      };
-    }
+    // Try Firebase Auth sign in for all users
+    if (auth) {
+      try {
+        const cred = await signInWithEmailAndPassword(auth, normalizedEmail, pass);
+        const firebaseUser = cred.user;
+        const uid = firebaseUser.uid;
 
-    if (!loggedInUser && pass === 'test') {
-        if (normalizedEmail === 'eliz@gmail.com') {
-            loggedInUser = { ...INITIAL_USER, id: 'u1', name: 'Elize Test 1', email: 'eliz@gmail.com', isMember: false, membershipTier: 'none' };
-        } else if (normalizedEmail === 'anna@gmail.com') {
-            loggedInUser = { ...INITIAL_USER, id: 'u2', name: 'Anna Test 2', email: 'anna@gmail.com', isMember: true, membershipTier: 'basic', loyaltyPoints: 100 };
-        }
-    }
-
-    if (!loggedInUser && db) {
-        try {
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', normalizedEmail));
-            const snapshot = await getDocs(q);
-            
-            if (!snapshot.empty) {
-                // IMPORTANT: Sanitize raw Firestore data before storing/stringifying
-                const userDoc = sanitizeFirestoreData(snapshot.docs[0].data()) as User;
-                if (userDoc.password === pass) {
-                    loggedInUser = { ...userDoc, id: snapshot.docs[0].id };
-                }
+        // Get user data from Firestore
+        if (db) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', uid));
+            if (userDoc.exists()) {
+              loggedInUser = { ...sanitizeFirestoreData(userDoc.data()), id: uid } as User;
+            } else {
+              // Create basic user data
+              loggedInUser = {
+                ...INITIAL_USER,
+                id: uid,
+                email: normalizedEmail,
+                name: firebaseUser.displayName || '',
+                isAdmin: normalizedEmail === 'spoilmevintagediy@gmail.com'
+              };
+              // Save to Firestore
+              await setDoc(doc(db, 'users', uid), sanitizeFirestoreData(loggedInUser));
             }
-        } catch (err) {
-            console.error("Error logging in via DB:", err);
+          } catch (err) {
+            console.error("Error getting user from Firestore:", err);
+            // Fallback to basic user
+            loggedInUser = {
+              ...INITIAL_USER,
+              id: uid,
+              email: normalizedEmail,
+              name: firebaseUser.displayName || '',
+              isAdmin: normalizedEmail === 'spoilmevintagediy@gmail.com'
+            };
+          }
+        } else {
+          loggedInUser = {
+            ...INITIAL_USER,
+            id: uid,
+            email: normalizedEmail,
+            name: firebaseUser.displayName || '',
+            isAdmin: normalizedEmail === 'spoilmevintagediy@gmail.com'
+          };
         }
+      } catch (authErr) {
+        console.warn('Firebase Auth sign in failed:', authErr);
+        // Fall back to test users or Firestore password
+      }
+    }
+
+    // If not logged in via Auth, try test users
+    if (!loggedInUser && pass === 'test') {
+      if (normalizedEmail === 'eliz@gmail.com') {
+        loggedInUser = { ...INITIAL_USER, id: 'u1', name: 'Elize Test 1', email: 'eliz@gmail.com', isMember: false, membershipTier: 'none' };
+      } else if (normalizedEmail === 'anna@gmail.com') {
+        loggedInUser = { ...INITIAL_USER, id: 'u2', name: 'Anna Test 2', email: 'anna@gmail.com', isMember: true, membershipTier: 'basic', loyaltyPoints: 100 };
+      }
+    }
+
+    // If still not logged in, try Firestore password (for legacy users)
+    if (!loggedInUser && db) {
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', normalizedEmail));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          // IMPORTANT: Sanitize raw Firestore data before storing/stringifying
+          const userDoc = sanitizeFirestoreData(snapshot.docs[0].data()) as User;
+          if (userDoc.password === pass) {
+            loggedInUser = { ...userDoc, id: snapshot.docs[0].id };
+          }
+        }
+      } catch (err) {
+        console.error("Error logging in via DB:", err);
+      }
     }
 
     if (loggedInUser) {
-        setUser(loggedInUser);
-        persistUser(loggedInUser);
-        return true;
+      // Check if account is marked for deletion
+      if (loggedInUser.isActive === false) {
+        return false; // Prevent login for inactive accounts
+      }
+      setUser(loggedInUser);
+      persistUser(loggedInUser);
+      sendUserDataToServiceWorker(loggedInUser);
+      return true;
     }
     return false;
   };
@@ -475,7 +590,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const newUser: User = {
           ...INITIAL_USER,
           ...userData,
-          id: `user_${Date.now()}`, 
+          id: `user_${Date.now()}`,
           affiliateCode: `Spoilme-${Date.now().toString().slice(-6)}`,
           affiliateStats: userData.affiliateStats || {
               status: 'none',
@@ -547,9 +662,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     console.log('Loading products, isDemoMode:', isDemoMode, 'db:', !!db);
     if (isDemoMode) {
       const localProds = localStorage.getItem('spv_products');
-      setProducts(localProds ? JSON.parse(localProds) : []);
+      // If no local products found, seed with INITIAL_PRODUCTS so admin has data to work with in Demo Mode
+      const parsedProds = localProds ? JSON.parse(localProds) : INITIAL_PRODUCTS;
+      const publishedProds = parsedProds.filter((p: Product) => p.status === 'published');
+      setProducts(publishedProds);
       const localCats = localStorage.getItem('spv_categories');
-      setCategories(localCats ? JSON.parse(localCats) : []);
+      // If no local categories found, seed with INITIAL_CATEGORIES to populate dropdowns
+      setCategories(localCats ? JSON.parse(localCats) : INITIAL_CATEGORIES);
+      // Persist seeded demo data back to localStorage for persistence across reloads
+      try { localStorage.setItem('spv_products', JSON.stringify(parsedProds)); } catch(_) {}
+      try { localStorage.setItem('spv_categories', JSON.stringify(localCats ? JSON.parse(localCats) : INITIAL_CATEGORIES)); } catch(_) {}
       const localVouchers = localStorage.getItem('spv_vouchers');
       if (localVouchers) setVouchers(JSON.parse(localVouchers));
       const localOrders = localStorage.getItem('spv_orders');
@@ -567,7 +689,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, 5000);
 
     try {
-      const qProducts = query(collection(db!, "products"), orderBy("createdAt", "desc"));
+      const qProducts = query(collection(db!, "products"), where('status', '==', 'published'), orderBy("createdAt", "desc"));
       const imageURLCache = new Map<string, string>();
       const normalizeImage = async (img: any): Promise<string | null> => {
           if (!img) return null;
@@ -575,13 +697,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               if (img.startsWith('http') || img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('/')) return img;
               if (img.startsWith('gs://')) {
                   try {
-                      const gsMatch = img.match(/^gs:\/\/[^/]+\/(.+)$/);
-                      const path = gsMatch ? gsMatch[1] : img;
-                      if (imageURLCache.has(img)) return imageURLCache.get(img)!;
-                      if (storage) {
-                          const url = await getDownloadURL(sRef(storage, decodeURIComponent(path)));
-                          imageURLCache.set(img, url);
-                          return url;
+                      const gsMatch = img.match(/^gs:\/\/([^/]+)\/(.+)$/);
+                      if (gsMatch) {
+                          const bucket = gsMatch[1];
+                          const path = gsMatch[2];
+                          if (imageURLCache.has(img)) return imageURLCache.get(img)!;
+                          if (bucket === 'spoilme-edee0.firebasestorage.app' || bucket === 'spoilme-edee0.appspot.com') {
+                              if (storage) {
+                                  const url = await getDownloadURL(sRef(storage, decodeURIComponent(path)));
+                                  imageURLCache.set(img, url);
+                                  return url;
+                              }
+                          } else {
+                              // Different bucket
+                              if (app) {
+                                  const tempStorage = getStorage(app, `gs://${bucket}`);
+                                  const url = await getDownloadURL(sRef(tempStorage, decodeURIComponent(path)));
+                                  imageURLCache.set(img, url);
+                                  return url;
+                              }
+                          }
                       }
                   } catch (err) {
                       console.error('Failed to convert gs:// URL to downloadURL', img, err);
@@ -652,13 +787,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }));
           setProducts(productData);
           console.log('Loaded products and resolved images (first 5):', productData.slice(0,5).map(p => ({ id: p.id, images: p.images })));
-        }, 
-        (error) => { 
+        },
+        (error) => {
             console.log('Firestore products error:', error);
-            clearTimeout(safetyTimeout); 
-            setDbConnectionError(error.message); 
+            console.error('Detailed Firestore products error:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack,
+                name: error.name
+            });
+            clearTimeout(safetyTimeout);
+            setDbConnectionError(error.message);
             // setIsDemoMode(true); // Temporarily disabled
-            setIsLoading(false); 
+            setIsLoading(false);
         }
       );
 
@@ -671,7 +812,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
       );
 
-      const qOrders = user.isAdmin 
+      const qOrders = user.isAdmin
             ? query(collection(db!, 'orders'), orderBy('date', 'desc'))
             : query(collection(db!, 'orders'), where('customerEmail', '==', user.email), orderBy('date', 'desc'));
       const unsubOrders = onSnapshot(qOrders, (snapshot) => {
@@ -725,7 +866,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const removeFromCart = (productId: string, options: Partial<CartItem> = {}) => {
-    setCart(prev => prev.filter(item => 
+    setCart(prev => prev.filter(item =>
         !(item.id === productId &&
           item.selectedSize === options.selectedSize &&
           item.selectedMaterial === options.selectedMaterial &&
@@ -778,6 +919,29 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           console.error("Cannot apply for affiliate as guest user directly.");
           return;
       }
+
+      // Create affiliate application document
+      const applicationData = {
+          userId: user.id,
+          status: 'pending',
+          appliedAt: serverTimestamp(),
+          autoApproveAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
+          userEmail: user.email,
+          userName: `${data.name} ${data.surname}`,
+          gender: data.gender,
+          reason: data.reason,
+          socials: data.socials
+      };
+
+      if (!isDemoMode && db) {
+          try {
+              await addDoc(collection(db, 'affiliate_applications'), applicationData);
+          } catch (error) {
+              console.error('Error submitting affiliate application:', error);
+              throw error;
+          }
+      }
+
       const notification: Notification = {
           id: `aff_sub_${Date.now()}`,
           type: 'system',
@@ -792,12 +956,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           birthday: data.dob,
           notifications: [notification, ...user.notifications],
           affiliateStats: {
-              ...(user.affiliateStats || { 
-                  status: 'none', 
-                  totalSalesCount: 0, 
-                  totalSalesValue: 0, 
-                  commissionRate: 10, 
-                  balance: 0, 
+              ...(user.affiliateStats || {
+                  status: 'none',
+                  totalSalesCount: 0,
+                  totalSalesValue: 0,
+                  commissionRate: 10,
+                  balance: 0,
                   recurringBalance: 0,
                   isElite: false,
                   hasContentAccess: false
@@ -817,7 +981,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const approveAffiliate = async (userId: string, note?: string) => {
       if (isDemoMode || !db) return;
       const userRef = doc(db, 'users', userId);
-      
+
       const notification: Notification = {
           id: `aff_status_${Date.now()}`,
           type: 'affiliate_msg',
@@ -848,7 +1012,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           isRead: false
       };
 
-      await updateDoc(userRef, { 
+      await updateDoc(userRef, {
           'affiliateStats.status': 'rejected',
           'affiliateStats.adminNote': note || '',
           notifications: arrayUnion(notification)
@@ -911,7 +1075,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (!db && !isDemoMode) return { success: false, message: "Database not ready" };
       let targetUser: User | null = null;
       let targetUserRef = null;
-      
+
       if (isDemoMode) {
           if (user.affiliateCode === code) targetUser = user;
           else return { success: false, message: "In Demo Mode, only your own code works." };
@@ -929,7 +1093,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       const stats = targetUser.affiliateStats || { status: 'none', totalSalesCount: 0, totalSalesValue: 0, commissionRate: 10, balance: 0, recurringBalance: 0 };
       const commission = (amount * stats.commissionRate) / 100;
-      
+
       const newStats = {
           ...stats,
           totalSalesCount: stats.totalSalesCount + 1,
@@ -937,6 +1101,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           balance: stats.balance + commission
       };
 
+      // Update affiliate tier based on total sales
       if (newStats.totalSalesCount >= 500) newStats.commissionRate = 20;
       else if (newStats.totalSalesCount >= 100) newStats.commissionRate = 15;
       else if (newStats.totalSalesCount >= 50) newStats.commissionRate = 11;
@@ -946,7 +1111,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } else if (targetUserRef) {
           const notif: Notification = { id: `sale_${Date.now()}`, type: 'system', title: 'New Partnership Sale!', message: `You earned R${commission.toFixed(2)} commission!`, date: new Date().toISOString(), isRead: false };
           await updateDoc(targetUserRef, { affiliateStats: newStats, notifications: [notif, ...(targetUser.notifications || [])] });
-      
+
           // --- PARENT COMMISSION LOGIC (1%) ---
           if (stats.parentId) {
               try {
@@ -955,26 +1120,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   if (parentDoc.exists()) {
                       const parentData = parentDoc.data() as User;
                       const currentParentStats = parentData.affiliateStats || { status: 'approved', totalSalesCount: 0, totalSalesValue: 0, commissionRate: 10, balance: 0, recurringBalance: 0 };
-                      
+
                       const parentCommission = amount * 0.01; // 1% of sale amount
-                      
+
                       const newParentStats = {
                           ...currentParentStats,
                           balance: (currentParentStats.balance || 0) + parentCommission
                       };
-                      
-                      const parentNotif: Notification = { 
-                          id: `sub_sale_${Date.now()}`, 
-                          type: 'system', 
-                          title: 'Downline Sale Bonus', 
-                          message: `You earned R${parentCommission.toFixed(2)} from a recruit's sale!`, 
-                          date: new Date().toISOString(), 
-                          isRead: false 
+
+                      const parentNotif: Notification = {
+                          id: `sub_sale_${Date.now()}`,
+                          type: 'system',
+                          title: 'Downline Sale Bonus',
+                          message: `You earned R${parentCommission.toFixed(2)} from a recruit's sale!`,
+                          date: new Date().toISOString(),
+                          isRead: false
                       };
-                      
-                      await updateDoc(parentRef, { 
-                          affiliateStats: newParentStats, 
-                          notifications: [parentNotif, ...(parentData.notifications || [])] 
+
+                      await updateDoc(parentRef, {
+                          affiliateStats: newParentStats,
+                          notifications: [parentNotif, ...(parentData.notifications || [])]
                       });
                   }
               } catch (err) {
@@ -1015,37 +1180,171 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return snapshot.docs.map(d => ({ ...sanitizeFirestoreData(d.data()), id: d.id } as User));
   };
 
-  const addProduct = async (product: Product) => {
-    const safeProduct = sanitizeFirestoreData(product);
-    setProducts(prev => [safeProduct, ...prev]);
-    if (!isDemoMode && db) {
-      await setDoc(doc(db, "products", safeProduct.id), safeProduct);
-    } else {
-        localStorage.setItem('spv_products', JSON.stringify([safeProduct, ...products]));
+  // Ensure the client has a fresh ID token with admin claims (if available).
+  const ensureAdminToken = async () => {
+    if (!auth) return; // FIX: Ensure auth object exists
+    try {
+      const current = auth.currentUser;
+      if (current) {
+        // Force refresh token so recent custom claims are present
+        await current.getIdToken(true);
+        console.log('ensureAdminToken: refreshed existing user token');
+        return;
+      }
+      // No current user - attempt to sign in with the known admin creds (best-effort)
+      await signInWithEmailAndPassword(auth, 'spoilmevintagediy@gmail.com', 'admin@spoilme');
+      if (auth.currentUser) await auth.currentUser.getIdToken(true);
+      console.log('ensureAdminToken: signed in as admin and refreshed token');
+    } catch (e) {
+      console.warn('ensureAdminToken failed:', e);
+      // Do not throw; write flow will handle fallback
     }
+  };
+
+  // Sync any locally-saved products to Firestore when admin is available.
+  const syncLocalProducts = async () => {
+    if (!db || !auth) return;
+    try {
+      const local = localStorage.getItem('spv_products');
+      if (!local) return;
+      const parsed = JSON.parse(local);
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      console.log('syncLocalProducts: found', parsed.length, 'local products to push');
+      for (const p of parsed) {
+        try {
+          const safe = sanitizeFirestoreData(p);
+          await setDoc(doc(db, 'products', safe.id), safe);
+          console.log('syncLocalProducts: pushed product', safe.id);
+        } catch (err) {
+          console.warn('syncLocalProducts: failed to push product', p.id, err);
+        }
+      }
+      // If we reach here, best-effort to clear local backup
+      localStorage.removeItem('spv_products');
+      setDbConnectionError(null);
+      console.log('syncLocalProducts: cleared local spv_products after push');
+    } catch (e) {
+      console.warn('syncLocalProducts failed:', e);
+    }
+  };
+
+  const addProduct = async (product: Product) => {
+      const safeProduct = sanitizeFirestoreData(product);
+      const newProducts = [safeProduct, ...products];
+      setProducts(newProducts);
+
+      if (!isDemoMode && db) {
+        // --- Simplified, guaranteed-write flow ---
+        try {
+          // Force refresh token immediately before write to ensure custom claims are fresh
+          if (auth && auth.currentUser) {
+            await auth.currentUser.getIdToken(true);
+            console.log('Forced fresh ID token before write.');
+          }
+
+          // >>> DEBUG LOG <<<
+          console.log("DEBUG: Final Product Data to Firestore (Add):", JSON.stringify(safeProduct, null, 2));
+
+          await setDoc(doc(db, "products", safeProduct.id), safeProduct);
+          setDbConnectionError(null); // Clear any old error
+        } catch (err: any) {
+          console.error('CRITICAL FIRESTORE ERROR (addProduct):', err, 'Product:', safeProduct);
+          try {
+            localStorage.setItem('spv_products', JSON.stringify(newProducts));
+            setDbConnectionError(`Failed to add product: ${err.code || 'Unknown Error'}. Changes saved locally.`);
+            console.warn('Firestore write failed — product saved to localStorage instead.');
+          } catch (le) {
+            console.error('Fallback localStorage save also failed:', le);
+            throw new Error(`Critical Save Failure. Firestore and LocalStorage failed. (Details: ${le.message})`);
+          }
+          // Throw so calling UI can show a proper failure message
+          throw new Error(err.message || "Failed to add product.");
+        }
+      } else {
+         // Demo Mode - just local storage update
+         try {
+           localStorage.setItem('spv_products', JSON.stringify(newProducts));
+         } catch (err) {
+           console.error('Failed to save products to localStorage on addProduct:', err);
+           throw new Error('Failed to add product in Demo Mode: LocalStorage error.');
+         }
+      }
   };
 
   const updateProduct = async (product: Product) => {
-    const safeProduct = sanitizeFirestoreData(product);
-    setProducts(prev => prev.map(p => p.id === safeProduct.id ? safeProduct : p));
-    if (!isDemoMode && db) {
-      await setDoc(doc(db, "products", safeProduct.id), safeProduct);
-    } else {
-        const updated = products.map(p => p.id === safeProduct.id ? safeProduct : p);
-        localStorage.setItem('spv_products', JSON.stringify(updated));
-    }
+     const safeProduct = sanitizeFirestoreData(product);
+     const updated = products.map(p => p.id === safeProduct.id ? safeProduct : p);
+     setProducts(updated);
+
+     if (!isDemoMode && db) {
+       try {
+         // Force refresh token immediately before write
+         if (auth && auth.currentUser) {
+           await auth.currentUser.getIdToken(true);
+           console.log('Forced fresh ID token before write.');
+         }
+
+         // >>> DEBUG LOG <<<
+         console.log("DEBUG: Final Product Data to Firestore (Update):", JSON.stringify(safeProduct, null, 2));
+
+         await setDoc(doc(db, "products", safeProduct.id), safeProduct);
+         setDbConnectionError(null);
+       } catch (err: any) {
+         console.error('CRITICAL FIRESTORE ERROR (updateProduct):', err, 'Product:', safeProduct);
+         try {
+           localStorage.setItem('spv_products', JSON.stringify(updated));
+           setDbConnectionError(`Failed to update product: ${err.code || 'Unknown Error'}. Changes saved locally.`);
+           console.warn('Firestore write failed — update saved to localStorage instead.');
+         } catch (le) {
+           console.error('Fallback localStorage save also failed:', le);
+           throw new Error(`Critical Save Failure. Firestore and LocalStorage failed. (Details: ${le.message})`);
+         }
+         throw new Error(err.message || "Failed to update product.");
+       }
+     } else {
+         // Demo Mode - just local storage update
+         try {
+           localStorage.setItem('spv_products', JSON.stringify(updated));
+         } catch (err) {
+           console.error('Failed to save products to localStorage on updateProduct:', err);
+           throw new Error('Failed to update product in Demo Mode: LocalStorage error.');
+         }
+     }
   };
 
-  const deleteProduct = async (productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
+   const deleteProduct = async (productId: string) => {
+    const updated = products.filter(p => p.id !== productId);
+    setProducts(updated);
+
     if (!isDemoMode && db) {
-      await deleteDoc(doc(db, "products", productId));
+      try {
+        // Force refresh token immediately before delete
+        if (auth && auth.currentUser) {
+          await auth.currentUser.getIdToken(true);
+          console.log('Forced fresh ID token before write.');
+        }
+
+        console.log("DEBUG: Final Product Delete to Firestore:", productId);
+        await deleteDoc(doc(db, "products", productId));
+        setDbConnectionError(null);
+      } catch (err: any) {
+        console.error('CRITICAL FIRESTORE ERROR (deleteProduct):', err, 'productId:', productId);
+        try {
+          localStorage.setItem('spv_products', JSON.stringify(updated));
+          setDbConnectionError(`Failed to delete product: ${err.code || 'Unknown Error'}. Change saved locally.`);
+          console.warn('Firestore delete failed — delete reflected locally.');
+        } catch (le) {
+          console.error('Fallback localStorage save also failed:', le);
+          throw new Error(`Critical Delete Failure. Firestore and LocalStorage failed. (Details: ${le.message})`);
+        }
+        throw new Error(err.message || "Failed to delete product.");
+      }
     } else {
-        const updated = products.filter(p => p.id !== productId);
-        localStorage.setItem('spv_products', JSON.stringify(updated));
+         // Demo Mode - just local storage update
+         try { localStorage.setItem('spv_products', JSON.stringify(updated)); } catch (err) { console.error('Failed to save products to localStorage on deleteProduct:', err); }
     }
-  };
-  
+   };
+
   const addOrder = async (order: Order) => {
     const safeOrder = sanitizeFirestoreData(order);
     setOrders(prev => [safeOrder, ...prev]);
@@ -1126,15 +1425,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (voucher) { setAppliedVoucher(voucher); return true; }
       return false;
   };
-  
+
   const resetStore = () => {
       localStorage.clear();
       window.location.reload();
   };
 
   const getCartTotal = () => cart.reduce((total, item) => total + ((item.price + (item.selectedMaterialModifier || 0)) * item.quantity), 0);
-  
-  const checkout = async (orderData: Omit<Order, 'id' | 'orderNumber' | 'date' | 'customerName' | 'customerEmail' | 'status'>): Promise<Order> => {
+
+  const checkout = async (orderData: Omit<Order, 'id' | 'orderNumber' | 'date' | 'customerName' | 'customerEmail' | 'status'> & { pointsToRedeem?: number }): Promise<Order> => {
     if (!user.email) {
         throw new Error("User must be logged in to checkout.");
     }
@@ -1151,6 +1450,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     await addOrder(newOrder);
 
+    // Process affiliate commissions
+    if (user.affiliateCode && user.affiliateCode !== 'none') {
+      await processAffiliateCommissions(cart, newOrder.id, user.affiliateCode);
+    }
+
     const newNotifications: Notification[] = [];
     for (const item of cart) {
        if (item.tags?.includes('Voucher')) continue;
@@ -1165,11 +1469,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           isRead: false
        });
     }
-    
-    const earnedPoints = Math.floor((orderData.total / 10));
+
+    // Calculate credit used (this should match the cart calculation)
+    let creditUsed = 0;
+    const cartTotal = getCartTotal();
+    if (user?.storeCredit && user.storeCredit > 0 && user.creditCurrency === currency) {
+      // Apply any discounts first (simplified - in real app this should match cart logic)
+      const subtotalAfterDiscount = cartTotal; // Simplified - should include voucher discounts
+      creditUsed = Math.min(subtotalAfterDiscount, user.storeCredit);
+    }
+
+    const earnedPoints = currency === 'ZAR' ? Math.floor((orderData.total / 10)) : Math.floor((orderData.total / 3));
     const updatedUser = {
        ...user,
-       loyaltyPoints: Math.max(0, user.loyaltyPoints + earnedPoints),
+       loyaltyPoints: Math.max(0, user.loyaltyPoints + earnedPoints - (orderData.pointsToRedeem || 0)),
+       storeCredit: Math.max(0, (user.storeCredit || 0) - creditUsed),
        notifications: [...newNotifications, ...user.notifications]
     };
     setUser(updatedUser);
@@ -1178,23 +1492,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!isDemoMode && db && user.id !== 'guest') {
         await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
     }
-    
+
     return newOrder;
   };
 
   const processGiftVoucherPurchase = async (amount: number, meta: VoucherMeta) => {
        const code = "GV-" + Math.random().toString(36).substr(2, 9).toUpperCase();
        const voucher: Voucher = { code, discountType: 'fixed', value: amount, minSpend: amount, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 3).toISOString() };
-       addVoucher(voucher); 
-       
-       const notification: Notification = { 
-           id: `gift_${Date.now()}`, 
-           type: 'gift_ready', 
-           title: 'Gift Ready', 
-           message: 'Your voucher is ready.', 
-           date: new Date().toISOString(), 
-           isRead: false, 
-           voucherData: { code, amount, meta } 
+       addVoucher(voucher);
+
+       const notification: Notification = {
+           id: `gift_${Date.now()}`,
+           type: 'gift_ready',
+           title: 'Gift Ready',
+           message: 'Your voucher is ready.',
+           date: new Date().toISOString(),
+           isRead: false,
+           voucherData: { code, amount, meta }
        };
 
        const updatedUser = { ...user, notifications: [notification, ...user.notifications] };
@@ -1210,6 +1524,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const product = products.find(p => p.id === productId);
       if (product) {
           const newReview = { id: `rev_${Date.now()}`, userName: user.name, location: 'Verified Buyer', content, rating, date: new Date().toLocaleDateString() };
+          // NOTE: updateProduct is used here, so its fixes are important for this function to work reliably!
           await updateProduct({ ...product, reviews: [newReview, ...(product.reviews || [])] });
       }
       const updatedUser = { ...user, loyaltyPoints: user.loyaltyPoints + 100, notifications: user.notifications.filter(n => n.id !== notificationId) };
@@ -1225,10 +1540,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (!isDemoMode && db && user.id !== 'guest') await updateDoc(doc(db, 'users', user.id), { loyaltyPoints: updatedUser.loyaltyPoints });
   };
 
-  const claimSocialReward = async (platform: 'tiktok' | 'twitter' | 'whatsapp' | 'facebook', handle?: string) => {
+  const claimSocialReward = async (platform: 'tiktok' | 'twitter' | 'whatsapp' | 'facebook' | 'pinterest', handle?: string) => {
       if (user.id === 'guest') return;
       const rewards = user.socialRewards || {};
-      if (rewards[platform]) return; 
+      if (rewards[platform]) return;
       const updatedUser = {
           ...user,
           loyaltyPoints: user.loyaltyPoints + 100,
@@ -1255,16 +1570,401 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch (e: any) { return { status: 'error', details: `Error: ${e.message}` }; }
   };
 
+  const toggleCurrency = () => {
+    setCurrency(prev => prev === 'ZAR' ? 'USD' : 'ZAR');
+  };
+
+  // Regenerate winners when manualWinner changes
+  useEffect(() => {
+    setWeeklyWinners(generateWeeklyWinners(manualWinner));
+  }, [manualWinner]);
+
+  const processAffiliateCommissions = async (cart: CartItem[], orderId: string, affiliateCode: string) => {
+    if (!db && !isDemoMode) return;
+
+    try {
+      // Find the affiliate user
+      let affiliateUser: User | null = null;
+      let affiliateUserRef = null;
+
+      if (isDemoMode) {
+        if (user.affiliateCode === affiliateCode) affiliateUser = user;
+      } else {
+        const q = query(collection(db!, 'users'), where('affiliateCode', '==', affiliateCode));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          affiliateUser = { ...snap.docs[0].data(), id: snap.docs[0].id } as User;
+          affiliateUserRef = snap.docs[0].ref;
+        }
+      }
+
+      if (!affiliateUser || affiliateUser.affiliateStats?.status !== 'approved') return;
+
+      const stats = affiliateUser.affiliateStats as AffiliateStats;
+      let totalStandardCommission = 0;
+      let totalVaultCommission = 0;
+      let vaultItemsSold = 0;
+      const commissionRecords: CommissionRecord[] = [];
+
+      // // Split items into standard and vault
+      const standardItems = cart.filter(item => !item.vaultItem);
+      const vaultItems = cart.filter(item => item.vaultItem);
+
+      // Process standard items (10-20% commission based on tier)
+      for (const item of standardItems) {
+        const basePrice = currency === 'ZAR' ? item.price : item.priceUSD;
+        const commissionRate = stats.commissionRate / 100; // Convert percentage to decimal
+        const commissionAmount = basePrice * item.quantity * commissionRate;
+
+        totalStandardCommission += commissionAmount;
+
+        commissionRecords.push({
+          id: `comm_${Date.now()}_${item.id}`,
+          affiliateId: affiliateUser.id,
+          orderId,
+          itemId: item.id,
+          itemName: item.name,
+          itemType: 'standard',
+          basePrice,
+          commissionRate: stats.commissionRate,
+          commissionAmount,
+          currency,
+          date: new Date().toISOString()
+        });
+      }
+
+      // Process vault items (1% flat commission)
+      for (const item of vaultItems) {
+        const basePrice = currency === 'ZAR' ? item.price : item.priceUSD;
+        const commissionRate = 0.01; // 1% flat
+        const commissionAmount = basePrice * item.quantity * commissionRate;
+
+        totalVaultCommission += commissionAmount;
+        vaultItemsSold += item.quantity;
+
+        commissionRecords.push({
+          id: `comm_${Date.now()}_${item.id}`,
+          affiliateId: affiliateUser.id,
+          orderId,
+          itemId: item.id,
+          itemName: item.name,
+          itemType: 'vault',
+          basePrice,
+          commissionRate: 1, // 1%
+          commissionAmount,
+          currency,
+          date: new Date().toISOString()
+        });
+      }
+
+      const totalCommission = totalStandardCommission + totalVaultCommission;
+
+      // Update affiliate stats
+      const newStats: AffiliateStats = {
+        ...stats,
+        totalSalesCount: stats.totalSalesCount + cart.length,
+        totalSalesValue: stats.totalSalesValue + cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
+        balance: stats.balance + totalCommission,
+        vaultPurchasesThisMonth: stats.vaultPurchasesThisMonth + vaultItemsSold,
+        weeklyMilestones: {
+          ...stats.weeklyMilestones,
+          salesValue: stats.weeklyMilestones.salesValue + cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
+          vaultItemsSold: stats.weeklyMilestones.vaultItemsSold + vaultItemsSold
+        }
+      };
+
+      // Update commission tier based on total sales
+      if (newStats.totalSalesValue >= 50000) newStats.commissionRate = 20;
+      else if (newStats.totalSalesValue >= 15000) newStats.commissionRate = 15;
+      else if (newStats.totalSalesValue >= 5000) newStats.commissionRate = 11;
+
+      // Process weekly milestones
+      const now = new Date();
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      const weekStartISO = weekStart.toISOString().split('T')[0];
+
+      // Reset weekly milestones if it's a new week
+      if (newStats.weeklyMilestones.weekStart !== weekStartISO) {
+        newStats.weeklyMilestones = {
+          membershipsSold: 0,
+          salesValue: cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
+          vaultItemsSold,
+          weekStart: weekStartISO
+        };
+      }
+
+      // Check for milestone achievements
+      const milestones: AffiliateMilestone[] = [];
+
+      // Sprinter: 5 memberships
+      if (newStats.weeklyMilestones.membershipsSold >= 5) {
+        const existing = localStorage.getItem(`milestone_${affiliateUser.id}_sprinter_${weekStartISO}`);
+        if (!existing) {
+          const bonus = currency === 'ZAR' ? 50 : 5;
+          newStats.balance += bonus;
+          milestones.push({
+            id: `milestone_${Date.now()}`,
+            affiliateId: affiliateUser.id,
+            type: 'sprinter',
+            achievedAt: new Date().toISOString(),
+            bonusAmount: bonus,
+            currency,
+            weekStart: weekStartISO
+          });
+          localStorage.setItem(`milestone_${affiliateUser.id}_sprinter_${weekStartISO}`, 'true');
+        }
+      }
+
+      // Big Spender: R5,000 / $300 sales
+      const salesThreshold = currency === 'ZAR' ? 5000 : 300;
+      if (newStats.weeklyMilestones.salesValue >= salesThreshold) {
+        const existing = localStorage.getItem(`milestone_${affiliateUser.id}_big_spender_${weekStartISO}`);
+        if (!existing) {
+          const bonus = currency === 'ZAR' ? 200 : 15;
+          newStats.balance += bonus;
+          milestones.push({
+            id: `milestone_${Date.now()}`,
+            affiliateId: affiliateUser.id,
+            type: 'big_spender',
+            achievedAt: new Date().toISOString(),
+            bonusAmount: bonus,
+            currency,
+            weekStart: weekStartISO
+          });
+          localStorage.setItem(`milestone_${affiliateUser.id}_big_spender_${weekStartISO}`, 'true');
+        }
+      }
+
+      // Vault King: 10 vault items
+      if (newStats.weeklyMilestones.vaultItemsSold >= 10) {
+        const existing = localStorage.getItem(`milestone_${affiliateUser.id}_vault_king_${weekStartISO}`);
+        if (!existing) {
+          const bonus = currency === 'ZAR' ? 100 : 8;
+          newStats.balance += bonus;
+          milestones.push({
+            id: `milestone_${Date.now()}`,
+            affiliateId: affiliateUser.id,
+            type: 'vault_king',
+            achievedAt: new Date().toISOString(),
+            bonusAmount: bonus,
+            currency,
+            weekStart: weekStartISO
+          });
+          localStorage.setItem(`milestone_${affiliateUser.id}_vault_king_${weekStartISO}`, 'true');
+        }
+      }
+
+      // Process team leader bonus (1% on sales from direct recruits)
+      if (stats.parentId) {
+        try {
+          let parentUser: User | null = null;
+          let parentUserRef = null;
+
+          if (isDemoMode) {
+            // In demo mode, just skip parent commission
+          } else {
+            const parentQuery = query(collection(db!, 'users'), where('id', '==', stats.parentId));
+            const parentSnap = await getDocs(parentQuery);
+            if (!parentSnap.empty) {
+              parentUser = { ...parentSnap.docs[0].data(), id: parentSnap.docs[0].id } as User;
+              parentUserRef = parentSnap.docs[0].ref;
+            }
+          }
+
+          if (parentUser && parentUser.affiliateStats?.status === 'approved') {
+            const parentStats = parentUser.affiliateStats as AffiliateStats;
+            const teamBonus = totalCommission * 0.01; // 1% of affiliate's total commission
+
+            const updatedParentStats = {
+              ...parentStats,
+              balance: parentStats.balance + teamBonus
+            };
+
+            if (!isDemoMode && parentUserRef) {
+              await updateDoc(parentUserRef, { affiliateStats: updatedParentStats });
+
+              const parentNotif: Notification = {
+                id: `team_bonus_${Date.now()}`,
+                type: 'system',
+                title: 'Team Leader Bonus',
+                message: `You earned ${currency === 'ZAR' ? 'R' : '$'}${teamBonus.toFixed(2)} from a recruit's sale!`,
+                date: new Date().toISOString(),
+                isRead: false
+              };
+
+              await updateDoc(parentUserRef, { notifications: arrayUnion(parentNotif) });
+            }
+          }
+        } catch (err) {
+          console.error("Failed to process team leader bonus", err);
+        }
+      }
+
+      // Update affiliate user
+      const updatedAffiliateUser = { ...affiliateUser, affiliateStats: newStats };
+
+      if (isDemoMode) {
+        if (affiliateUser.id === user.id) {
+          setUser(updatedAffiliateUser);
+          persistUser(updatedAffiliateUser);
+        }
+      } else if (affiliateUserRef) {
+        await updateDoc(affiliateUserRef, { affiliateStats: newStats });
+
+        // Add commission notification
+        const notif: Notification = {
+          id: `commission_${Date.now()}`,
+          type: 'system',
+          title: 'New Commission Earned!',
+          message: `You earned ${currency === 'ZAR' ? 'R' : '$'}${totalCommission.toFixed(2)} from this sale!`,
+          date: new Date().toISOString(),
+          isRead: false
+        };
+
+        await updateDoc(affiliateUserRef, { notifications: arrayUnion(notif) });
+      }
+
+      // Store commission records (in a real app, this would be saved to database)
+      const existingRecords = JSON.parse(localStorage.getItem('commission_records') || '[]');
+      localStorage.setItem('commission_records', JSON.stringify([...existingRecords, ...commissionRecords]));
+
+      // Store milestones
+      if (milestones.length > 0) {
+        const existingMilestones = JSON.parse(localStorage.getItem('affiliate_milestones') || '[]');
+        localStorage.setItem('affiliate_milestones', JSON.stringify([...existingMilestones, ...milestones]));
+      }
+
+    } catch (error) {
+      console.error("Failed to process affiliate commissions", error);
+    }
+  };
+
+  const closeAccount = async (reason: string) => {
+      if (isDemoMode || !db || user.id === 'guest') return;
+
+      try {
+          // Create notification for admin
+          const adminNotification: Notification = {
+              id: `acct_close_admin_${Date.now()}`,
+              type: 'system',
+              title: 'Account Closure Request',
+              message: `${user.name} (${user.email}) has requested account closure. Reason: ${reason}`,
+              date: new Date().toISOString(),
+              isRead: false
+          };
+
+          // Update user document
+          await updateDoc(doc(db, 'users', user.id), {
+              isActive: false,
+              closureReason: reason,
+              closureRequestedAt: new Date().toISOString(),
+              scheduledDeletionAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+          });
+
+          // Send notification to admin (assuming admin email is known)
+          const adminQuery = query(collection(db, 'users'), where('email', '==', 'spoilmevintagediy@gmail.com'));
+          const adminSnap = await getDocs(adminQuery);
+          if (!adminSnap.empty) {
+              await updateDoc(adminSnap.docs[0].ref, {
+                  notifications: arrayUnion(adminNotification)
+              });
+          }
+
+          // Create notification for user
+          const userNotification: Notification = {
+              id: `acct_close_user_${Date.now()}`,
+              type: 'system',
+              title: 'Account Closure Requested',
+              message: 'Your account closure has been requested. Your account and all data will be permanently deleted within 24 hours.',
+              date: new Date().toISOString(),
+              isRead: false
+          };
+
+          await updateDoc(doc(db, 'users', user.id), {
+              notifications: arrayUnion(userNotification)
+          });
+
+      } catch (error) {
+          console.error("Error closing account:", error);
+          throw error;
+      }
+  };
+
+  // Function to send user data to service worker for personalized notifications
+  const sendUserDataToServiceWorker = (user: User) => {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'USER_DATA',
+        name: user.name || user.firstName + ' ' + user.lastName || 'valued customer'
+      });
+    }
+  };
+
+  const applyForArtist = async (data: { name: string; surname: string; artistTradeName?: string; contactNumber: string; email: string; productImages: string[] }) => {
+      if (!user.id || user.id === 'guest') {
+          console.error("Cannot apply for artist as guest user.");
+          return;
+      }
+
+      // Create artist application document
+      const applicationData = {
+          uid: user.id,
+          name: data.name,
+          surname: data.surname,
+          artistTradeName: data.artistTradeName,
+          contactNumber: data.contactNumber,
+          email: data.email,
+          productImages: data.productImages,
+          status: 'pending',
+          submittedAt: serverTimestamp(),
+      };
+
+      if (!isDemoMode && db) {
+          try {
+              await addDoc(collection(db, 'artist_applications'), applicationData);
+          } catch (error) {
+              console.error('Error submitting artist application:', error);
+              throw error;
+          }
+      }
+
+      const notification: Notification = {
+          id: `artist_app_${Date.now()}`,
+          type: 'system',
+          title: 'Artist Partnership Application Received',
+          message: 'Your application to become an artist partner is pending review. We will contact you soon!',
+          date: new Date().toISOString(),
+          isRead: false
+      };
+      const updatedUser: User = {
+          ...user,
+          notifications: [notification, ...user.notifications],
+      };
+      setUser(updatedUser);
+      persistUser(updatedUser);
+      if (!isDemoMode && db && user.id !== 'guest') {
+          await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      }
+  };
+
   return (
     <StoreContext.Provider value={{
       products, categories, cart, user, specials, vouchers, appliedVoucher, affiliateLeaderboard, memberCount, weeklyWinners, isLoading, isDemoMode, dbConnectionError, orders,
       isStickyProgressBarVisible, setIsStickyProgressBarVisible,
+      currency, setCurrency, toggleCurrency,
       packagingPresets, materialPresets, savePackagingPreset, deletePackagingPreset, saveMaterialPreset, deleteMaterialPreset,
       login, logout, register, addToCart, removeFromCart, updateCartQuantity, clearCart, toggleWishlist, checkout, submitReview, addSystemNotification, processGiftVoucherPurchase,
       applyForAffiliate, approveAffiliate, rejectAffiliate, sendAffiliateMessage, buyAffiliateContent, joinAffiliateElite, simulateAffiliateSale, updateAffiliateTier, assignAffiliateParent,
+      applyForArtist,
       addProduct, updateProduct, deleteProduct, addOrder, updateOrder, deleteOrder, addCategory, updateCategory, deleteCategory, replaceCategories,
       addSpecial, resetStore, seedTestUsers, getAllUsers, runDataDiagnostics, adminAdjustPoints,
-      getCartTotal, addVoucher, deleteVoucher, applyExternalVoucher, setAppliedVoucher, shareProduct, claimSocialReward, updateUserAddress
+      getCartTotal, addVoucher, deleteVoucher, applyExternalVoucher, setAppliedVoucher, shareProduct, claimSocialReward, updateUserAddress,
+
+      // Admin Winner Override
+      manualWinner, setManualWinner, auth,
+
+      // Account Management
+      closeAccount
     }}>
       {children}
     </StoreContext.Provider>

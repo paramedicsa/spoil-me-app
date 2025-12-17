@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, ExternalLink, DollarSign, Package, Truck } from 'lucide-react';
+import AdminAdPricing from './AdminAdPricing';
 
 interface PudoCostItem {
   name: string;
@@ -14,7 +15,7 @@ interface PudoCostItem {
 
 const INITIAL_PUDO_COSTS: PudoCostItem[] = [
   { name: 'Extra-Small (XS)', dimensions: '60cm × 17cm × 8cm', maxWeight: '2kg', boxCost: 6, lockerToLockerCost: 49, doorToLockerCost: 69, lockerHandleFee: 0, doorHandleFee: 0 },
-  { name: 'Small (S)', dimensions: '60cm × 41cm × 8cm', maxWeight: '5kg', boxCost: 15, lockerToLockerCost: 59, doorToLockerCost: 79, lockerHandleFee: 0, doorHandleFee: 0 },
+  { name: 'Small (S)', dimensions: '60cm × 41cm', maxWeight: '5kg', boxCost: 15, lockerToLockerCost: 59, doorToLockerCost: 79, lockerHandleFee: 0, doorHandleFee: 0 },
   { name: 'Medium (M)', dimensions: '60cm × 41cm × 19cm', maxWeight: '10kg', boxCost: 18, lockerToLockerCost: null, doorToLockerCost: null, lockerHandleFee: 0, doorHandleFee: 0 },
 ];
 
@@ -31,12 +32,12 @@ interface PaxiServicesState {
 
 const INITIAL_PAXI_COSTS: PaxiServicesState = {
   '7-9 Days Service': [
-    { bag: 'Single Small Paxi Bags', serviceCost: 59.95, handleFee: 0 },
-    { bag: 'Single Large Paxi Bags', serviceCost: 89.95, handleFee: 0 },
+    { bag: 'Single Small Paxi Bags', serviceCost: 59.95, handleFee: 10 },
+    { bag: 'Single Large Paxi Bags', serviceCost: 89.95, handleFee: 10 },
   ],
   '3-5 Days Service': [
-    { bag: 'Single Small Paxi Bags', serviceCost: 109.95, handleFee: 0 },
-    { bag: 'Single Large Paxi Bags', serviceCost: 139.95, handleFee: 0 },
+    { bag: 'Single Small Paxi Bags', serviceCost: 109.95, handleFee: 10 },
+    { bag: 'Single Large Paxi Bags', serviceCost: 139.95, handleFee: 10 },
   ]
 };
 
@@ -55,6 +56,7 @@ const INITIAL_DOOR_TO_DOOR_COSTS: PudoDoorToDoorItem[] = [
 ];
 
 const AdminExpenses: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('shipping');
   const [pudoCosts, setPudoCosts] = useState<PudoCostItem[]>(() => {
     const saved = localStorage.getItem('spv_pudo_costs');
     return saved ? JSON.parse(saved) : INITIAL_PUDO_COSTS;
@@ -148,229 +150,285 @@ const AdminExpenses: React.FC = () => {
         <p className="text-gray-400 text-sm">Reference for PUDO & PAXI costs and supplies.</p>
       </div>
 
-      {/* PUDO Section */}
-      <div className="bg-zinc-900 border border-gray-700 p-6 rounded-xl shadow-lg">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h3 className="font-bold text-white text-lg flex items-center gap-3">
-            <Box size={20} className="text-cyan-400" /> PUDO Box & Service Pricing
-          </h3>
-          <a href="https://stationery.thecourierguy.co.za/" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap">
-            Order Stationery <ExternalLink size={16} />
-          </a>
+      <div className="rounded-xl border border-gray-700 bg-zinc-900">
+        <div className="grid w-full grid-cols-3">
+          <button
+            onClick={() => setActiveTab('shipping')}
+            className={`py-3 px-4 text-sm font-medium transition-colors ${
+              activeTab === 'shipping'
+                ? 'bg-yellow-400 text-black border-b-2 border-yellow-400'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            Shipping Costs
+          </button>
+          <button
+            onClick={() => setActiveTab('ads')}
+            className={`py-3 px-4 text-sm font-medium transition-colors ${
+              activeTab === 'ads'
+                ? 'bg-yellow-400 text-black border-b-2 border-yellow-400'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            Ad Revenue
+          </button>
+          <button
+            onClick={() => setActiveTab('marketing')}
+            className={`py-3 px-4 text-sm font-medium transition-colors ${
+              activeTab === 'marketing'
+                ? 'bg-yellow-400 text-black border-b-2 border-yellow-400'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            Marketing Settings
+          </button>
         </div>
-        {/* PUDO Mobile View */}
-        <div className="space-y-4 md:hidden">
-          {/* ...existing mobile code... */}
-          {pudoCosts.map((item, index) => {
-            const lockerTotal = item.boxCost + (item.lockerToLockerCost || 0) + item.lockerHandleFee;
-            const doorTotal = item.boxCost + (item.doorToLockerCost || 0) + item.doorHandleFee;
-            return (
-              <div key={index} className="bg-black/40 p-4 rounded-lg border border-gray-800">
-                {/* ...existing code... */}
-              </div>
-            );
-          })}
-        </div>
-        {/* PUDO Desktop Table View */}
-        <div className="hidden md:block mt-8">
-          {/* Locker to Locker Table */}
-          <h4 className="font-bold text-cyan-400 mb-2 mt-6">Locker to Locker</h4>
-          <table className="min-w-full text-sm text-left text-gray-400 mb-8">
-            <thead className="bg-zinc-800 text-gray-300">
-              <tr>
-                <th className="px-4 py-2">Box</th>
-                <th className="px-4 py-2">Dimensions</th>
-                <th className="px-4 py-2">Max Weight</th>
-                <th className="px-4 py-2">Box Cost</th>
-                <th className="px-4 py-2">Locker to Locker</th>
-                <th className="px-4 py-2">Locker Handle Fee</th>
-                <th className="px-4 py-2">Total</th>
-                <th className="px-4 py-2">Save</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pudoCosts.map((item, idx) => {
-                if (item.lockerToLockerCost === null) return null;
-                const total = item.boxCost + (item.lockerToLockerCost || 0) + item.lockerHandleFee;
-                return (
-                  <tr key={idx} className="border-b border-gray-700">
-                    <td className="px-4 py-2 font-bold text-white">{item.name}</td>
-                    <td className="px-4 py-2">{item.dimensions}</td>
-                    <td className="px-4 py-2">{item.maxWeight}</td>
-                    <td className="px-4 py-2">
-                      <input type="number" value={item.boxCost} onChange={e => handlePudoChange(idx, 'boxCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input type="number" value={item.lockerToLockerCost || 0} onChange={e => handlePudoChange(idx, 'lockerToLockerCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input type="number" value={item.lockerHandleFee} onChange={e => handlePudoChange(idx, 'lockerHandleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    </td>
-                    <td className="px-4 py-2 font-bold text-cyan-400">R{total.toFixed(2)}</td>
-                    <td className="px-4 py-2">
-                      <button className="px-2 py-1 bg-cyan-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_pudo_costs', JSON.stringify(pudoCosts)); handleSave(`pudo-lockerToLockerCost-${idx}`); }}>💾</button>
-                      <span className="text-green-400 text-xs">{saveStatus[`pudo-lockerToLockerCost-${idx}`]}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
 
-          {/* Door to Locker Table */}
-          <h4 className="font-bold text-purple-400 mb-2 mt-6">Door to Locker</h4>
-          <table className="min-w-full text-sm text-left text-gray-400">
-            <thead className="bg-zinc-800 text-gray-300">
-              <tr>
-                <th className="px-4 py-2">Box</th>
-                <th className="px-4 py-2">Dimensions</th>
-                <th className="px-4 py-2">Max Weight</th>
-                <th className="px-4 py-2">Box Cost</th>
-                <th className="px-4 py-2">Door to Locker</th>
-                <th className="px-4 py-2">Door Handle Fee</th>
-                <th className="px-4 py-2">Total</th>
-                <th className="px-4 py-2">Save</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pudoCosts.map((item, idx) => {
-                if (item.doorToLockerCost === null) return null;
-                const total = item.boxCost + (item.doorToLockerCost || 0) + item.doorHandleFee;
-                return (
-                  <tr key={idx} className="border-b border-gray-700">
-                    <td className="px-4 py-2 font-bold text-white">{item.name}</td>
-                    <td className="px-4 py-2">{item.dimensions}</td>
-                    <td className="px-4 py-2">{item.maxWeight}</td>
-                    <td className="px-4 py-2">
-                      <input type="number" value={item.boxCost} onChange={e => handlePudoChange(idx, 'boxCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input type="number" value={item.doorToLockerCost || 0} onChange={e => handlePudoChange(idx, 'doorToLockerCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input type="number" value={item.doorHandleFee} onChange={e => handlePudoChange(idx, 'doorHandleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    </td>
-                    <td className="px-4 py-2 font-bold text-purple-400">R{total.toFixed(2)}</td>
-                    <td className="px-4 py-2">
-                      <button className="px-2 py-1 bg-purple-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_pudo_costs', JSON.stringify(pudoCosts)); handleSave(`pudo-doorToLockerCost-${idx}`); }}>💾</button>
-                      <span className="text-green-400 text-xs">{saveStatus[`pudo-doorToLockerCost-${idx}`]}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* PAXI Section */}
-      <div className="bg-zinc-900 border border-gray-700 p-6 rounded-xl shadow-lg">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h3 className="font-bold text-white text-lg flex items-center gap-3">
-            <Package size={20} className="text-pink-400" /> PAXI Bag & Service Pricing
-          </h3>
-          <a href="https://www.paxi.co.za/" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap">
-            PAXI Website <ExternalLink size={16} />
-          </a>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {Object.entries(paxiCosts).map(([service, bags]) => (
-            <div key={service}>
-              <h4 className="font-bold text-pink-400 mb-2">{service}</h4>
-              <table className="min-w-full text-sm text-left text-gray-400 mb-8">
-                <thead className="bg-zinc-800 text-gray-300">
-                  <tr>
-                    <th className="px-4 py-2">Bag</th>
-                    <th className="px-4 py-2">Box Fee</th>
-                    <th className="px-4 py-2">Service Cost</th>
-                    <th className="px-4 py-2">Handle Fee</th>
-                    <th className="px-4 py-2">Total</th>
-                    <th className="px-4 py-2">Save</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bags.map((bag, idx) => {
-                    // For demo, use a default box fee per bag type (could be editable or from config)
-                    let boxFee = bag.bag.includes('Small') ? 6 : 15;
-                    const total = boxFee + bag.serviceCost + bag.handleFee;
+        <div className="p-6">
+          {activeTab === 'shipping' && (
+            <>
+              {/* PUDO Section */}
+              <div className="bg-zinc-900 border border-gray-700 p-6 rounded-xl shadow-lg mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                  <h3 className="font-bold text-white text-lg flex items-center gap-3">
+                    <Box size={20} className="text-cyan-400" /> PUDO Box & Service Pricing
+                  </h3>
+                  <a href="https://stationery.thecourierguy.co.za/" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap">
+                    Order Stationery <ExternalLink size={16} />
+                  </a>
+                </div>
+                {/* PUDO Mobile View */}
+                <div className="space-y-4 md:hidden">
+                  {pudoCosts.map((item, index) => {
+                    const lockerTotal = item.boxCost + (item.lockerToLockerCost || 0) + item.lockerHandleFee;
+                    const doorTotal = item.boxCost + (item.doorToLockerCost || 0) + item.doorHandleFee;
                     return (
-                      <tr key={idx} className="border-b border-gray-700">
-                        <td className="px-4 py-2 font-bold text-white">{bag.bag}</td>
-                        <td className="px-4 py-2">
-                          <input type="number" value={boxFee} onChange={e => {/* Optionally allow editing boxFee here if needed */}} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" disabled />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input type="number" value={bag.serviceCost} onChange={e => handlePaxiChange(service as keyof PaxiServicesState, idx, 'serviceCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input type="number" value={bag.handleFee} onChange={e => handlePaxiChange(service as keyof PaxiServicesState, idx, 'handleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                        </td>
-                        <td className="px-4 py-2 font-bold text-pink-400">R{total.toFixed(2)}</td>
-                        <td className="px-4 py-2">
-                          <button className="px-2 py-1 bg-pink-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_paxi_costs', JSON.stringify(paxiCosts)); handleSave(`paxi-${service}-${idx}`); }}>💾</button>
-                          <span className="text-green-400 text-xs">{saveStatus[`paxi-${service}-${idx}`]}</span>
-                        </td>
-                      </tr>
+                      <div key={index} className="bg-black/40 p-4 rounded-lg border border-gray-800">
+                        <h4 className="font-bold text-white mb-2">{item.name}</h4>
+                        <div className="text-sm text-gray-400 space-y-1">
+                          <p>Dimensions: {item.dimensions}</p>
+                          <p>Max Weight: {item.maxWeight}</p>
+                          <p>Box Cost: R{item.boxCost}</p>
+                          {item.lockerToLockerCost && <p>Locker to Locker: R{item.lockerToLockerCost}</p>}
+                          {item.doorToLockerCost && <p>Door to Locker: R{item.doorToLockerCost}</p>}
+                          <p className="font-bold text-cyan-400">Total: R{lockerTotal.toFixed(2)}</p>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-      </div>
+                </div>
+                {/* PUDO Desktop Table View */}
+                <div className="hidden md:block mt-8">
+                  {/* Locker to Locker Table */}
+                  <h4 className="font-bold text-cyan-400 mb-2 mt-6">Locker to Locker</h4>
+                  <table className="min-w-full text-sm text-left text-gray-400 mb-8">
+                    <thead className="bg-zinc-800 text-gray-300">
+                      <tr>
+                        <th className="px-4 py-2">Box</th>
+                        <th className="px-4 py-2">Dimensions</th>
+                        <th className="px-4 py-2">Max Weight</th>
+                        <th className="px-4 py-2">Box Cost</th>
+                        <th className="px-4 py-2">Locker to Locker</th>
+                        <th className="px-4 py-2">Locker Handle Fee</th>
+                        <th className="px-4 py-2">Total</th>
+                        <th className="px-4 py-2">Save</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pudoCosts.map((item, idx) => {
+                        if (item.lockerToLockerCost === null) return null;
+                        const total = item.boxCost + (item.lockerToLockerCost || 0) + item.lockerHandleFee;
+                        return (
+                          <tr key={idx} className="border-b border-gray-700">
+                            <td className="px-4 py-2 font-bold text-white">{item.name}</td>
+                            <td className="px-4 py-2">{item.dimensions}</td>
+                            <td className="px-4 py-2">{item.maxWeight}</td>
+                            <td className="px-4 py-2">
+                              <input type="number" value={item.boxCost} onChange={e => handlePudoChange(idx, 'boxCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input type="number" value={item.lockerToLockerCost || 0} onChange={e => handlePudoChange(idx, 'lockerToLockerCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input type="number" value={item.lockerHandleFee} onChange={e => handlePudoChange(idx, 'lockerHandleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            </td>
+                            <td className="px-4 py-2 font-bold text-cyan-400">R{total.toFixed(2)}</td>
+                            <td className="px-4 py-2">
+                              <button className="px-2 py-1 bg-cyan-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_pudo_costs', JSON.stringify(pudoCosts)); handleSave(`pudo-lockerToLockerCost-${idx}`); }}>💾</button>
+                              <span className="text-green-400 text-xs">{saveStatus[`pudo-lockerToLockerCost-${idx}`]}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
 
-      {/* Door-to-Door Section */}
-      <div className="bg-zinc-900 border border-gray-700 p-6 rounded-xl shadow-lg">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h3 className="font-bold text-white text-lg flex items-center gap-3">
-            <Truck size={20} className="text-yellow-400" /> Door-to-Door Courier Pricing
-          </h3>
+                  {/* Door to Locker Table */}
+                  <h4 className="font-bold text-purple-400 mb-2 mt-6">Door to Locker</h4>
+                  <table className="min-w-full text-sm text-left text-gray-400">
+                    <thead className="bg-zinc-800 text-gray-300">
+                      <tr>
+                        <th className="px-4 py-2">Box</th>
+                        <th className="px-4 py-2">Dimensions</th>
+                        <th className="px-4 py-2">Max Weight</th>
+                        <th className="px-4 py-2">Box Cost</th>
+                        <th className="px-4 py-2">Door to Locker</th>
+                        <th className="px-4 py-2">Door Handle Fee</th>
+                        <th className="px-4 py-2">Total</th>
+                        <th className="px-4 py-2">Save</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pudoCosts.map((item, idx) => {
+                        if (item.doorToLockerCost === null) return null;
+                        const total = item.boxCost + (item.doorToLockerCost || 0) + item.doorHandleFee;
+                        return (
+                          <tr key={idx} className="border-b border-gray-700">
+                            <td className="px-4 py-2 font-bold text-white">{item.name}</td>
+                            <td className="px-4 py-2">{item.dimensions}</td>
+                            <td className="px-4 py-2">{item.maxWeight}</td>
+                            <td className="px-4 py-2">
+                              <input type="number" value={item.boxCost} onChange={e => handlePudoChange(idx, 'boxCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input type="number" value={item.doorToLockerCost || 0} onChange={e => handlePudoChange(idx, 'doorToLockerCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input type="number" value={item.doorHandleFee} onChange={e => handlePudoChange(idx, 'doorHandleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            </td>
+                            <td className="px-4 py-2 font-bold text-purple-400">R{total.toFixed(2)}</td>
+                            <td className="px-4 py-2">
+                              <button className="px-2 py-1 bg-purple-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_pudo_costs', JSON.stringify(pudoCosts)); handleSave(`pudo-doorToLockerCost-${idx}`); }}>💾</button>
+                              <span className="text-green-400 text-xs">{saveStatus[`pudo-doorToLockerCost-${idx}`]}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* PAXI Section */}
+              <div className="bg-zinc-900 border border-gray-700 p-6 rounded-xl shadow-lg mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                  <h3 className="font-bold text-white text-lg flex items-center gap-3">
+                    <Package size={20} className="text-pink-400" /> PAXI Bag & Service Pricing
+                  </h3>
+                  <a href="https://www.paxi.co.za/" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap">
+                    PAXI Website <ExternalLink size={16} />
+                  </a>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {Object.entries(paxiCosts).map(([service, bags]) => (
+                    <div key={service}>
+                      <h4 className="font-bold text-pink-400 mb-2">{service}</h4>
+                      <table className="min-w-full text-sm text-left text-gray-400 mb-8">
+                        <thead className="bg-zinc-800 text-gray-300">
+                          <tr>
+                            <th className="px-4 py-2">Bag</th>
+                            <th className="px-4 py-2">Box Fee</th>
+                            <th className="px-4 py-2">Service Cost</th>
+                            <th className="px-4 py-2">Handle Fee</th>
+                            <th className="px-4 py-2">Total</th>
+                            <th className="px-4 py-2">Save</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bags.map((bag, idx) => {
+                            // For demo, use a default box fee per bag type (could be editable or from config)
+                            let boxFee = bag.bag.includes('Small') ? 6 : 15;
+                            const total = boxFee + bag.serviceCost + bag.handleFee;
+                            return (
+                              <tr key={idx} className="border-b border-gray-700">
+                                <td className="px-4 py-2 font-bold text-white">{bag.bag}</td>
+                                <td className="px-4 py-2">
+                                  <input type="number" value={boxFee} onChange={e => {/* Optionally allow editing boxFee here if needed */}} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" disabled />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <input type="number" value={bag.serviceCost} onChange={e => handlePaxiChange(service as keyof PaxiServicesState, idx, 'serviceCost', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <input type="number" value={bag.handleFee} onChange={e => handlePaxiChange(service as keyof PaxiServicesState, idx, 'handleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                                </td>
+                                <td className="px-4 py-2 font-bold text-pink-400">R{total.toFixed(2)}</td>
+                                <td className="px-4 py-2">
+                                  <button className="px-2 py-1 bg-pink-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_paxi_costs', JSON.stringify(paxiCosts)); handleSave(`paxi-${service}-${idx}`); }}>💾</button>
+                                  <span className="text-green-400 text-xs">{saveStatus[`paxi-${service}-${idx}`]}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Door-to-Door Section */}
+              <div className="bg-zinc-900 border border-gray-700 p-6 rounded-xl shadow-lg">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                  <h3 className="font-bold text-white text-lg flex items-center gap-3">
+                    <Truck size={20} className="text-yellow-400" /> Door-to-Door Courier Pricing
+                  </h3>
+                </div>
+                <table className="min-w-full text-sm text-left text-gray-400 mb-8">
+                  <thead className="bg-zinc-800 text-gray-300">
+                    <tr>
+                      <th className="px-4 py-2">Service</th>
+                      <th className="px-4 py-2">Initial Weight</th>
+                      <th className="px-4 py-2">Box Fee</th>
+                      <th className="px-4 py-2">Initial Charge</th>
+                      <th className="px-4 py-2">Rate per Kg</th>
+                      <th className="px-4 py-2">Handle Fee</th>
+                      <th className="px-4 py-2">Total</th>
+                      <th className="px-4 py-2">Save</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doorToDoorCosts.map((item, idx) => {
+                      const total = item.boxFee + item.initialCharge + (item.ratePerKg !== null ? item.ratePerKg : 0) + item.handleFee;
+                      return (
+                        <tr key={idx} className="border-b border-gray-700">
+                          <td className="px-4 py-2 font-bold text-white">{item.service}</td>
+                          <td className="px-4 py-2">{item.initialWeight}</td>
+                          <td className="px-4 py-2">
+                            <input type="number" value={item.boxFee} onChange={e => handleDoorToDoorChange(idx, 'boxFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input type="number" value={item.initialCharge} onChange={e => handleDoorToDoorChange(idx, 'initialCharge', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                          </td>
+                          <td className="px-4 py-2">
+                            {item.ratePerKg !== null ? (
+                              <input type="number" value={item.ratePerKg} onChange={e => handleDoorToDoorChange(idx, 'ratePerKg', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                            ) : '-'}
+                          </td>
+                          <td className="px-4 py-2">
+                            <input type="number" value={item.handleFee} onChange={e => handleDoorToDoorChange(idx, 'handleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
+                          </td>
+                          <td className="px-4 py-2 font-bold text-yellow-400">R{total.toFixed(2)}</td>
+                          <td className="px-4 py-2">
+                            <button className="px-2 py-1 bg-yellow-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_door_to_door_costs', JSON.stringify(doorToDoorCosts)); handleSave(`doorToDoor-${idx}`); }}>💾</button>
+                            <span className="text-green-400 text-xs">{saveStatus[`doorToDoor-${idx}`]}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'ads' && (
+            <AdminAdRevenue />
+          )}
+
+          {activeTab === 'marketing' && (
+            <AdminAdPricing />
+          )}
         </div>
-        <table className="min-w-full text-sm text-left text-gray-400 mb-8">
-          <thead className="bg-zinc-800 text-gray-300">
-            <tr>
-              <th className="px-4 py-2">Service</th>
-              <th className="px-4 py-2">Initial Weight</th>
-              <th className="px-4 py-2">Box Fee</th>
-              <th className="px-4 py-2">Initial Charge</th>
-              <th className="px-4 py-2">Rate per Kg</th>
-              <th className="px-4 py-2">Handle Fee</th>
-              <th className="px-4 py-2">Total</th>
-              <th className="px-4 py-2">Save</th>
-            </tr>
-          </thead>
-          <tbody>
-            {doorToDoorCosts.map((item, idx) => {
-              const total = item.boxFee + item.initialCharge + (item.ratePerKg !== null ? item.ratePerKg : 0) + item.handleFee;
-              return (
-                <tr key={idx} className="border-b border-gray-700">
-                  <td className="px-4 py-2 font-bold text-white">{item.service}</td>
-                  <td className="px-4 py-2">{item.initialWeight}</td>
-                  <td className="px-4 py-2">
-                    <input type="number" value={item.boxFee} onChange={e => handleDoorToDoorChange(idx, 'boxFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                  </td>
-                  <td className="px-4 py-2">
-                    <input type="number" value={item.initialCharge} onChange={e => handleDoorToDoorChange(idx, 'initialCharge', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                  </td>
-                  <td className="px-4 py-2">
-                    {item.ratePerKg !== null ? (
-                      <input type="number" value={item.ratePerKg} onChange={e => handleDoorToDoorChange(idx, 'ratePerKg', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                    ) : '-'}
-                  </td>
-                  <td className="px-4 py-2">
-                    <input type="number" value={item.handleFee} onChange={e => handleDoorToDoorChange(idx, 'handleFee', e.target.value)} className="w-20 bg-zinc-800 border border-gray-600 rounded p-1 text-white text-right" />
-                  </td>
-                  <td className="px-4 py-2 font-bold text-yellow-400">R{total.toFixed(2)}</td>
-                  <td className="px-4 py-2">
-                    <button className="px-2 py-1 bg-yellow-700 text-white rounded text-xs" onClick={() => { localStorage.setItem('spv_door_to_door_costs', JSON.stringify(doorToDoorCosts)); handleSave(`doorToDoor-${idx}`); }}>💾</button>
-                    <span className="text-green-400 text-xs">{saveStatus[`doorToDoor-${idx}`]}</span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       </div>
     </div>
   );

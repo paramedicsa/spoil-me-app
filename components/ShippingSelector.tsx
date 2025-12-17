@@ -116,15 +116,15 @@ const INITIAL_DOOR_TO_DOOR_COSTS: PudoDoorToDoorItem[] = [ { service: 'Overnight
 
 interface ShippingSelectorProps {
     cartItemCount: number;
-    onShippingChange: (info: { method: 'pudo' | 'paxi' | 'door'; cost: number; details: string; }) => void;
+    onShippingChange: (info: { method: 'pudo' | 'paxi' | 'door' | 'international'; cost: number; details: string; }) => void;
     subtotal: number;
 }
 
 const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onShippingChange, subtotal }) => {
-    const { user } = useStore();
-    
-    const [shippingMethod, setShippingMethod] = useState<'pudo' | 'paxi' | 'door'>('pudo');
-    
+    const { user, currency } = useStore();
+
+    const [shippingMethod, setShippingMethod] = useState<'pudo' | 'paxi' | 'door' | 'international'>('pudo');
+
     // Paxi Logic
     const [paxiProvince, setPaxiProvince] = useState('');
     const [paxiTown, setPaxiTown] = useState('');
@@ -146,6 +146,17 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
         postalCode: user.shippingAddress?.postalCode || ''
     });
 
+    // International Shipping Logic
+    const [internationalAddress, setInternationalAddress] = useState<ShippingAddress>({
+        street: '',
+        suburb: '',
+        city: '',
+        province: '',
+        postalCode: '',
+        country: '',
+        email: ''
+    });
+
     // Dynamic Costs
     const [pudoCosts, setPudoCosts] = useState<PudoCostItem[]>(INITIAL_PUDO_COSTS);
     const [paxiCosts, setPaxiCosts] = useState<PaxiServicesState>(INITIAL_PAXI_COSTS);
@@ -160,6 +171,13 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
         }
     }, [isFreeShippingActive, shippingMethod]);
 
+    useEffect(() => {
+        if (currency === 'USD') {
+            setShippingMethod('international');
+        } else if (shippingMethod === 'international') {
+            setShippingMethod('pudo');
+        }
+    }, [currency]);
 
     useEffect(() => {
         try {
@@ -230,6 +248,13 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
             if(doorAddress.street && doorAddress.city && doorAddress.postalCode) {
                 details = JSON.stringify({...doorAddress, service: doorService });
             }
+        } else if (shippingMethod === 'international') {
+            cost = 60;
+            if(internationalAddress.street && internationalAddress.city && internationalAddress.postalCode) {
+                details = `International Shipping | ${internationalAddress.street}, ${internationalAddress.suburb ? internationalAddress.suburb + ', ' : ''}${internationalAddress.city}, ${internationalAddress.province ? internationalAddress.province + ', ' : ''}${internationalAddress.postalCode}${internationalAddress.country ? ', ' + internationalAddress.country : ''}${internationalAddress.email ? ' | Email: ' + internationalAddress.email : ''}`;
+            } else {
+                details = 'International Shipping';
+            }
         }
 
         onShippingChange({ method: shippingMethod, cost, details });
@@ -237,9 +262,25 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
         shippingMethod, cartItemCount, pudoCosts, paxiCosts, doorToDoorCosts, doorService,
         pudoProvince, pudoTown, pudoLockerLocation,
         paxiProvince, paxiTown, paxiStoreName, paxiStoreAddress,
-        doorAddress, onShippingChange
+        doorAddress, internationalAddress,
+        onShippingChange
     ]);
 
+
+    useEffect(() => {
+        setPudoTown('');
+    }, [pudoProvince]);
+
+    useEffect(() => {
+        setPaxiTown('');
+        setPaxiStoreName('');
+        setPaxiStoreAddress('');
+    }, [paxiProvince]);
+
+    useEffect(() => {
+        setPaxiStoreName('');
+        setPaxiStoreAddress('');
+    }, [paxiTown]);
 
     return (
         <div className="bg-zinc-900 border border-gray-800 p-6 rounded-xl">
@@ -248,59 +289,73 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
             </h3>
             
             <div className="space-y-3">
-                <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${shippingMethod === 'pudo' ? 'bg-cyan-900/20 border-cyan-500' : 'bg-black border-gray-700 hover:border-gray-600'}`}>
-                   <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${shippingMethod === 'pudo' ? 'border-cyan-500 bg-cyan-500' : 'border-gray-500'}`}>
-                         {shippingMethod === 'pudo' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
-                      </div>
-                      <span className="text-sm text-gray-300">PUDO Locker to Locker</span>
-                   </div>
-                   <input type="radio" className="hidden" name="shipping" checked={shippingMethod === 'pudo'} onChange={() => setShippingMethod('pudo')} />
-                </label>
+                {currency === 'USD' ? (
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${shippingMethod === 'international' ? 'bg-green-900/20 border-green-500' : 'bg-black border-gray-700 hover:border-gray-600'}`}>
+                       <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${shippingMethod === 'international' ? 'border-green-500 bg-green-500' : 'border-gray-500'}`}>
+                             {shippingMethod === 'international' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
+                          </div>
+                          <span className="text-sm text-gray-300">International Shipping $60</span>
+                       </div>
+                       <input type="radio" className="hidden" name="shipping" checked={shippingMethod === 'international'} onChange={() => setShippingMethod('international')} />
+                    </label>
+                ) : (
+                    <>
+                        <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${shippingMethod === 'pudo' ? 'bg-cyan-900/20 border-cyan-500' : 'bg-black border-gray-700 hover:border-gray-600'}`}>
+                           <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${shippingMethod === 'pudo' ? 'border-cyan-500 bg-cyan-500' : 'border-gray-500'}`}>
+                                 {shippingMethod === 'pudo' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
+                              </div>
+                              <span className="text-sm text-gray-300">PUDO Locker to Locker</span>
+                           </div>
+                           <input type="radio" className="hidden" name="shipping" checked={shippingMethod === 'pudo'} onChange={() => setShippingMethod('pudo')} />
+                        </label>
 
-                <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${shippingMethod === 'paxi' ? 'bg-yellow-900/20 border-yellow-500' : 'bg-black border-gray-700 hover:border-gray-600'}`}>
-                   <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${shippingMethod === 'paxi' ? 'border-yellow-500 bg-yellow-500' : 'border-gray-500'}`}>
-                         {shippingMethod === 'paxi' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
-                      </div>
-                      <span className="text-sm text-gray-300">PAXI (PEP Store - 7-9 Days)</span>
-                   </div>
-                   <input type="radio" className="hidden" name="shipping" checked={shippingMethod === 'paxi'} onChange={() => setShippingMethod('paxi')} />
-                </label>
+                        <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${shippingMethod === 'paxi' ? 'bg-yellow-900/20 border-yellow-500' : 'bg-black border-gray-700 hover:border-gray-600'}`}>
+                           <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${shippingMethod === 'paxi' ? 'border-yellow-500 bg-yellow-500' : 'border-gray-500'}`}>
+                                 {shippingMethod === 'paxi' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
+                              </div>
+                              <span className="text-sm text-gray-300">PAXI (PEP Store - 7-9 Days)</span>
+                           </div>
+                           <input type="radio" className="hidden" name="shipping" checked={shippingMethod === 'paxi'} onChange={() => setShippingMethod('paxi')} />
+                        </label>
 
-                <label className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                    shippingMethod === 'door' 
-                        ? 'bg-purple-900/20 border-purple-500 cursor-pointer' 
-                        : isFreeShippingActive 
-                            ? 'bg-zinc-900 border-gray-800 opacity-50 cursor-not-allowed' 
-                            : 'bg-black border-gray-700 hover:border-gray-600 cursor-pointer'
-                }`}>
-                   <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                          shippingMethod === 'door' 
-                              ? 'border-purple-500 bg-purple-500' 
-                              : isFreeShippingActive 
-                                  ? 'border-gray-700' 
-                                  : 'border-gray-500'
-                      }`}>
-                         {shippingMethod === 'door' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
-                      </div>
-                      <div>
-                          <span className={`text-sm ${isFreeShippingActive ? 'text-gray-500' : 'text-gray-300'}`}>
-                              PUDO Door to Door
-                          </span>
-                          {isFreeShippingActive && <span className="text-xs text-gray-500 block">Not available for free shipping</span>}
-                      </div>
-                   </div>
-                   <input 
-                      type="radio" 
-                      className="hidden" 
-                      name="shipping" 
-                      checked={shippingMethod === 'door'} 
-                      onChange={() => setShippingMethod('door')} 
-                      disabled={isFreeShippingActive}
-                   />
-                </label>
+                        <label className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                            shippingMethod === 'door'
+                                ? 'bg-purple-900/20 border-purple-500 cursor-pointer'
+                                : isFreeShippingActive
+                                    ? 'bg-zinc-900 border-gray-800 opacity-50 cursor-not-allowed'
+                                    : 'bg-black border-gray-700 hover:border-gray-600 cursor-pointer'
+                        }`}>
+                           <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                  shippingMethod === 'door'
+                                      ? 'border-purple-500 bg-purple-500'
+                                      : isFreeShippingActive
+                                          ? 'border-gray-700'
+                                          : 'border-gray-500'
+                              }`}>
+                                 {shippingMethod === 'door' && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
+                              </div>
+                              <div>
+                                  <span className={`text-sm ${isFreeShippingActive ? 'text-gray-500' : 'text-gray-300'}`}>
+                                      PUDO Door to Door
+                                  </span>
+                                  {isFreeShippingActive && <span className="text-xs text-gray-500 block">Not available for free shipping</span>}
+                              </div>
+                           </div>
+                           <input
+                              type="radio"
+                              className="hidden"
+                              name="shipping"
+                              checked={shippingMethod === 'door'}
+                              onChange={() => setShippingMethod('door')}
+                              disabled={isFreeShippingActive}
+                           />
+                        </label>
+                    </>
+                )}
             </div>
 
             {/* Dynamic Inputs based on Method */}
@@ -327,7 +382,13 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
                      {pudoProvince && (
                          <div className="animate-in fade-in slide-in-from-top-1">
                              <label className="block text-[9px] text-gray-500 uppercase mb-1">Step 2: City / Town</label>
-                             <input type="text" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs focus:border-cyan-500 outline-none" placeholder="e.g. Sandton" value={pudoTown} onChange={e => setPudoTown(e.target.value)} />
+                             <div className="relative">
+                                 <select className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs focus:border-cyan-500 outline-none appearance-none" value={pudoTown} onChange={e => setPudoTown(e.target.value)}>
+                                     <option value="">-- Select Town --</option>
+                                     {Object.keys(PAXI_LOCATIONS[pudoProvince] || {}).sort().map(town => (<option key={town} value={town}>{town}</option>))}
+                                 </select>
+                                 <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                             </div>
                          </div>
                      )}
 
@@ -365,7 +426,13 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
                      {paxiProvince && (
                          <div className="animate-in fade-in slide-in-from-top-1">
                              <label className="block text-[9px] text-gray-500 uppercase mb-1">Step 2: City / Town</label>
-                             <input type="text" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs focus:border-yellow-500 outline-none" placeholder="e.g. Acornhoek" value={paxiTown} onChange={e => setPaxiTown(e.target.value)} />
+                             <div className="relative">
+                                 <select className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs focus:border-yellow-500 outline-none appearance-none" value={paxiTown} onChange={e => setPaxiTown(e.target.value)}>
+                                     <option value="">-- Select Town --</option>
+                                     {Object.keys(PAXI_LOCATIONS[paxiProvince] || {}).sort().map(town => (<option key={town} value={town}>{town}</option>))}
+                                 </select>
+                                 <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                             </div>
                          </div>
                      )}
 
@@ -411,6 +478,29 @@ const ShippingSelector: React.FC<ShippingSelectorProps> = ({ cartItemCount, onSh
                      </div>
                      <input type="text" placeholder="Province" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs" 
                         value={doorAddress.province} onChange={e => setDoorAddress({...doorAddress, province: e.target.value})} />
+                 </div>
+            )}
+
+            {shippingMethod === 'international' && (
+                 <div className="mt-3 animate-in slide-in-from-top-2 space-y-3 p-3 bg-zinc-800/30 rounded border border-green-500/20">
+                     <label className="text-[10px] text-green-400 uppercase font-bold block">International Shipping Address</label>
+                     <input type="text" placeholder="Street Address" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                        value={internationalAddress.street} onChange={e => setInternationalAddress({...internationalAddress, street: e.target.value})} />
+                     <input type="text" placeholder="Suburb" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                        value={internationalAddress.suburb} onChange={e => setInternationalAddress({...internationalAddress, suburb: e.target.value})} />
+                     <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="City" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                            value={internationalAddress.city} onChange={e => setInternationalAddress({...internationalAddress, city: e.target.value})} />
+                        <input type="text" placeholder="Postal Code" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                            value={internationalAddress.postalCode} onChange={e => setInternationalAddress({...internationalAddress, postalCode: e.target.value})} />
+                     </div>
+                     <input type="text" placeholder="Province" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                        value={internationalAddress.province} onChange={e => setInternationalAddress({...internationalAddress, province: e.target.value})} />
+                     <input type="text" placeholder="Country" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                        value={internationalAddress.country || ''} onChange={e => setInternationalAddress({...internationalAddress, country: e.target.value})} />
+                     <input type="email" placeholder="Email" className="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs"
+                        value={internationalAddress.email || ''} onChange={e => setInternationalAddress({...internationalAddress, email: e.target.value})} />
+                     <p className="text-xs text-yellow-400 mt-2">You are liable for any import taxes if any arises.</p>
                  </div>
             )}
         </div>

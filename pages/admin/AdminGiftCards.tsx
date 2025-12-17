@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Gift, CreditCard, Plus, Trash2, Copy, Check, RefreshCw, PenTool, ShoppingBag, Send, UserCheck, AlertTriangle } from 'lucide-react';
@@ -7,9 +6,9 @@ import { db } from '../../firebaseConfig';
 import { collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 
 const AdminGiftCards: React.FC = () => {
-  const { vouchers, addVoucher, deleteVoucher, cart } = useStore();
-  
-  const [amount, setAmount] = useState(250);
+  const { vouchers, addVoucher, deleteVoucher, cart, currency } = useStore();
+
+  const [amount, setAmount] = useState(10);
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [customMessage, setCustomMessage] = useState('');
@@ -36,12 +35,14 @@ const AdminGiftCards: React.FC = () => {
     
     setIsSending(true);
 
+    const voucherValue = amount * 29; // Always store in ZAR
+
     // 1. Create the Voucher in Global Store (so it can be redeemed)
     const newVoucher: Voucher = {
         code: generatedCode,
         discountType: 'fixed',
-        value: amount,
-        minSpend: amount, 
+        value: voucherValue,
+        minSpend: voucherValue,
         expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 3).toISOString() // 3 Years
     };
     addVoucher(newVoucher);
@@ -59,12 +60,12 @@ const AdminGiftCards: React.FC = () => {
                     id: `gift_recv_${Date.now()}`,
                     type: 'gift_received',
                     title: 'You received a Gift Voucher!',
-                    message: `Spoil Me Vintage sent you a voucher worth R${amount}.`,
+                    message: `Spoil Me Vintage sent you a voucher worth ${currency === 'ZAR' ? 'R' : '$'}${currency === 'ZAR' ? voucherValue : amount}.`,
                     date: new Date().toISOString(),
                     isRead: false,
                     voucherData: {
                         code: generatedCode,
-                        amount: amount,
+                        amount: voucherValue,
                         meta: {
                             recipientName: recipientName || userDoc.data().name || 'Valued Customer',
                             senderName: 'Spoil Me Vintage Team',
@@ -131,12 +132,12 @@ const AdminGiftCards: React.FC = () => {
                             <div key={idx} className="bg-zinc-900 p-3 rounded-lg border border-pink-500/20 flex justify-between items-center">
                                 <div>
                                     <p className="text-white text-sm font-medium">{order.name}</p>
-                                    <p className="text-xs text-gray-500">Value: R{order.price}</p>
+                                    <p className="text-xs text-gray-500">Value: {currency === 'ZAR' ? 'R' : '$'}{currency === 'ZAR' ? order.price : (order.price / 29).toFixed(0)}</p>
                                 </div>
                                 <button 
                                   onClick={() => {
-                                      setAmount(order.price);
-                                      setRecipientName('Customer'); 
+                                      setAmount(currency === 'ZAR' ? order.price : order.price / 29);
+                                      setRecipientName('Customer');
                                       generateCode();
                                   }}
                                   className="px-3 py-1.5 bg-pink-600 text-white text-xs rounded hover:bg-pink-500"
@@ -156,9 +157,11 @@ const AdminGiftCards: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                     <div>
-                        <label className="block text-xs text-gray-500 uppercase mb-1">Voucher Value (R)</label>
-                        <input 
+                        <label className="block text-xs text-gray-500 uppercase mb-1">Voucher Value (USD)</label>
+                        <input
                             type="number" 
+                            min="10"
+                            max="100"
                             value={amount}
                             onChange={e => setAmount(parseFloat(e.target.value))}
                             className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white font-bold focus:border-cyan-400 outline-none"
@@ -241,7 +244,7 @@ const AdminGiftCards: React.FC = () => {
                              <div key={i} className="flex items-center justify-between bg-black p-3 rounded-lg border border-gray-800 hover:border-gray-600 transition-colors">
                                  <div>
                                      <p className="font-mono text-cyan-400 font-bold">{v.code}</p>
-                                     <p className="text-xs text-gray-500">Value: R{v.value} • Expires: {new Date(v.expiresAt).toLocaleDateString()}</p>
+                                     <p className="text-xs text-gray-500">Value: {currency === 'ZAR' ? 'R' : '$'}{currency === 'ZAR' ? v.value : (v.value / 29).toFixed(0)} • Expires: {new Date(v.expiresAt).toLocaleDateString()}</p>
                                  </div>
                                  <div className="flex items-center gap-2">
                                      <button onClick={() => copyToClipboard(v.code)} className="p-2 text-gray-500 hover:text-white">
@@ -276,7 +279,7 @@ const AdminGiftCards: React.FC = () => {
                               <div className="font-cherry text-xl text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400">
                                   Spoil Me Vintage
                               </div>
-                              <div className="text-3xl font-bold text-white font-architects">R{amount}</div>
+                              <div className="text-3xl font-bold text-white font-architects">{currency === 'ZAR' ? 'R' : '$'}{currency === 'ZAR' ? (amount * 29).toFixed(0) : amount}</div>
                           </div>
                           
                           <div className="text-center my-auto">

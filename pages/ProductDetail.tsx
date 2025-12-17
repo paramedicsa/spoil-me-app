@@ -1,11 +1,13 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { ShoppingBag, Heart, Truck, ShieldCheck, Share2, Star, Check, ChevronDown, User as UserIcon, Gift, Clock, HelpCircle, Info, BadgeCheck, Ruler, ArrowLeft, ArrowRight, Crown, Sparkles, AlertCircle, Facebook, MessageCircle } from 'lucide-react';
-import { useResolvedImage, ResolvedImage } from '@/utils/imageUtils';
+import { useResolvedImage, ResolvedImage, handleImageError, getFallbackImage } from '@/utils/imageUtils';
 import { EarringMaterial, Review } from '../types';
 import ProductCard from '../components/ProductCard';
+import { getAnalytics, logEvent } from "firebase/analytics";
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 // Chain descriptions mapping (Must match Admin)
 const CHAIN_DESCRIPTIONS: Record<string, string> = {
@@ -31,7 +33,7 @@ const RING_SIZE_CHART = [
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { products, addToCart, toggleWishlist, user, shareProduct, cart } = useStore();
+  const { products, addToCart, toggleWishlist, user, shareProduct, cart, currency } = useStore();
   const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState(0);
   const [showRRPInfo, setShowRRPInfo] = useState(false);
@@ -53,6 +55,11 @@ const ProductDetail: React.FC = () => {
   const [selectedChainStyle, setSelectedChainStyle] = useState('');
   const [selectedChainLength, setSelectedChainLength] = useState('');
 
+  // Reviews state
+  const [realReviews, setRealReviews] = useState<any[]>([]);
+  const [limitCount, setLimitCount] = useState(5);
+  const [hasMoreReviews, setHasMoreReviews] = useState(false);
+
   const product = products.find(p => p.id === id);
   
   // Get related products in same category (excluding current product)
@@ -65,6 +72,60 @@ const ProductDetail: React.FC = () => {
     window.scrollTo(0, 0);
     setHasShared(false); // Reset share status on product change
   }, [id]);
+
+  // Analytics logging instead of view count
+  useEffect(() => {
+    if (product) {
+      // Calculate Price in selected Currency
+      const displayPrice = getPrice(currentPrice);
+
+      // Log Event to Firebase Analytics (Free) instead of Firestore (Paid)
+      const analytics = getAnalytics();
+      logEvent(analytics, 'view_item', {
+        currency: currency,
+        value: displayPrice,
+        items: [{
+          item_id: product.id,
+          item_name: product.name,
+          price: displayPrice
+        }]
+      });
+    }
+  }, [product, currency]);
+
+  // Fetch reviews from Firestore
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!product) return;
+
+      try {
+        const reviewsRef = collection(db, 'reviews');
+        const q = query(
+          reviewsRef,
+          where('productId', '==', product.id),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        );
+
+        const snapshot = await getDocs(q);
+        const fetchedReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        setRealReviews(fetchedReviews);
+        setHasMoreReviews(fetchedReviews.length === limitCount);
+      } catch (error: any) {
+        console.error("Review fetch error:", error);
+        if (error.code === 'failed-precondition') {
+          console.warn("⚠️ INDEX MISSING: Click the link in console to build index.");
+        }
+      }
+    };
+
+    fetchReviews();
+  }, [product, limitCount]);
+
+  // Merge legacy and real reviews
+  const legacyReviews = (product?.reviews && Array.isArray(product.reviews)) ? product.reviews : [];
+  const allReviewsToDisplay = [...legacyReviews, ...realReviews];
 
   // Initialize defaults
   useEffect(() => {
@@ -133,6 +194,10 @@ const ProductDetail: React.FC = () => {
         }
     }
     
+    if (product.isSoldOut) {
+        outOfStock = true;
+    }
+
     const limitReached = stock > 0 && quantityInCart >= stock;
     if (!outOfStock && limitReached) {
         message = 'Stock limit in cart';
@@ -164,38 +229,39 @@ const ProductDetail: React.FC = () => {
     && (!isStartValid || promoStart! <= now) 
     && (!isEndValid || promoExpiry! > now);
   
-  // Fixed Member Price: 20% off Retail
-  const standardMemberPrice = parseFloat((product.price * 0.8).toFixed(2));
-  
+  // Fixed Member Price: Use stored member prices with fallback to calculation
+  const basePrice = currency === 'ZAR' ? product.price : (product.priceUSD || product.price);
+  const standardMemberPrice = currency === 'ZAR' ? (product.memberPrice || basePrice * 0.8) : (product.memberPriceUSD || basePrice * 0.8);
+
   // Effective Base Price Logic
-  let basePrice = product.price;
+  let currentBasePrice = basePrice;
   let appliedTier = 'none';
 
   // STRICT MEMBER CHECK: Only apply membership logic if user is logged in as member
   if (user.isMember) {
      // Default to Standard Member Price
-     basePrice = standardMemberPrice;
-     
+     currentBasePrice = standardMemberPrice;
+
      if (isPromoActive) {
          if (user.membershipTier === 'deluxe' && product.promoDeluxeMemberPrice && product.promoDeluxeMemberPrice > 0) {
-             basePrice = product.promoDeluxeMemberPrice;
+             currentBasePrice = product.promoDeluxeMemberPrice;
              appliedTier = 'deluxe';
          } else if (user.membershipTier === 'premium' && product.promoPremiumMemberPrice && product.promoPremiumMemberPrice > 0) {
-             basePrice = product.promoPremiumMemberPrice;
+             currentBasePrice = product.promoPremiumMemberPrice;
              appliedTier = 'premium';
          } else if (user.membershipTier === 'basic' && product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0) {
-             basePrice = product.promoBasicMemberPrice;
+             currentBasePrice = product.promoBasicMemberPrice;
              appliedTier = 'basic';
          } else {
             // If no specific tier price, check if general promo is better than member 20% off
             if ((product.promoPrice || Infinity) < standardMemberPrice) {
-                basePrice = product.promoPrice!;
+                currentBasePrice = product.promoPrice!;
             }
          }
      }
   } else if (isPromoActive) {
      // Non-members get the general promo price if active
-     basePrice = product.promoPrice!;
+     currentBasePrice = product.promoPrice!;
   }
   
   // Calculate Member Price for Upsell Display (Non-Members)
@@ -204,13 +270,13 @@ const ProductDetail: React.FC = () => {
       : standardMemberPrice;
 
   // Final Price Calculation with Modifiers
-  let currentPrice = basePrice;
+  let currentPrice = currentBasePrice;
   if (selectedMaterial) {
     currentPrice += selectedMaterial.modifier;
   }
 
   // Original Price (Base + Mods) for strikethrough comparison
-  const standardPrice = product.price + (selectedMaterial?.modifier || 0);
+  const standardPrice = basePrice + (selectedMaterial?.modifier || 0);
 
   // Calculate Savings for Display based on current view (Upsell)
   const upsellSavingsAmount = standardPrice - memberUpsellPrice;
@@ -317,7 +383,12 @@ const ProductDetail: React.FC = () => {
       }
   };
 
-  const resolvedPrimary = useResolvedImage(product.images[activeImage] || product.images[0] || '', 'https://via.placeholder.com/800x800');
+  const resolvedPrimary = useResolvedImage(product.images[activeImage] || product.images[0] || '', getFallbackImage(800, 800, 'Spoil Me Vintage'));
+
+  // Helper functions for currency display
+  const getCurrencySymbol = () => currency === 'ZAR' ? 'R' : '$';
+  const getPrice = (zarPrice: number, usdPrice?: number) => currency === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+  const convertPrice = (zarPrice: number) => currency === 'ZAR' ? zarPrice : zarPrice / 29; // Keep for backwards compatibility
 
   return (
     <div className="space-y-16 pt-4 pb-16 relative">
@@ -517,14 +588,15 @@ const ProductDetail: React.FC = () => {
         {/* Image Gallery */}
         <div className="space-y-4">
           <div className="aspect-square rounded-2xl overflow-hidden bg-zinc-900 shadow-lg border border-gray-800 relative group">
-            <ResolvedImage src={resolvedPrimary} alt={product.name} className="w-full h-full object-cover opacity-95" onError={(e) => { console.warn('Image failed to load in ProductDetail primary:', (e.currentTarget as HTMLImageElement).src); (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/800x800'; }} />
+            <ResolvedImage src={resolvedPrimary} alt={product.name} className="w-full h-full object-cover opacity-95" onError={handleImageError} />
+
             {/* Badges */}
             <div className="absolute top-4 left-4 flex flex-col gap-2">
                 {product.isNewArrival && <span className="bg-cyan-600/90 text-white text-xs font-bold px-3 py-1 rounded-full w-fit">NEW</span>}
                 {user.isMember && (
                    <span className="bg-purple-600/90 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-purple-400 flex items-center gap-1 w-fit">
                       <Crown size={12} fill="currentColor" /> 
-                      {appliedTier !== 'none' ? `${appliedTier.toUpperCase()} PRICE` : 'MEMBER DEAL'}
+                      {appliedTier !== 'none' ? `${appliedTier.toUpperCASE()} PRICE` : 'MEMBER DEAL'}
                    </span>
                 )}
             </div>
@@ -537,7 +609,7 @@ const ProductDetail: React.FC = () => {
                 onClick={() => setActiveImage(idx)}
                 className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${activeImage === idx ? 'border-pink-500 opacity-100 shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'border-gray-800 opacity-60 hover:opacity-100'}`}
               >
-                <ResolvedImage src={img} alt={`View ${idx}`} className="w-full h-full object-cover" onError={(e) => { console.warn('Image failed to load in ProductDetail thumb:', (e.currentTarget as HTMLImageElement).src); (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/320x320'; }} />
+                <ResolvedImage src={img} alt={`View ${idx}`} className="w-full h-full object-cover" onError={handleImageError} />
               </button>
             ))}
           </div>
@@ -559,7 +631,7 @@ const ProductDetail: React.FC = () => {
             <div className="flex flex-col gap-1">
                {product.compareAtPrice && product.compareAtPrice > currentPrice && (
                   <div className="flex items-center gap-2 relative">
-                    <span className="text-sm text-gray-500 line-through">RRP R{product.compareAtPrice.toFixed(2)}</span>
+                    <span className="text-sm text-gray-500 line-through">RRP {getCurrencySymbol()}{getPrice(product.compareAtPrice, product.compareAtPriceUSD).toFixed(2)}</span>
                     <button onClick={() => setShowRRPInfo(!showRRPInfo)} className="text-gray-500 hover:text-cyan-400">
                        <HelpCircle size={14} />
                     </button>
@@ -573,11 +645,11 @@ const ProductDetail: React.FC = () => {
                
                <div className="flex items-baseline gap-3">
                   <span className={`text-[32px] font-bold drop-shadow-sm ${user.isMember ? 'text-purple-400' : 'text-green-400'}`}>
-                     R{currentPrice.toFixed(2)}
+                     {getCurrencySymbol()}{getPrice(currentPrice).toFixed(2)}
                   </span>
                   {/* Ensure that if Promo is active (or member price is lower), we show the struck through original price */}
                   {standardPrice > currentPrice + 0.01 && (
-                     <span className="text-lg text-gray-600 line-through">R{standardPrice.toFixed(2)}</span>
+                     <span className="text-lg text-gray-600 line-through">{getCurrencySymbol()}{getPrice(standardPrice).toFixed(2)}</span>
                   )}
                </div>
                
@@ -597,10 +669,18 @@ const ProductDetail: React.FC = () => {
 
                {/* Stock Indicator */}
                <div className="mt-3 flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${availableStock > 0 ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></div>
-                    <span className={`${availableStock > 0 ? (availableStock <= 5 ? 'text-orange-400' : 'text-green-400') : 'text-red-400'} font-bold`}>
-                       {availableStock > 0 ? (availableStock <= 5 ? `Only ${availableStock} left!` : 'In Stock') : 'Out of Stock'}
-                    </span>
+                    {isOutOfStock ? (
+                        <span className="bg-red-600 text-white font-black px-3 py-1 rounded-lg shadow-[0_0_10px_rgba(220,38,38,0.8)] border-2 border-red-400 animate-pulse">
+                           Just SOLD
+                        </span>
+                    ) : (
+                        <>
+                            <div className={`w-2 h-2 rounded-full ${availableStock > 0 ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></div>
+                            <span className={`${availableStock > 0 ? (availableStock <= 5 ? 'text-orange-400' : 'text-green-400') : 'text-red-400'} font-bold`}>
+                               {availableStock > 0 ? (availableStock <= 5 ? `Only ${availableStock} left!` : 'In Stock') : 'Out of Stock'}
+                            </span>
+                        </>
+                    )}
                </div>
             </div>
           </div>
@@ -619,7 +699,7 @@ const ProductDetail: React.FC = () => {
                 <div className="space-y-3">
                    <div className="flex justify-between items-center text-sm p-2 rounded bg-zinc-800/50 border border-zinc-700/50">
                       <span className="text-gray-400">Retail Price</span>
-                      <span className="text-gray-300 font-medium">R{standardPrice.toFixed(2)}</span>
+                      <span className="text-gray-300 font-medium">{getCurrencySymbol()}{getPrice(standardPrice).toFixed(2)}</span>
                    </div>
                    
                    {/* DYNAMIC MEMBERSHIP PRICING DISPLAY */}
@@ -633,7 +713,7 @@ const ProductDetail: React.FC = () => {
                                   <span className="text-xs text-purple-300 uppercase font-bold">{getPercentOff(product.promoBasicMemberPrice)}% Off</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-purple-400 font-bold text-lg">R{product.promoBasicMemberPrice.toFixed(0)}</span>
+                                    <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(product.promoBasicMemberPrice).toFixed(0)}</span>
                                 </div>
                               </div>
                           )}
@@ -645,7 +725,7 @@ const ProductDetail: React.FC = () => {
                                    <span className="text-xs text-purple-300 uppercase font-bold">{getPercentOff(product.promoPremiumMemberPrice)}% Off</span>
                                  </div>
                                  <div className="text-right">
-                                     <span className="block text-purple-400 font-bold text-lg">R{product.promoPremiumMemberPrice.toFixed(0)}</span>
+                                     <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(product.promoPremiumMemberPrice).toFixed(0)}</span>
                                  </div>
                                </div>
                           )}
@@ -658,7 +738,7 @@ const ProductDetail: React.FC = () => {
                                   <span className="text-xs text-lime-300 uppercase font-bold">{getPercentOff(product.promoDeluxeMemberPrice)}% Off</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-lime-400 font-bold text-lg">R{product.promoDeluxeMemberPrice.toFixed(0)}</span>
+                                    <span className="block text-lime-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(product.promoDeluxeMemberPrice).toFixed(0)}</span>
                                 </div>
                               </div>
                           )}
@@ -668,10 +748,10 @@ const ProductDetail: React.FC = () => {
                       <div className="flex justify-between items-center text-sm p-2 rounded bg-purple-900/20 border border-purple-500/40">
                          <span className="text-purple-200 font-bold">Member Price</span>
                          <div className="text-right">
-                            <span className="block text-purple-400 font-bold text-lg">R{memberUpsellPrice.toFixed(2)}</span>
+                            <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(memberUpsellPrice).toFixed(2)}</span>
                             <span className="text-xs text-purple-300 uppercase font-bold">Save {upsellSavingsPercent}%</span>
                          </div>
-                      </div>
+                       </div>
                    )}
                 </div>
                 
@@ -809,7 +889,7 @@ const ProductDetail: React.FC = () => {
                         <div className="flex justify-between items-center">
                            <span className={`font-medium text-sm ${selectedMaterial?.name === mat.name ? 'text-white' : 'text-gray-300'}`}>{mat.name}</span>
                            <span className="text-xs font-bold text-pink-400">
-                             {mat.modifier > 0 ? `+R${mat.modifier}` : ''}
+                             {mat.modifier > 0 ? `+${getCurrencySymbol()}${getPrice(mat.modifier).toFixed(0)}` : ''}
                            </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{mat.description}</p>
@@ -955,13 +1035,7 @@ const ProductDetail: React.FC = () => {
                    <p className="text-xs text-gray-500">On orders over R500 (PUDO/PAXI only)</p>
                 </div>
              </div>
-             <div className="flex items-start gap-3">
-                <ShieldCheck className="text-cyan-400 mt-1" size={20} />
-                <div>
-                   <h4 className="font-semibold text-sm text-gray-200">2 Year Warranty</h4>
-                   <p className="text-xs text-gray-500">Full coverage included</p>
-                </div>
-             </div>
+            {/* 2 Year Warranty removed per request */}
           </div>
         </div>
       </div>
@@ -983,7 +1057,7 @@ const ProductDetail: React.FC = () => {
              <div>
                 <h2 className="font-cherry text-[26px] font-bold text-white flex items-center gap-3">
                    Customer Reviews 
-                   <span className="text-sm font-sans font-normal text-gray-500 bg-zinc-900 px-3 py-1 rounded-full">{reviewCount}</span>
+                   <span className="text-sm font-sans font-normal text-gray-500 bg-zinc-900 px-3 py-1 rounded-full">{allReviewsToDisplay.length}</span>
                 </h2>
                 
                 {/* Verified Badge & Explanation */}
@@ -1005,44 +1079,54 @@ const ProductDetail: React.FC = () => {
              </button>
          </div>
 
-         {hasReviews ? (
+         {allReviewsToDisplay.length > 0 ? (
            <div className="space-y-8">
-             {product.reviews!.map((review) => (
-               <div key={review.id} className="flex flex-col md:flex-row gap-6 border-b border-gray-800 pb-8 last:border-0">
+             {allReviewsToDisplay.map((review, index) => (
+               <div key={review.id || `legacy-${index}`} className="flex flex-col md:flex-row gap-6 border-b border-gray-800 pb-8 last:border-0">
                  <div className="md:w-48 flex-shrink-0">
                     <div className="flex items-center gap-2 mb-1">
                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-600 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
-                          {review.userName.charAt(0)}
+                          {(review.userName || review.name || "Verified Buyer").charAt(0)}
                        </div>
-                       <span className="font-bold text-gray-200 text-sm">{review.userName}</span>
+                       <span className="font-bold text-gray-200 text-sm">{review.userName || review.name || "Verified Buyer"}</span>
                     </div>
                     <div className="flex items-center gap-1 ml-10 mb-1">
                         <BadgeCheck size={12} className="text-green-500" />
                         <span className="text--[10px] text-green-500 font-medium">Verified Buyer</span>
                     </div>
-                    <p className="text-xs text-gray-500 ml-10 mb-2">{review.location}</p>
+                    <p className="text-xs text-gray-500 ml-10 mb-2">{review.location || 'Unknown'}</p>
                     <div className="flex items-center gap-1 ml-10">
                        <div className="flex text-yellow-400">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <Star 
                               key={star} 
                               size={12} 
-                              fill={star <= Math.round(review.rating) ? "currentColor" : "none"} 
-                              className={star <= Math.round(review.rating) ? "text-yellow-400" : "text-gray-700"}
+                              fill={star <= Math.round(review.rating || 5) ? "currentColor" : "none"}
+                              className={star <= Math.round(review.rating || 5) ? "text-yellow-400" : "text-gray-700"}
                             />
                           ))}
                        </div>
-                       <span className="text-xs font-bold text-gray-400">({review.rating})</span>
+                       <span className="text-xs font-bold text-gray-400">({review.rating || 5})</span>
                     </div>
                  </div>
                  <div className="flex-1">
                     <div className="bg-zinc-900/50 p-4 rounded-xl rounded-tl-none border border-gray-800/50">
-                       <p className="text-gray-300 text-sm italic mb-3 leading-relaxed">"{review.content}"</p>
-                       <p className="text-xs text-gray-500 font-medium text-right">{review.date}</p>
+                       <p className="text-gray-300 text-sm italic mb-3 leading-relaxed">"{review.content || review.comment || review.text}"</p>
+                       <p className="text-xs text-gray-500 font-medium text-right">{review.date || (review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : 'Recent')}</p>
                     </div>
                  </div>
                </div>
              ))}
+             {realReviews.length >= limitCount && (
+               <div className="text-center pt-4">
+                 <button
+                   onClick={() => setLimitCount(prev => prev + 5)}
+                   className="w-full py-2 text-gold text-sm underline hover:text-white transition-colors"
+                 >
+                   Load More Customer Reviews
+                 </button>
+               </div>
+             )}
            </div>
          ) : (
             <div className="bg-zinc-900/30 border border-dashed border-gray-800 rounded-xl p-8 text-center">

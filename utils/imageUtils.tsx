@@ -63,6 +63,13 @@ export function useResolvedImage(src?: any, fallback?: string) {
       return;
     }
 
+    // If src is already a direct HTTP URL, use it immediately
+    if (isHttpUrl(src) || isDataUrl(src) || isBlobUrl(src) || src.startsWith('/')) {
+      setResolved(src);
+      return;
+    }
+
+    // Only do async resolution for Firebase paths
     (async () => {
       try {
         const url = await resolveImageSrc(src);
@@ -80,8 +87,33 @@ export function useResolvedImage(src?: any, fallback?: string) {
 }
 
 export const ResolvedImage: React.FC<{ src?: any; alt?: string; className?: string; fallback?: string; onError?: (e: any) => void }> = ({ src, alt = '', className, fallback, onError }) => {
-  const resolved = useResolvedImage(src, fallback || 'https://via.placeholder.com/600');
+  const resolved = useResolvedImage(src, fallback || getFallbackImage(600));
   return (
-    <img src={resolved} alt={alt} className={className} onError={(e) => { onError?.(e); }} />
+    <img src={resolved} alt={alt} className={className} onError={(e) => {
+      console.warn('❌ Image onError triggered for:', resolved);
+      onError?.(e);
+    }} />
   );
+};
+
+export const getFallbackImage = (width: number = 600, height?: number, text: string = 'No Image') => {
+  const size = height ? `${width}x${height}` : width.toString();
+  return `https://placehold.co/${size}/1a1a1a/D4AF37?text=${encodeURIComponent(text)}`;
+};
+
+export const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const target = e.currentTarget;
+
+  // 1. Check if we are already using the fallback to prevent infinite loops
+  if (target.src.includes('placehold.co')) {
+    console.warn("Fallback image also failed. Hiding element.");
+    target.style.display = 'none'; // Give up
+    return;
+  }
+
+  // 2. Log the error for debugging
+  console.warn(`Image failed to load: ${target.src}. Switching to fallback.`);
+
+  // 3. Switch to the working fallback service
+  target.src = getFallbackImage(600, 600, 'Spoil Me Vintage');
 };

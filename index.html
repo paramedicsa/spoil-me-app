@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Spoil Me Vintage</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS is now compiled locally via PostCSS during build -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Cherry+Cream+Soda&display=swap" rel="stylesheet">
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#000000" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -18,12 +18,12 @@
     <!-- CSP is critical for network calls -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self'; 
-      connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com https://esm.sh; 
-      img-src 'self' data: blob: https: https://picsum.photos https://firebasestorage.googleapis.com https://images.unsplash.com https://via.placeholder.com https://spoilme-edee0.firebaseapp.com https://spoilme-edee0.web.app https://spoilme-edee0.firebasestorage.app https://storage.googleapis.com; 
+      connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com https://esm.sh https://spoilme-edee0.web.app https://*.paypal.com https://*.cloudfunctions.net;
+      img-src 'self' data: blob: https: https://picsum.photos https://firebasestorage.googleapis.com https://images.unsplash.com https://via.placeholder.com https://spoilme-edee0.firebaseapp.com https://spoilme-edee0.web.app https://spoilme-edee0.firebasestorage.app https://storage.googleapis.com;
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
         font-src 'self' https://fonts.gstatic.com;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://esm.sh https://www.gstatic.com blob:;
-        frame-src 'self' https://*.firebaseapp.com;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh https://www.gstatic.com blob: https://www.paypal.com;
+        frame-src 'self' https://*.firebaseapp.com https://*.paypal.com;
         worker-src 'self' blob:;
     ">
     
@@ -45,16 +45,20 @@
     <!-- Using local node modules for React and other libs in dev.
          Keep Tailwind CDN for now (development). -->
     <link rel="stylesheet" href="/index.css">
+    <!-- PayPal SDK is now loaded dynamically by components -->
   </head>
-  <body class="bg-black text-gray-100 antialiased selection:bg-pink-500 selection:text-white">
+  <body class="bg-black text-gray-100 antialiased selection:bg-pink-500 selection:text-white" style="background-color: #000000; color: #f3f4f6;">
     <div id="root"></div>
+
+
     <script type="module" src="/index.tsx"></script>
-    <script>
+    <!-- Service Worker registration removed for development -->
+    <!-- <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('/service-worker.js');
         });
       }
-    </script>
+    </script> -->
   </body>
 </html>

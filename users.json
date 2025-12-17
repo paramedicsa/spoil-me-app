@@ -1,0 +1,13 @@
+{"users": [
+{
+  "localId": "Dzk5mgkC7UYtlN3F6f3kK2EhM1S2",
+  "email": "spoilmevintagediy@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "2vSAisSl0YB5LZjO/UQoSyI6KNUD6oBdOm30kXc1DNWiC27KUt4N3nCJn94UngtuslzyYpf+2T1RmdXETreKjA==",
+  "salt": "vVzA8PtCeznm6A==",
+  "lastSignedInAt": "1764735402496",
+  "createdAt": "1764665244948",
+  "disabled": false,
+  "customAttributes": "{\"admin\":true}",
+  "providerUserInfo": []
+}]}

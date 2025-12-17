@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { Truck, ArrowRight, X } from 'lucide-react';
+import { useStore } from '../context/StoreContext';
 
 const FREE_SHIPPING_THRESHOLD = 500;
 
@@ -17,13 +17,24 @@ const ShippingProgressBar: React.FC<ShippingProgressBarProps> = ({
   onContinueShopping,
   onClose,
 }) => {
-  const amountLeft = FREE_SHIPPING_THRESHOLD - subtotal;
-  const progress = Math.min((subtotal / FREE_SHIPPING_THRESHOLD) * 100, 100);
-  const isFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
+  const { currency: curr } = useStore();
+
+  // Hide the shipping progress bar for USD currency (international shipping)
+  if (curr === 'USD') {
+    return null;
+  }
+
+  const getCurrencySymbol = () => curr === 'ZAR' ? 'R' : '$';
+  const getPrice = (zarPrice: number, usdPrice?: number) => curr === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+
+  const threshold = getPrice(FREE_SHIPPING_THRESHOLD);
+  const amountLeft = threshold - subtotal;
+  const progress = Math.min((subtotal / threshold) * 100, 100);
+  const isFreeShipping = subtotal >= threshold;
 
   const message = isFreeShipping
     ? "Congratulations! You've unlocked FREE shipping!"
-    : `You're R${amountLeft.toFixed(2)} away from free shipping!`;
+    : `You're ${getCurrencySymbol()}${getPrice(amountLeft).toFixed(2)} away from free shipping!`;
 
   if (isSticky) {
     return (

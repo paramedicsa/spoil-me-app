@@ -1,18 +1,18 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 import { Heart, ShoppingBag, HelpCircle, Star, TrendingUp, Crown, Clock, Eye } from 'lucide-react';
+import { ResolvedImage, handleImageError, getFallbackImage } from '../utils/imageUtils';
 
 interface ProductCardProps {
   product: Product;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const { addToCart, toggleWishlist, user, cart } = useStore();
+  const { addToCart, toggleWishlist, user, cart, currency: curr } = useStore();
   const [showRRP, setShowRRP] = useState(false);
-  const isLiked = user.wishlist.includes(product.id);
+  const isLiked = user.wishlist?.includes(product.id) || false;
   const navigate = useNavigate();
 
   // Promo Logic (Time Limited)
@@ -29,11 +29,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     && (!isStartValid || promoStart! <= now) 
     && (!isEndValid || promoExpiry! > now);
   
-  // Standard Member Price (20% off)
-  const standardMemberPrice = parseFloat((product.price * 0.8).toFixed(2));
-  
+  // Standard Member Price (Use stored member prices with fallback)
+  const basePrice = curr === 'ZAR' ? product.price : (product.priceUSD || product.price);
+  const standardMemberPrice = curr === 'ZAR' ? (product.memberPrice || basePrice * 0.8) : (product.memberPriceUSD || basePrice * 0.8);
+
   // Determine effective price for the user based on Tier + Promo
-  let currentPrice = product.price;
+  let currentPrice = basePrice;
   let isMemberPricingEffective = false;
   let appliedTier = 'none';
 
@@ -101,8 +102,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       (product.showEarringOptions && product.earringMaterials && product.earringMaterials.length > 1) ||
       (product.type === 'Pendant' && product.chainStyles && product.chainStyles.length > 1);
 
-  const isSoldOut = product.stock <= 0;
-  
+  // Respect admin `isSoldOut` override; treat as sold out if flag set or stock <= 0
+  const isSoldOut = !!product.isSoldOut || product.stock <= 0;
+
   // Check quantity in cart for simple products
   const quantityInCartForThisProduct = cart
     .filter(item => item.id === product.id)
@@ -125,6 +127,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     (product.promoDeluxeMemberPrice && product.promoDeluxeMemberPrice > 0)
   );
 
+  // Helper function for currency display
+  const getCurrencySymbol = () => curr === 'ZAR' ? 'R' : '$';
+  const getPrice = (zarPrice: number, usdPrice?: number) => curr === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+
+  // Get the base price for calculations
+  const baseCompareAtPrice = curr === 'ZAR' ? product.compareAtPrice : (product.compareAtPriceUSD || product.compareAtPrice);
+  const baseMemberPrice = curr === 'ZAR' ? (product.memberPrice || product.price * 0.8) : (product.memberPriceUSD || (product.priceUSD || product.price) * 0.8);
+
   return (
     <div className="group relative bg-zinc-900 rounded-lg shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:shadow-pink-500/20 transition-all duration-300 border border-gray-800 hover:border-pink-500/50 z-0 flex flex-col h-full">
       
@@ -132,13 +142,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     
 
     <Link to={`/product/${product.id}`} className="block relative overflow-hidden aspect-square rounded-t-lg">
-                <img 
+                <ResolvedImage
                     src={product.images[0]}
                     alt={product.name}
-                    onError={(e) => { console.warn('Image failed to load in ProductCard:', (e.currentTarget as HTMLImageElement).src); }}
-          className={`w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 ${isSoldOut ? 'opacity-50 grayscale' : 'opacity-90 group-hover:opacity-100'}`}
-        />
-        
+                    className={`w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 ${product.stock <= 0 ? 'opacity-50 grayscale' : 'opacity-90 group-hover:opacity-100'}`}
+                    fallback={getFallbackImage(600)}
+                    onError={handleImageError}
+                />
+
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
             {isMemberPricingEffective && (
@@ -159,14 +170,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             )}
         </div>
 
-        {/* SOLD OUT OVERLAY */}
-        {isSoldOut && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                <div className="border-2 border-white px-4 py-2 transform -rotate-12 backdrop-blur-sm">
-                    <span className="text-white font-bold uppercase tracking-widest text-lg">Sold Out</span>
-                </div>
-            </div>
-        )}
 
         {/* Promo Timer Overlay - Show for everyone if promo active */}
         {isPromoActive && timeLeft && !isSoldOut && (
@@ -234,10 +237,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* 4. RRP & Retail Price Info */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[20px]">
-            {product.compareAtPrice && (
+            {baseCompareAtPrice && (
                 <div className="flex items-center gap-1 relative">
-                    <span className="text-[10px] text-gray-500 line-through">RRP R{product.compareAtPrice.toFixed(2)}</span>
-                    <button 
+                    <span className="text-[10px] text-gray-500 line-through">RRP {getCurrencySymbol()}{baseCompareAtPrice.toFixed(2)}</span>
+                    <button
                         onClick={(e) => { e.preventDefault(); setShowRRP(!showRRP); }}
                         className="text-gray-600 hover:text-gray-400 focus:outline-none"
                     >
@@ -251,7 +254,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 </div>
             )}
             <span className="text-sm font-bold text-green-400">
-                Retail R{product.price.toFixed(2)}
+                Retail {getCurrencySymbol()}{basePrice.toFixed(2)}
             </span>
         </div>
 
@@ -266,10 +269,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                         </span>
                         <div className="flex items-baseline gap-2">
                             <span className="text-2xl font-bold text-white drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]">
-                                R{currentPrice.toFixed(2)}
+                                {getCurrencySymbol()}{getPrice(currentPrice).toFixed(2)}
                             </span>
                             {currentPrice < product.price && (
-                                <span className="text-xs text-gray-500 line-through">R{product.price.toFixed(2)}</span>
+                                <span className="text-xs text-gray-500 line-through">{getCurrencySymbol()}{getPrice(product.price).toFixed(2)}</span>
                             )}
                         </div>
                     </div>
@@ -282,9 +285,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                          {isPromoActive ? (
                             <div className="flex items-baseline gap-2">
                                 <span className="text-2xl font-bold text-green-400">
-                                    R{currentPrice.toFixed(2)}
+                                    {getCurrencySymbol()}{getPrice(currentPrice).toFixed(2)}
                                 </span>
-                                <span className="text-xs text-gray-400 line-through">R{product.price.toFixed(2)}</span>
+                                <span className="text-xs text-gray-400 line-through">{getCurrencySymbol()}{getPrice(product.price).toFixed(2)}</span>
                             </div>
                          ) : null}
                          
@@ -293,16 +296,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                             <div className="flex flex-col gap-0.5 mt-1">
                                 <div className="flex justify-between text-[9px] text-gray-400">
                                     <span>Basic & Premium:</span>
-                                    <span className="text-purple-400 font-bold">R{(product.promoBasicMemberPrice || 0).toFixed(2)}</span>
+                                    <span className="text-purple-400 font-bold">{getCurrencySymbol()}{getPrice(product.promoBasicMemberPrice || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-[9px] text-gray-400">
                                     <span>Deluxe:</span>
-                                    <span className="text-purple-400 font-bold">R{(product.promoDeluxeMemberPrice || 0).toFixed(2)}</span>
+                                    <span className="text-purple-400 font-bold">{getCurrencySymbol()}{getPrice(product.promoDeluxeMemberPrice || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                          ) : (
                              <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                Members: <span className="text-purple-400 font-bold">R{displayMemberUpsellPrice.toFixed(2)}</span>
+                                Members: <span className="text-purple-400 font-bold">{getCurrencySymbol()}{getPrice(displayMemberUpsellPrice).toFixed(2)}</span>
                              </div>
                          )}
                      </div>

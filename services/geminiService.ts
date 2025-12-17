@@ -1,8 +1,16 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Review } from "../types";
 
-const apiKey = process.env.API_KEY;
+// Prefer Vite env for frontend builds: VITE_GEMINI_API_KEY
+// Fallback to process.env for server-side usage or Node-based scripts.
+const viteKey = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_GEMINI_API_KEY) ? (import.meta as any).env.VITE_GEMINI_API_KEY : undefined;
+const nodeKey = typeof process !== 'undefined' ? (process.env.API_KEY || process.env.VITE_GEMINI_API_KEY) : undefined;
+const apiKey = viteKey || nodeKey || '';
+
+// Warn if key is present in a browser context (exposed client-side)
+if (typeof window !== 'undefined' && apiKey) {
+  console.warn('Warning: Gemini API key is present in the frontend build (VITE_GEMINI_API_KEY). This exposes the key to users. Consider proxying requests through a server or using a server-side function to keep keys secret.');
+}
 
 // Helper to ensure we don't crash if key is missing, though metadata.json handles this mostly.
 const getAI = () => {
@@ -13,9 +21,51 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+// --- Local fallback generators to keep the admin UX working when AI is unavailable ---
+const adjectives = ["Timeless", "Elegant", "Vintage", "Handmade", "Artisan", "Luxe", "Delicate", "Statement", "Classic", "Boho"];
+const materials = ["Gold", "Silver", "Sterling Silver", "Resin", "Bronze", "Copper", "Glass", "Crystal", "Gemstone"];
+const styles = ["Art Deco", "Vintage", "Boho", "Minimalist", "Retro", "Contemporary", "Minimal"];
+
+const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+
+const localGenerateProductName = (categoryContext: string, seed?: string) => {
+  const adj = pick(adjectives);
+  const style = pick(styles);
+  const base = categoryContext ? categoryContext.replace(/[^a-zA-Z0-9 ]/g, '') : 'Piece';
+  // Use a short seed if provided to make slightly different names
+  return `${adj} ${style} ${base}`.trim();
+};
+
+const localExtractTags = (categoryContext: string) => {
+  const cat = (categoryContext || '').toLowerCase();
+  const tags: string[] = [];
+  if (cat.includes('ring')) tags.push('Ring');
+  if (cat.includes('neck') || cat.includes('pendant') || cat.includes('choker')) tags.push('Pendant');
+  if (cat.includes('ear')) tags.push('Stud');
+  if (cat.includes('bracelet')) tags.push('Bracelet');
+  if (tags.length === 0) tags.push(pick(['Pendant', 'Ring', 'Stud', 'Dangle']));
+  // Ensure material-like tags
+  tags.push(pick(materials));
+  // Limit and unique
+  return Array.from(new Set(tags)).slice(0, 5);
+};
+
+const localGenerateDescription = (name: string, category: string, keywords?: string) => {
+  const k = keywords ? `Features: ${keywords}. ` : '';
+  return `${name} is a ${category.toLowerCase()} crafted with care. ${k}Perfect for elevating everyday looks or adding a special touch for events. Hand-finished details and quality materials make it a timeless addition to any collection.`;
+};
+
+const localGenerateSeoKeywords = (name: string, tags: string[]) => {
+  const baseKeywords = name.split(' ').slice(0,4).map(s => s.replace(/[^a-zA-Z0-9]/g,'').toLowerCase()).filter(Boolean);
+  return Array.from(new Set([...baseKeywords, ...tags.map(t => t.toLowerCase())])).slice(0,6);
+};
+
+// --- End local fallbacks ---
+
 export const generateProductDescription = async (productName: string, category: string, keywords: string): Promise<string> => {
   const ai = getAI();
-  if (!ai) return "AI Generation unavailable (Missing API Key).";
+  // If AI is unavailable, use local fallback so admin can still generate useful descriptions
+  if (!ai) return localGenerateDescription(productName || localGenerateProductName(category || ''), category || 'Jewelry', keywords);
 
   try {
     const response = await ai.models.generateContent({
@@ -30,10 +80,11 @@ export const generateProductDescription = async (productName: string, category: 
       Keep it under 150 words.`,
     });
     
-    return response.text || "Could not generate description.";
+    return response.text || localGenerateDescription(productName, category, keywords) || "Could not generate description.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Error generating description. Please try again.";
+    // Fallback to local generator so admin can continue working offline
+    return localGenerateDescription(productName, category, keywords);
   }
 };
 
@@ -72,7 +123,27 @@ export interface AIProductMetadata {
 
 export const generateProductMetadataFromImage = async (base64Image: string, categoryContext: string): Promise<AIProductMetadata | null> => {
   const ai = getAI();
-  if (!ai) return null;
+  // If AI is not configured, return a local generated metadata object so the admin can continue
+  if (!ai) {
+    try {
+      const name = localGenerateProductName(categoryContext);
+      const tags = localExtractTags(categoryContext);
+      const description = localGenerateDescription(name, categoryContext || 'Jewelry', 'Handmade, Unique');
+      const seoKeywords = localGenerateSeoKeywords(name, tags);
+      const colors: string[] = [];
+      return {
+        name,
+        description,
+        whenAndHowToWear: 'Perfect for both everyday wear and special occasions. Layer with other pieces for a curated look.',
+        tags,
+        seoKeywords,
+        colors
+      } as AIProductMetadata;
+    } catch (fallbackError) {
+      console.error('Local fallback for product metadata failed:', fallbackError);
+      return null;
+    }
+  }
 
   // Strip data URL prefix if present to get raw base64
   const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -122,7 +193,26 @@ export const generateProductMetadataFromImage = async (base64Image: string, cate
     return JSON.parse(text) as AIProductMetadata;
   } catch (error) {
     console.error("Gemini Image Analysis Error:", error);
-    return null;
+    // If AI fails or key missing, use local deterministic fallback so admin can still generate metadata
+    try {
+      const name = localGenerateProductName(categoryContext);
+      const tags = localExtractTags(categoryContext);
+      const description = localGenerateDescription(name, categoryContext || 'Jewelry', 'Handmade, Unique');
+      const seoKeywords = localGenerateSeoKeywords(name, tags);
+      const colors: string[] = []; // cannot reliably detect colors locally
+
+      return {
+        name,
+        description,
+        whenAndHowToWear: 'Perfect for both everyday wear and special occasions. Layer with other pieces for a curated look.',
+        tags,
+        seoKeywords,
+        colors
+      } as AIProductMetadata;
+    } catch (fallbackError) {
+      console.error('Local fallback for product metadata failed:', fallbackError);
+      return null;
+    }
   }
 };
 
@@ -146,6 +236,8 @@ export const generateSouthAfricanReviews = async (productName: string, count: nu
       5. **Realism**: Include occasional spelling mistakes (e.g., "realy", "awsome") and casual grammar.
       6. **Rating**: Randomly between 3.5 and 5.0 stars.
       7. **Content**: Short, punchy comments about quality, delivery, or how it looks.
+         - **Price Mentions**: When mentioning price, ALWAYS portray it as cheap and good quality (e.g., "So affordable for such good quality", "Worth every cent").
+         - **Delivery/Waiting**: If any negative sentiment about waiting time, turn it positive (e.g., "Waited a bit but worth the wait", "Delivery took time but totally worth it").
       8. **Dates**: Random dates strictly between January 1st, 2025 and today (Format: YYYY-MM-DD). Do NOT generate 2024 dates.
 
       Output strictly as a JSON Array of objects with keys: userName, location, content, rating, date.`,
@@ -187,8 +279,11 @@ export const generateUniquePendantReviews = async (count: number): Promise<Revie
       4. **Locations**: Specific SA towns.
       5. **Language**: Mix in SA slang (Lekker, Mooi, Pragtig, Yho, Stunning).
       6. **Rating**: 4.0 to 5.0 stars.
-      7. **Dates**: Random dates between Jan 2025 and now.
-      
+      7. **Content**: Short, punchy comments about quality, delivery, or how it looks.
+         - **Price Mentions**: When mentioning price, ALWAYS portray it as cheap and good quality (e.g., "So affordable for such good quality", "Worth every cent").
+         - **Delivery/Waiting**: If any negative sentiment about waiting time, turn it positive (e.g., "Waited a bit but worth the wait", "Delivery took time but totally worth it").
+      8. **Dates**: Random dates between Jan 2025 and now.
+
       Output strictly as a JSON Array of objects with keys: userName, location, content, rating, date.`,
       config: {
         responseMimeType: "application/json"
@@ -213,7 +308,7 @@ export const generateUniquePendantReviews = async (count: number): Promise<Revie
 
 export const generateSocialPost = async (productName: string, platform: string, price: number): Promise<string> => {
   const ai = getAI();
-  if (!ai) return "Check out this amazing product at Spoil Me Vintage! #vintage #jewelry";
+  if (!ai) return `Check out this amazing product: ${productName} for R${price}! #SpoilMeVintage #vintage #jewelry`;
 
   try {
     let prompt = `Write a single social media post for a jewelry product named "${productName}". Price: R${price}.`;
