@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, X, Mail, Lock, ArrowRight } from 'lucide-react';
-import { signInWithEmail } from '@repo/utils/supabaseClient';
+import { signInWithEmail } from '../utils/supabaseClient';
 
 interface LoginModalProps {
   isOpen: boolean;

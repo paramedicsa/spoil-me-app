@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { getDocument, updateDocument, createDocument } from '@repo/utils/supabaseClient';
+import { getDocument, updateDocument, createDocument } from '../utils/supabaseClient';
 import { Check, Lock, Star, Share2, ShoppingBag, MessageSquare, CreditCard, Users, Facebook, Twitter, Smartphone, MessageCircle, Gift, Zap, Crown, Award } from 'lucide-react';
 
 interface UserData {

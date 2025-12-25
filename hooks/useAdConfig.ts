@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDocument, subscribeToTable } from '@repo/utils/supabaseClient';
+import { getDocument, subscribeToTable } from '../utils/supabaseClient';
 
 // Default fallback (Safety net)
 const DEFAULT_CONFIG = {

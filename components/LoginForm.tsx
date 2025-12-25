@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { signInWithEmail } from '@repo/utils/supabaseClient';
+import { signInWithEmail } from '../utils/supabaseClient';
 
 interface LoginFormProps {
   onSuccess: () => void;

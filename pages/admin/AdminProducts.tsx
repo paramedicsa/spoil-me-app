@@ -3,7 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { Product, PackagingItem, Review } from '../../types';
 import { Plus, Edit2, Trash2, Sparkles, Save, X, Link as LinkIcon, Tag, MessageSquare, Star, Gift, Clock, Package, ExternalLink, AlertTriangle, Crown, Percent, Truck, RefreshCw, Upload, Loader2, Camera, Check, Info, Bot, DollarSign, BarChart3, Search, Filter, Layers, ImagePlus, Smartphone, FileDown, Bookmark, Gem } from 'lucide-react';
 import { generateProductDescription, generateProductMetadataFromImage, generateSouthAfricanReviews, generateUniquePendantReviews } from '../../services/geminiService';
-import { uploadFile } from '@repo/utils/supabaseClient';
+import { uploadFile } from '../../utils/supabaseClient';
 import { handleImageError } from '../../utils/imageUtils';
 
 // Chain Length Descriptions from Firestore

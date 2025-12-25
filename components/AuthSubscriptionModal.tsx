@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, X, Calendar, User, Mail, Lock, Heart } from 'lucide-react';
-import { signUpWithEmail } from '@repo/utils/supabaseClient';
+import { signUpWithEmail } from '../utils/supabaseClient';
 
 interface AuthSubscriptionModalProps {
   isOpen: boolean;

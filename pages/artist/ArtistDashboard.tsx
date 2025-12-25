@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { queryDocuments, subscribeToTable, createDocument, updateDocument } from '@repo/utils/supabaseClient';
+import { queryDocuments, subscribeToTable, createDocument, updateDocument } from '../../utils/supabaseClient';
 import { Package, Truck, DollarSign, AlertCircle, CheckCircle, Upload, Plus } from 'lucide-react';
 
 interface ArtistProduct {

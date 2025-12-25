@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../context/StoreContext';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
-import { getDocument, updateDocument } from '@repo/utils/supabaseClient';
+import { getDocument, updateDocument } from '../utils/supabaseClient';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 interface Props {

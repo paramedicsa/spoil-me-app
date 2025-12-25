@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, User, Crown, CreditCard, Clock, CheckCircle, XCircle, Users as UsersIcon, Download, Filter } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { callServerFunction } from '@repo/utils/supabaseClient';
-import { queryDocuments } from '@repo/utils/supabaseClient';
+import { callServerFunction } from '../../utils/supabaseClient';
+import { queryDocuments } from '../../utils/supabaseClient';
 
 // Use server-side functions via HTTP proxy
 

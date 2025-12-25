@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { BarChart, DollarSign, ShoppingBag, Users, Database, RefreshCw, AlertTriangle, UserCheck, Stethoscope, Check, X, Activity, Award, Zap, TestTube, Truck, ExternalLink, Package, Tags, Gift, Share2, Trophy, Crown, UserPlus, Sparkles, Palette } from 'lucide-react';
 import { User } from '../../types';
-import { queryDocuments, subscribeToTable } from '@repo/utils/supabaseClient';
+import { queryDocuments, subscribeToTable } from '../../utils/supabaseClient';
 
 const AdminDashboard: React.FC = () => {
   const { products, isDemoMode, resetStore, dbConnectionError, seedTestUsers, runDataDiagnostics, simulateAffiliateSale, getAllUsers, adminAdjustPoints, auth, user } = useStore();

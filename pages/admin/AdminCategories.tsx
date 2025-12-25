@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Category } from '../../types';
 import { ArrowUp, ArrowDown, X, Upload, Plus, Loader2 } from 'lucide-react';
-import { uploadFile } from '@repo/utils/supabaseClient';
+import { uploadFile } from '../../utils/supabaseClient';
 
 const AdminCategories: React.FC = () => {
   const { categories, addCategory, updateCategory, deleteCategory, replaceCategories } = useStore();

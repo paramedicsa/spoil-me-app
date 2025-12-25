@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { updateDocument } from '@repo/utils/supabaseClient';
+import { updateDocument, callServerFunction, getDocument } from '../../utils/supabaseClient';
 import { Users, Trash2, AlertTriangle, Search, User, Mail, Calendar, MapPin, Crown, Download, Filter, Globe, UserCheck } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { callServerFunction, getDocument } from '@repo/utils/supabaseClient';
-import { getDocument } from '@repo/utils/supabaseClient';
+// Consolidated above: callServerFunction/getDocument imported from utils
 
 // Server function caller
 

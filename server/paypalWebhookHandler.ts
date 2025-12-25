@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { Request, Response } from 'express';
-import { supabase, getDocument, updateDocument, createDocument, queryDocuments } from '@repo/utils/supabaseClient';
+import { supabase, getDocument, updateDocument, createDocument, queryDocuments } from '../utils/supabaseClient';
 
 const router = express.Router();
 

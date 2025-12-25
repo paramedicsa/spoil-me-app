@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Clock, User, AlertTriangle, RefreshCw } from 'lucide-react';
-import { callServerFunction } from '@repo/utils/supabaseClient';
-import { queryDocuments, subscribeToTable } from '@repo/utils/supabaseClient';
+import { callServerFunction } from '../../utils/supabaseClient';
+import { queryDocuments, subscribeToTable } from '../../utils/supabaseClient';
 
 // Server function caller (migrated from Firebase httpsCallable)
 

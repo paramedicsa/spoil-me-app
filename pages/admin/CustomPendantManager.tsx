@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { CustomTemplate } from '../../types';
 import { Plus, Edit2, Trash2, Save, X, Upload, Loader2, ImagePlus, Check } from 'lucide-react';
-import { uploadFile, queryDocuments, createDocument, updateDocument, deleteDocument } from '@repo/utils/supabaseClient';
+import { uploadFile, queryDocuments, createDocument, updateDocument, deleteDocument } from '../../utils/supabaseClient';
 
 const CustomPendantManager: React.FC = () => {
   const { user } = useStore();

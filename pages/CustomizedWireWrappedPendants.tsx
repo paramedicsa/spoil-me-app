@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { queryDocuments } from '@repo/utils/supabaseClient';
+import { queryDocuments } from '../utils/supabaseClient';
 import { CustomTemplate } from '../types';
 import { ArrowLeft, Sparkles, Crown } from 'lucide-react';
 

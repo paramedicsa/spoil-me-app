@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Gift, CreditCard, Plus, Trash2, Copy, Check, RefreshCw, PenTool, ShoppingBag, Send, UserCheck, AlertTriangle } from 'lucide-react';
 import { Voucher, Notification } from '../../types';
-import { queryDocuments, createDocument } from '@repo/utils/supabaseClient';
+import { queryDocuments, createDocument } from '../../utils/supabaseClient';
 
 const AdminGiftCards: React.FC = () => {
   const { vouchers, addVoucher, deleteVoucher, cart, currency } = useStore();

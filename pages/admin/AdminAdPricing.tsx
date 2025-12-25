@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getDocument, updateDocument, createDocument } from '@repo/utils/supabaseClient';
+import { getDocument, updateDocument, createDocument } from '../../utils/supabaseClient';
 
 interface AdPackage {
   id: string;

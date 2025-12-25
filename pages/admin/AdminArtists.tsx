@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { queryDocuments, subscribeToTable, createDocument, updateDocument, deleteDocument } from '@repo/utils/supabaseClient';
+import { queryDocuments, subscribeToTable, createDocument, updateDocument, deleteDocument } from '../../utils/supabaseClient';
 import { CheckCircle, XCircle, Eye, Package, DollarSign, Users, TrendingUp, Truck, Warehouse, AlertTriangle, Trash } from 'lucide-react';
 
 interface ArtistApplication {

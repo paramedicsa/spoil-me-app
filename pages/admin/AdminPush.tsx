@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { callServerFunction } from '@repo/utils/supabaseClient';
+import { callServerFunction } from '../../utils/supabaseClient';
 import { Bell, Send, User, Globe, Users } from 'lucide-react';
 
 type TargetGroup = 'all' | 'affiliates' | 'artists' | 'non_members' | 'south_africa' | 'international' | 'individual';
