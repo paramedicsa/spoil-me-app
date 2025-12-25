@@ -100,7 +100,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const requiresOptions = 
       product.type === 'Ring' || 
       (product.showEarringOptions && product.earringMaterials && product.earringMaterials.length > 1) ||
-      (product.type === 'Pendant' && product.chainStyles && product.chainStyles.length > 1);
+      ((product.type === 'Pendant' || product.type === 'Necklace') && product.chainStyles && product.chainStyles.length > 1);
 
   // Respect admin `isSoldOut` override; treat as sold out if flag set or stock <= 0
   const isSoldOut = !!product.isSoldOut || product.stock <= 0;

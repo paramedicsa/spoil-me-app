@@ -196,8 +196,8 @@ const ProductDetail: React.FC = () => {
       setSelectedMaterial(product.earringMaterials[0]);
     }
 
-    // Pendant Default
-    if (product.type === 'Pendant' && product.chainStyles && product.chainStyles.length > 0) {
+    // Pendant / Necklace Default
+    if ((product.type === 'Pendant' || product.type === 'Necklace') && product.chainStyles && product.chainStyles.length > 0) {
       if (product.chainStyles.includes('Metal Chain')) {
         setSelectedChainStyle('Metal Chain');
       } else {
@@ -963,8 +963,8 @@ const ProductDetail: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* Pendant Chain Selector */}
-            {product.type === 'Pendant' && product.chainStyles && product.chainStyles.length > 0 && (
+            {/* Pendant / Necklace Chain Selector */}
+            {(product.type === 'Pendant' || product.type === 'Necklace') && product.chainStyles && product.chainStyles.length > 0 && (
                <div className="space-y-6">
                   {product.chainStyles.length > 1 && (
                     <div>

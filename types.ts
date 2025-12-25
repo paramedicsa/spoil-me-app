@@ -95,7 +95,7 @@ export interface Product {
 
   // Categorization
   category: string;
-  type: 'Ring' | 'Stud' | 'Dangle' | 'Pendant' | 'Bracelet' | 'Watch' | 'Jewelry Box' | 'Perfume Holder' | 'Other';
+  type: 'Ring' | 'Stud' | 'Dangle' | 'Pendant' | 'Necklace' | 'Bracelet' | 'Watch' | 'Jewelry Box' | 'Perfume Holder' | 'Other';
   status: 'published' | 'draft';
   
   // Media

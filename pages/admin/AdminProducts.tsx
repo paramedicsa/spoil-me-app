@@ -161,7 +161,8 @@ const AdminProducts: React.FC = () => {
       if (name.includes('jewelry box') || name.includes('jewellery box')) return 'Jewelry Box';
       if (name.includes('watch')) return 'Watch';
       if (name.includes('bracelet')) return 'Bracelet';
-      if (name.includes('pendant') || name.includes('necklace')) return 'Pendant';
+      if (name.includes('pendant')) return 'Pendant';
+      if (name.includes('necklace')) return 'Necklace';
       if (name.includes('ring')) return 'Ring';
       if (name.includes('dangle')) return 'Dangle';
       if (name.includes('stud')) return 'Stud';
@@ -783,7 +784,8 @@ const AdminProducts: React.FC = () => {
                          <option value="Ring">Rings</option>
                          <option value="Stud">Stud Earrings</option>
                          <option value="Dangle">Dangle Earrings</option>
-                         <option value="Pendant">Pendants</option>
+                                  <option value="Pendant">Pendants</option>
+                                  <option value="Necklace">Necklaces</option>
                          <option value="Bracelet">Bracelets</option>
                          <option value="Watch">Watches</option>
                          <option value="Jewelry Box">Jewelry Boxes</option>
@@ -1101,7 +1103,7 @@ const AdminProducts: React.FC = () => {
                    </div>
                 )}
                 
-                {formData.type === 'Pendant' && (
+                {(formData.type === 'Pendant' || formData.type === 'Necklace') && (
                    <div className="bg-zinc-800/50 p-4 rounded-xl border border-gray-700 space-y-4">
                       <div>
                          <label className="block text-sm font-bold text-white mb-2">Chain Styles</label>
@@ -1221,7 +1223,7 @@ const AdminProducts: React.FC = () => {
                             <button onClick={handleGenerateReviews} disabled={isGeneratingReviews} className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg shadow flex items-center justify-center gap-2">{isGeneratingReviews ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />} Generate Standard Reviews</button>
                         </div>
                         {/* RESTORED CONDITIONAL BUTTON FOR UNIQUE PENDANTS */}
-                        {(formData.isUniquePendant || formData.type === 'Pendant') && (
+                        {(formData.isUniquePendant || formData.type === 'Pendant' || formData.type === 'Necklace') && (
                             <div className="flex-1 bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30 p-5 rounded-xl shadow-lg">
                                 <div className="flex items-center gap-2 mb-3 text-purple-400 font-bold text-lg"><Gem size={24} /><h3>Unique Piece Reviewer</h3></div>
                                 <button onClick={handleGenerateUniqueReviews} disabled={isGeneratingReviews} className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg shadow flex items-center justify-center gap-2">{isGeneratingReviews ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />} Generate Unique Reviews</button>
