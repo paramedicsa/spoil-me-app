@@ -39,7 +39,8 @@ const Layout: React.FC = () => {
   const unreadNotifications = user.notifications ? user.notifications.filter(n => !n.isRead).length : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-gray-100">
+    // `safe-area` ensures content avoids notches while body background fills to the edge
+    <div className="min-h-screen flex flex-col safe-area text-gray-100">
       {/* GLOBAL MARQUEE BANNER */}
       <style>{`
         @keyframes marquee {

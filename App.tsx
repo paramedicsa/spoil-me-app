@@ -34,6 +34,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 import { App as CapApp } from '@capacitor/app';
 import { useAppUpdate } from './src/hooks/useAppUpdate';
 import UpdateNotification from './components/UpdateNotification';
+import UpdatePrompt from './components/UpdatePrompt';
 import AdminVault from './pages/admin/AdminVault';
 import Vault from './pages/Vault';
 import MemberManagement from './pages/admin/MemberManagement';
@@ -142,6 +143,7 @@ const AppContent: React.FC = () => {
     >
       <VoucherHandler />
       <InstallManager />
+      <UpdatePrompt />
       {updateAvailable && (
         <UpdateNotification
           version={updateAvailable.version}
