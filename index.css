@@ -16,6 +16,11 @@
   --spv-text: #f3f4f6; /* gray-100 */
 }
 
+/* Mobile safe-area and viewport fixes */
+html, body, #root { min-height: 100vh; min-height: -webkit-fill-available; }
+/* Ensure top/bottom safe area is respected by main layout */
+.safe-area { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
 /* Ensure body uses Tailwind reset + our fonts */
 @layer base {
   html, body, #root { height: 100%; }

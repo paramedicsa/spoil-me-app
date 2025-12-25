@@ -20,7 +20,7 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminGiftCards from './pages/admin/AdminGiftCards';
 import AdminSocial from './pages/admin/AdminSocial';
 import AdminAffiliates from './pages/admin/AdminAffiliates'; // NEW
-import InstallPWA from './components/InstallPWA'; // NEW
+import InstallManager from './components/InstallManager'; // NEW
 import WeeklyWinners from './pages/WeeklyWinners'; // NEW
 import AdminWinners from './pages/admin/AdminWinners'; // NEW
 import AdminExpenses from './pages/admin/AdminExpenses'; // NEW
@@ -141,7 +141,7 @@ const AppContent: React.FC = () => {
       }}
     >
       <VoucherHandler />
-      <InstallPWA />
+      <InstallManager />
       {updateAvailable && (
         <UpdateNotification
           version={updateAvailable.version}
