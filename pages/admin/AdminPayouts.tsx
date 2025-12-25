@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Send, AlertCircle, CheckCircle, Clock, Users, TrendingUp } from 'lucide-react';
-import { paypalPayoutService, PayoutRequest } from '../services/paypalPayoutService';
+import { paypalPayoutService, PayoutRequest } from '../../services/paypalPayoutService';
 
 interface AffiliatePayout {
   id: string;

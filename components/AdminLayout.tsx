@@ -9,7 +9,13 @@ const AdminLayout: React.FC = () => {
   const { user } = useStore();
 
   useEffect(() => {
-    if (!user || !user.isAdmin) {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!user.isAdmin) {
+      // Provide a clear reason for redirect so the Login page can show guidance
+      try { localStorage.setItem('spv_admin_denied', 'Your account does not have admin rights. If this is a local dev machine use "Ensure Admin (dev)" on the Login page, or set is_admin=true for your user in the database.'); } catch (_) {}
       navigate('/login');
     }
   }, [user, navigate]);

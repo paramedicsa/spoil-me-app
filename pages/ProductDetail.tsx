@@ -6,8 +6,7 @@ import { useResolvedImage, ResolvedImage, handleImageError, getFallbackImage } f
 import { EarringMaterial, Review } from '../types';
 import ProductCard from '../components/ProductCard';
 import { getAnalytics, logEvent } from "firebase/analytics";
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { queryDocuments } from '@repo/utils/supabaseClient';
 
 // Chain descriptions mapping (Must match Admin)
 const CHAIN_DESCRIPTIONS: Record<string, string> = {
@@ -57,8 +56,9 @@ const ProductDetail: React.FC = () => {
 
   // Reviews state
   const [realReviews, setRealReviews] = useState<any[]>([]);
-  const [limitCount, setLimitCount] = useState(5);
-  const [hasMoreReviews, setHasMoreReviews] = useState(false);
+  const REVIEWS_PAGE_SIZE = 5;
+  const REVIEWS_MAX = 10;
+  const [limitCount, setLimitCount] = useState(REVIEWS_PAGE_SIZE);
 
   const product = products.find(p => p.id === id);
   
@@ -99,24 +99,15 @@ const ProductDetail: React.FC = () => {
       if (!product) return;
 
       try {
-        const reviewsRef = collection(db, 'reviews');
-        const q = query(
-          reviewsRef,
-          where('productId', '==', product.id),
-          orderBy('createdAt', 'desc'),
-          limit(limitCount)
-        );
+        const fetchedReviews = await queryDocuments<any>('reviews', {
+          filters: { productId: product.id },
+          orderBy: { column: 'created_at', ascending: false },
+          limit: Math.min(limitCount, REVIEWS_MAX),
+        });
 
-        const snapshot = await getDocs(q);
-        const fetchedReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        setRealReviews(fetchedReviews);
-        setHasMoreReviews(fetchedReviews.length === limitCount);
+        setRealReviews(fetchedReviews.map(r => ({ id: r.id, ...r })));
       } catch (error: any) {
         console.error("Review fetch error:", error);
-        if (error.code === 'failed-precondition') {
-          console.warn("⚠️ INDEX MISSING: Click the link in console to build index.");
-        }
       }
     };
 
@@ -125,7 +116,68 @@ const ProductDetail: React.FC = () => {
 
   // Merge legacy and real reviews
   const legacyReviews = (product?.reviews && Array.isArray(product.reviews)) ? product.reviews : [];
-  const allReviewsToDisplay = [...legacyReviews, ...realReviews];
+
+  const reviewsToRender = useMemo(() => {
+    const combined = [...legacyReviews, ...realReviews];
+
+    // De-dupe by id if possible
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+    for (const r of combined) {
+      const key = (r?.id ?? '').toString();
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      deduped.push(r);
+    }
+
+    const toTime = (r: any) => {
+      const raw = r?.created_at ?? r?.createdAt ?? r?.date;
+      if (!raw) return 0;
+      if (typeof raw === 'string') {
+        const t = Date.parse(raw);
+        return Number.isFinite(t) ? t : 0;
+      }
+      if (raw?.toDate && typeof raw.toDate === 'function') {
+        try { return raw.toDate().getTime(); } catch { return 0; }
+      }
+      if (raw instanceof Date) return raw.getTime();
+      return 0;
+    };
+
+    const sorted = deduped.sort((a, b) => toTime(b) - toTime(a));
+    const capped = sorted.slice(0, REVIEWS_MAX);
+    return capped.slice(0, Math.min(limitCount, capped.length));
+  }, [legacyReviews, realReviews, limitCount]);
+
+  const totalReviewsShown = useMemo(() => {
+    const combined = [...legacyReviews, ...realReviews];
+    const toTime = (r: any) => {
+      const raw = r?.created_at ?? r?.createdAt ?? r?.date;
+      if (!raw) return 0;
+      if (typeof raw === 'string') {
+        const t = Date.parse(raw);
+        return Number.isFinite(t) ? t : 0;
+      }
+      if (raw?.toDate && typeof raw.toDate === 'function') {
+        try { return raw.toDate().getTime(); } catch { return 0; }
+      }
+      if (raw instanceof Date) return raw.getTime();
+      return 0;
+    };
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+    for (const r of combined) {
+      const key = (r?.id ?? '').toString();
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      deduped.push(r);
+    }
+    return deduped.sort((a, b) => toTime(b) - toTime(a)).slice(0, REVIEWS_MAX).length;
+  }, [legacyReviews, realReviews]);
 
   // Initialize defaults
   useEffect(() => {
@@ -229,9 +281,9 @@ const ProductDetail: React.FC = () => {
     && (!isStartValid || promoStart! <= now) 
     && (!isEndValid || promoExpiry! > now);
   
-  // Fixed Member Price: Use stored member prices with fallback to calculation
-  const basePrice = currency === 'ZAR' ? product.price : (product.priceUSD || product.price);
-  const standardMemberPrice = currency === 'ZAR' ? (product.memberPrice || basePrice * 0.8) : (product.memberPriceUSD || basePrice * 0.8);
+  // Fixed Member Price: Use stored member prices with NO CONVERSION fallback
+  const basePrice = currency === 'ZAR' ? product.price : (product.priceUSD !== undefined ? product.priceUSD : 0);
+  const standardMemberPrice = currency === 'ZAR' ? (product.memberPrice || basePrice * 0.8) : (product.memberPriceUSD !== undefined ? product.memberPriceUSD : basePrice * 0.8);
 
   // Effective Base Price Logic
   let currentBasePrice = basePrice;
@@ -292,11 +344,15 @@ const ProductDetail: React.FC = () => {
   const getPercentOff = (price: number) => Math.round(((standardPrice - price) / standardPrice) * 100);
 
   // Calculate Rating
-  const hasReviews = product.reviews && product.reviews.length > 0;
-  const averageRating = hasReviews 
-    ? (product.reviews!.reduce((acc, curr) => acc + curr.rating, 0) / product.reviews!.length).toFixed(1)
-    : "4.9"; 
-  const reviewCount = hasReviews ? product.reviews!.length : 128;
+  const combinedForRating = useMemo(() => {
+    const combined = [...legacyReviews, ...realReviews];
+    return combined.filter(r => typeof r?.rating === 'number' && !Number.isNaN(r.rating));
+  }, [legacyReviews, realReviews]);
+  const hasReviews = combinedForRating.length > 0;
+  const averageRating = hasReviews
+    ? (combinedForRating.reduce((acc: number, curr: any) => acc + curr.rating, 0) / combinedForRating.length).toFixed(1)
+    : "4.9";
+  const reviewCount = hasReviews ? combinedForRating.length : 128;
 
   // Find Gift Product
   const giftProduct = product.giftProductId ? products.find(p => p.id === product.giftProductId) : null;
@@ -385,9 +441,13 @@ const ProductDetail: React.FC = () => {
 
   const resolvedPrimary = useResolvedImage(product.images[activeImage] || product.images[0] || '', getFallbackImage(800, 800, 'Spoil Me Vintage'));
 
-  // Helper functions for currency display
+  // Helper functions for currency display - NO CONVERSION, show exactly what was inserted
   const getCurrencySymbol = () => currency === 'ZAR' ? 'R' : '$';
-  const getPrice = (zarPrice: number, usdPrice?: number) => currency === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+  const getPrice = (zarPrice: number, usdPrice?: number) => {
+    if (currency === 'ZAR') return zarPrice;
+    if (currency === 'USD') return usdPrice !== undefined ? usdPrice : 0; // Don't fallback to ZAR price
+    return zarPrice;
+  };
   const convertPrice = (zarPrice: number) => currency === 'ZAR' ? zarPrice : zarPrice / 29; // Keep for backwards compatibility
 
   return (
@@ -596,7 +656,7 @@ const ProductDetail: React.FC = () => {
                 {user.isMember && (
                    <span className="bg-purple-600/90 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-purple-400 flex items-center gap-1 w-fit">
                       <Crown size={12} fill="currentColor" /> 
-                      {appliedTier !== 'none' ? `${appliedTier.toUpperCASE()} PRICE` : 'MEMBER DEAL'}
+                      {appliedTier !== 'none' ? `${appliedTier.toUpperCase()} PRICE` : 'MEMBER DEAL'}
                    </span>
                 )}
             </div>
@@ -1057,7 +1117,7 @@ const ProductDetail: React.FC = () => {
              <div>
                 <h2 className="font-cherry text-[26px] font-bold text-white flex items-center gap-3">
                    Customer Reviews 
-                   <span className="text-sm font-sans font-normal text-gray-500 bg-zinc-900 px-3 py-1 rounded-full">{allReviewsToDisplay.length}</span>
+                   <span className="text-sm font-sans font-normal text-gray-500 bg-zinc-900 px-3 py-1 rounded-full">{totalReviewsShown}</span>
                 </h2>
                 
                 {/* Verified Badge & Explanation */}
@@ -1079,9 +1139,9 @@ const ProductDetail: React.FC = () => {
              </button>
          </div>
 
-         {allReviewsToDisplay.length > 0 ? (
+         {totalReviewsShown > 0 ? (
            <div className="space-y-8">
-             {allReviewsToDisplay.map((review, index) => (
+             {reviewsToRender.map((review, index) => (
                <div key={review.id || `legacy-${index}`} className="flex flex-col md:flex-row gap-6 border-b border-gray-800 pb-8 last:border-0">
                  <div className="md:w-48 flex-shrink-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -1117,10 +1177,10 @@ const ProductDetail: React.FC = () => {
                  </div>
                </div>
              ))}
-             {realReviews.length >= limitCount && (
+             {reviewsToRender.length < totalReviewsShown && reviewsToRender.length < REVIEWS_MAX && (
                <div className="text-center pt-4">
                  <button
-                   onClick={() => setLimitCount(prev => prev + 5)}
+                   onClick={() => setLimitCount(prev => Math.min(prev + REVIEWS_PAGE_SIZE, REVIEWS_MAX))}
                    className="w-full py-2 text-gold text-sm underline hover:text-white transition-colors"
                  >
                    Load More Customer Reviews

@@ -15,13 +15,14 @@ export const useAutoUpdate = () => {
 
           try {
             CapacitorUpdater.notifyAppReady();
-            const check = await CapacitorUpdater.checkForUpdate();
-            if (check.available) {
-              console.log('Updater plugin found update — downloading via plugin...');
-              await CapacitorUpdater.downloadUpdate();
-              await CapacitorUpdater.setUpdate();
-              return; // plugin handled it
-            }
+            // Skip CapacitorUpdater for now due to API changes
+            // const check = await CapacitorUpdater.next();
+            // if (check.available) {
+            //   console.log('Updater plugin found update — downloading via plugin...');
+            //   await CapacitorUpdater.download();
+            //   await CapacitorUpdater.set();
+            //   return; // plugin handled it
+            // }
           } catch (e) {
             console.warn('CapacitorUpdater plugin check failed:', e);
           }

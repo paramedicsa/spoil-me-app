@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Clock, User, AlertTriangle, RefreshCw } from 'lucide-react';
-import { httpsCallable, getFunctions } from 'firebase/functions';
-import { db, app } from '../../firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import { callServerFunction } from '@repo/utils/supabaseClient';
+import { queryDocuments, subscribeToTable } from '@repo/utils/supabaseClient';
 
-const functions = app ? getFunctions(app) : null;
+// Server function caller (migrated from Firebase httpsCallable)
 
 interface AffiliateApplication {
   id: string;
   userId: string;
   status: 'pending' | 'approved' | 'rejected';
-  appliedAt: Timestamp;
-  autoApproveAt: Timestamp;
+  appliedAt: Date;
+  autoApproveAt: Date;
   rejectionReason?: string;
   approvedBy?: string;
   userEmail?: string;
@@ -28,28 +27,27 @@ const AffiliateRequests: React.FC = () => {
   const [customReason, setCustomReason] = useState('');
 
   useEffect(() => {
-    // Real-time listener for pending applications
-    const q = query(
-      collection(db, 'affiliate_applications'),
-      where('status', '==', 'pending'),
-      orderBy('appliedAt', 'desc')
-    );
+    let unsub: (() => void) | null = null;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const apps: AffiliateApplication[] = [];
-      snapshot.forEach((doc) => {
-        apps.push({ id: doc.id, ...doc.data() } as AffiliateApplication);
-      });
-      setApplications(apps);
+    const load = async () => {
+      const apps = await queryDocuments<any>('affiliate_applications', { filters: { status: 'pending' }, orderBy: { column: 'applied_at', ascending: false } });
+      setApplications((apps || []).map(a => ({ id: a.id, ...a, appliedAt: a.applied_at ? new Date(a.applied_at) : new Date(), autoApproveAt: a.auto_approve_at ? new Date(a.auto_approve_at) : new Date() })));
       setLoading(false);
+    };
+
+    load();
+
+    unsub = subscribeToTable('affiliate_applications', async () => {
+      const apps = await queryDocuments<any>('affiliate_applications', { filters: { status: 'pending' }, orderBy: { column: 'applied_at', ascending: false } });
+      setApplications((apps || []).map(a => ({ id: a.id, ...a, appliedAt: a.applied_at ? new Date(a.applied_at) : new Date(), autoApproveAt: a.auto_approve_at ? new Date(a.auto_approve_at) : new Date() })));
     });
 
-    return () => unsubscribe();
+    return () => { if (unsub) unsub(); };
   }, []);
 
-  const calculateTimeLeft = (autoApproveAt: Timestamp) => {
+  const calculateTimeLeft = (autoApproveAt: Date) => {
     const now = new Date();
-    const approveTime = autoApproveAt.toDate();
+    const approveTime = autoApproveAt;
     const diff = approveTime.getTime() - now.getTime();
 
     if (diff <= 0) return 'Auto-approving...';
@@ -61,12 +59,9 @@ const AffiliateRequests: React.FC = () => {
   };
 
   const handleApprove = async (applicationId: string) => {
-    if (!functions) return;
-
     setProcessingId(applicationId);
     try {
-      const reviewFn = httpsCallable(functions, 'reviewAffiliateApplication');
-      await reviewFn({
+      await callServerFunction('reviewAffiliateApplication', {
         applicationId,
         decision: 'approve',
         reason: 'Approved by admin'
@@ -82,7 +77,7 @@ const AffiliateRequests: React.FC = () => {
   };
 
   const handleReject = async () => {
-    if (!functions || !selectedApplication) return;
+    if (!selectedApplication) return;
 
     const finalReason = customReason || rejectionReason;
 
@@ -93,8 +88,7 @@ const AffiliateRequests: React.FC = () => {
 
     setProcessingId(selectedApplication.id);
     try {
-      const reviewFn = httpsCallable(functions, 'reviewAffiliateApplication');
-      await reviewFn({
+      await callServerFunction('reviewAffiliateApplication', {
         applicationId: selectedApplication.id,
         decision: 'reject',
         reason: finalReason
@@ -162,7 +156,7 @@ const AffiliateRequests: React.FC = () => {
           <p className="text-3xl font-bold text-yellow-400">
             {applications.filter(app => {
               const now = new Date();
-              const approveTime = app.autoApproveAt.toDate();
+              const approveTime = app.autoApproveAt;
               return approveTime.getTime() - now.getTime() <= 10 * 60 * 1000; // Within 10 minutes
             }).length}
           </p>
@@ -177,7 +171,7 @@ const AffiliateRequests: React.FC = () => {
           <p className="text-3xl font-bold text-red-400">
             {applications.filter(app => {
               const now = new Date();
-              const approveTime = app.autoApproveAt.toDate();
+              const approveTime = app.autoApproveAt;
               return approveTime.getTime() - now.getTime() <= 0; // Already overdue
             }).length}
           </p>
@@ -213,8 +207,8 @@ const AffiliateRequests: React.FC = () => {
                       </h3>
                       <p className="text-gray-400 text-sm">{application.userEmail || application.userId}</p>
                       <p className="text-gray-500 text-xs">
-                        Applied: {application.appliedAt.toDate().toLocaleDateString()} at{' '}
-                        {application.appliedAt.toDate().toLocaleTimeString()}
+                        Applied: {application.appliedAt.toLocaleDateString()} at{' '}
+                        {application.appliedAt.toLocaleTimeString()}
                       </p>
                     </div>
                   </div>

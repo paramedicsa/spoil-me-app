@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { updateDocument } from '@repo/utils/supabaseClient';
 import { Users, Trash2, AlertTriangle, Search, User, Mail, Calendar, MapPin, Crown, Download, Filter, Globe, UserCheck } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { httpsCallable, getFunctions } from 'firebase/functions';
-import { db, app, auth } from '../../firebaseConfig';
-import { collection, query, getDocs, deleteDoc, doc, updateDoc, getDoc, where, orderBy, limit, startAfter } from 'firebase/firestore';
+import { callServerFunction, getDocument } from '@repo/utils/supabaseClient';
+import { getDocument } from '@repo/utils/supabaseClient';
 
-// Initialize Firebase Functions
-const functions = app ? getFunctions(app) : null;
+// Server function caller
 
 // Simple Switch Component
 const Switch: React.FC<{
@@ -72,71 +71,26 @@ const UsersManagement: React.FC = () => {
     const loadUsers = async () => {
       setIsLoading(true);
       try {
-        // Get current user's ID token
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          console.error('No authenticated user');
-          setIsLoading(false);
-          return;
-        }
-
-        const idToken = await currentUser.getIdToken();
-
-        // Fetch Firebase Auth users
-        const response = await fetch('https://us-central1-spoilme-edee0.cloudfunctions.net/api/users', {
-          headers:
-          {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
+        try {
+          // Try to fetch via server API (cloud function proxy) — may require server-side auth.
+          const resp = await fetch('/api/users');
+          if (resp.ok) {
+            const data = await resp.json();
+            const authUsers = data.users || data;
+            setAllUsers(authUsers);
+            setFilteredUsers(authUsers);
+          } else {
+            // Fallback: read from Supabase users table directly (may lack Auth metadata)
+            const users = await queryDocuments<any>('users', { orderBy: { column: 'created_at', ascending: false }, limit: 500 });
+            setAllUsers(users || []);
+            setFilteredUsers(users || []);
           }
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        } catch (err) {
+          console.warn('Failed to fetch users via API, falling back to supabase users table:', err);
+          const users = await queryDocuments<any>('users', { orderBy: { column: 'created_at', ascending: false }, limit: 500 });
+          setAllUsers(users || []);
+          setFilteredUsers(users || []);
         }
-
-        const data = await response.json();
-        const authUsers = data.users;
-
-        // Fetch additional user data from Firestore
-        const firestoreUsers = [];
-        for (const authUser of authUsers) {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-            if (userDoc.exists()) {
-              firestoreUsers.push({
-                id: authUser.uid,
-                ...authUser,
-                ...userDoc.data(),
-                // Override with Auth data if needed
-                email: authUser.email,
-                displayName: authUser.displayName,
-                emailVerified: authUser.emailVerified,
-                createdAt: authUser.metadata.creationTime ? new Date(authUser.metadata.creationTime) : null,
-                lastSignInAt: authUser.metadata.lastSignInTime ? new Date(authUser.metadata.lastSignInTime) : null
-              });
-            } else {
-              firestoreUsers.push({
-                id: authUser.uid,
-                ...authUser,
-                createdAt: authUser.metadata.creationTime ? new Date(authUser.metadata.creationTime) : null,
-                lastSignInAt: authUser.metadata.lastSignInTime ? new Date(authUser.metadata.lastSignInTime) : null
-              });
-            }
-          } catch (error) {
-            console.error(`Error fetching Firestore data for user ${authUser.uid}:`, error);
-            // Still include the user without Firestore data
-            firestoreUsers.push({
-              id: authUser.uid,
-              ...authUser,
-              createdAt: authUser.metadata.creationTime ? new Date(authUser.metadata.creationTime) : null,
-              lastSignInAt: authUser.metadata.lastSignInTime ? new Date(authUser.metadata.lastSignInTime) : null
-            });
-          }
-        }
-
-        setAllUsers(firestoreUsers);
-        setFilteredUsers(firestoreUsers);
       } catch (error) {
         console.error('Error loading users:', error);
       } finally {
@@ -202,14 +156,8 @@ const UsersManagement: React.FC = () => {
   // Delete user function
   const deleteUser = async (userId: string) => {
     try {
-      // Call Cloud Function to delete user from Firebase Auth and Firestore
-      if (!functions) {
-        alert('Firebase functions not available');
-        return;
-      }
-
-      const deleteUserFn = httpsCallable(functions, 'deleteUser');
-      await deleteUserFn({ userId });
+      // Call server-side function to delete user (replaces Firebase Cloud Function)
+      await callServerFunction('deleteUser', { userId, should_soft_delete: false });
 
       // Update local state
       const updatedUsers = allUsers.filter(user => user.id !== userId);
@@ -283,11 +231,8 @@ const UsersManagement: React.FC = () => {
     if (!selectedUserForAdmin) return;
 
     try {
-      // Update user permissions in Firestore
-      const userRef = doc(db, 'users', selectedUserForAdmin.id);
-      await updateDoc(userRef, {
-        adminPermissions
-      });
+        // Update user permissions via Supabase
+        await updateDocument('users', selectedUserForAdmin.id, { adminPermissions });
 
       alert('Admin permissions updated successfully!');
       setShowAdminModal(false);
@@ -483,7 +428,7 @@ const UsersManagement: React.FC = () => {
                             : user.displayName || 'No Name'
                           }
                           {user.isActive === false && (
-                            <AlertTriangle size={16} className="text-red-500" title="Account pending deletion" />
+                            <AlertTriangle size={16} className="text-red-500" />
                           )}
                           {user.membershipTier && (
                             <span className="text-xs px-2 py-1 rounded bg-yellow-900/30 text-yellow-400">
@@ -983,13 +928,8 @@ const UsersManagement: React.FC = () => {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={async () => {
-                  if (!functions) {
-                    alert('Firebase functions not available');
-                    return;
-                  }
                   try {
-                    const grantTrialFn = httpsCallable(functions, 'grantTrial');
-                    const result = await grantTrialFn({
+                    await callServerFunction('grantTrial', {
                       userId: selectedUserForTrial.id,
                       plan: trialPlan,
                       days: trialDays
@@ -1066,13 +1006,8 @@ const UsersManagement: React.FC = () => {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={async () => {
-                  if (!functions) {
-                    alert('Firebase functions not available');
-                    return;
-                  }
                   try {
-                    const updateArtistStatusFn = httpsCallable(functions, 'updateArtistStatus');
-                    await updateArtistStatusFn({
+                    await callServerFunction('updateArtistStatus', {
                       userId: selectedUserForArtist.id,
                       status: artistStatus
                     });
@@ -1140,13 +1075,8 @@ const UsersManagement: React.FC = () => {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={async () => {
-                  if (!functions) {
-                    alert('Firebase functions not available');
-                    return;
-                  }
                   try {
-                    const updateMembershipTierFn = httpsCallable(functions, 'updateMembershipTier');
-                    await updateMembershipTierFn({
+                    await callServerFunction('updateMembershipTier', {
                       userId: selectedUserForMembership.id,
                       tier: membershipTier
                     });

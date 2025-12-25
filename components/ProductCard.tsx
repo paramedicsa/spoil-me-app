@@ -129,7 +129,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   // Helper function for currency display
   const getCurrencySymbol = () => curr === 'ZAR' ? 'R' : '$';
-  const getPrice = (zarPrice: number, usdPrice?: number) => curr === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+  const getPrice = (zarPrice: number, usdPrice?: number) => {
+    if (curr === 'ZAR') return zarPrice;
+    if (curr === 'USD') return usdPrice !== undefined ? usdPrice : 0; // Don't fallback to ZAR price
+    return zarPrice;
+  };
 
   // Get the base price for calculations
   const baseCompareAtPrice = curr === 'ZAR' ? product.compareAtPrice : (product.compareAtPriceUSD || product.compareAtPrice);
@@ -143,7 +147,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
     <Link to={`/product/${product.id}`} className="block relative overflow-hidden aspect-square rounded-t-lg">
                 <ResolvedImage
-                    src={product.images[0]}
+                    src={product.image_url || product.imageUrl || product.images?.[0]}
                     alt={product.name}
                     className={`w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 ${product.stock <= 0 ? 'opacity-50 grayscale' : 'opacity-90 group-hover:opacity-100'}`}
                     fallback={getFallbackImage(600)}

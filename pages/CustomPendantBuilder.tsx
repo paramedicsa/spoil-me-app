@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
-import { db } from '../firebaseConfig';
-import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { getDocument, createDocument } from '@repo/utils/supabaseClient';
 import { CustomTemplate } from '../types';
 import { ArrowLeft, ShoppingCart, Sparkles, Crown } from 'lucide-react';
 
@@ -33,11 +32,9 @@ const CustomPendantBuilder: React.FC = () => {
 
   const fetchTemplate = async () => {
     try {
-      const docRef = doc(db, 'custom_templates', id!);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        setTemplate({ id: docSnap.id, ...docSnap.data() } as CustomTemplate);
+      const fetched = await getDocument<CustomTemplate>('custom_templates', id!);
+      if (fetched) {
+        setTemplate(fetched as CustomTemplate);
       } else {
         navigate('/customized-wire-wrapped-pendants');
       }
@@ -82,11 +79,20 @@ const CustomPendantBuilder: React.FC = () => {
 
       const customItem = {
         id: `custom-${Date.now()}`,
+        code: `CUSTOM-${Date.now()}`,
         name: `${template.name} - Custom`,
+        slug: `custom-pendant-${Date.now()}`,
         description: `Custom pendant with ${selectedStone?.name} stone, ${selectedWire?.name} wire style, ${selectedOptions.chainLength} chain`,
         price: calculateTotalPrice(),
-        image: template.mainImage,
-        type: 'Custom Pendant',
+        priceUSD: calculateTotalPrice() / 18, // Approximate USD conversion
+        costPrice: template.basePrice + (selectedStone?.priceModifier || 0) + (selectedWire?.priceModifier || 0),
+        category: 'Custom Pendants',
+        type: 'Pendant' as const,
+        status: 'published' as const,
+        stock: 1,
+        images: [template.mainImage],
+        tags: ['custom', 'pendant', 'wire-wrapped'],
+        createdAt: new Date().toISOString(),
         quantity: 1,
         customOptions: {
           templateId: template.id,
@@ -97,11 +103,11 @@ const CustomPendantBuilder: React.FC = () => {
         isCustom: true
       };
 
-      await addDoc(collection(db, 'cart_items'), {
-        userId: user.uid,
-        productId: customItem.id,
+      await createDocument('cart_items', {
+        user_id: user.uid,
+        product_id: customItem.id,
         ...customItem,
-        addedAt: new Date()
+        added_at: new Date().toISOString(),
       });
 
       addToCart(customItem);

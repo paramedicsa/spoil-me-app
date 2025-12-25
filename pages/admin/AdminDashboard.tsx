@@ -3,14 +3,13 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { BarChart, DollarSign, ShoppingBag, Users, Database, RefreshCw, AlertTriangle, UserCheck, Stethoscope, Check, X, Activity, Award, Zap, TestTube, Truck, ExternalLink, Package, Tags, Gift, Share2, Trophy, Crown, UserPlus, Sparkles, Palette } from 'lucide-react';
 import { User } from '../../types';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { queryDocuments, subscribeToTable } from '@repo/utils/supabaseClient';
 
 const AdminDashboard: React.FC = () => {
-  const { products, isDemoMode, resetStore, dbConnectionError, seedTestUsers, runDataDiagnostics, simulateAffiliateSale, getAllUsers, adminAdjustPoints, auth } = useStore();
+  const { products, isDemoMode, resetStore, dbConnectionError, seedTestUsers, runDataDiagnostics, simulateAffiliateSale, getAllUsers, adminAdjustPoints, auth, user } = useStore();
 
-  // Access control: Only allow spoilmevintagediy@gmail.com
-  if (!auth || !auth.currentUser || auth.currentUser.email !== 'spoilmevintagediy@gmail.com') {
+  // Access control: Check if user is admin (set in StoreContext login function)
+  if (!user || !user.isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-zinc-900 text-white">
         <div className="text-center">
@@ -59,48 +58,35 @@ const AdminDashboard: React.FC = () => {
       }
     };
 
-    const unsubApplications = onSnapshot(
-      query(collection(db, 'artist_applications'), orderBy('submittedAt', 'desc')),
-      (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          submittedAt: doc.data().submittedAt?.toDate() || new Date()
-        }));
-        setArtistApplications(apps);
-        checkLoadingComplete();
-      },
-      (error) => {
-        console.error('Error loading artist applications:', error);
-        checkLoadingComplete();
-      }
-    );
+    const loadInitial = async () => {
+      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
+      setArtistApplications((apps || []).map(a => ({ id: a.id, ...a, submittedAt: a.submitted_at ? new Date(a.submitted_at) : new Date() })));
+      checkLoadingComplete();
 
-    const unsubArtists = onSnapshot(collection(db, 'artists'), (snapshot) => {
-      const arts = snapshot.docs.map(doc => ({
-        uid: doc.id,
-        ...doc.data()
-      }));
-      setArtists(arts);
+      const arts = await queryDocuments<any>('artists');
+      setArtists(arts || []);
       checkLoadingComplete();
-    }, (error) => {
-      console.error('Error loading artists:', error);
+
+      const prods = await queryDocuments<any>('artist_products');
+      setArtistProducts((prods || []).map(p => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
       checkLoadingComplete();
+    };
+
+    loadInitial();
+
+    const unsubApplications = subscribeToTable('artist_applications', async () => {
+      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
+      setArtistApplications((apps || []).map(a => ({ id: a.id, ...a, submittedAt: a.submitted_at ? new Date(a.submitted_at) : new Date() })));
     });
 
-    const unsubProducts = onSnapshot(collection(db, 'artist_products'), (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        receivedAtHub: doc.data().receivedAtHub?.toDate() || null,
-        approvedAt: doc.data().approvedAt?.toDate() || null,
-      }));
-      setArtistProducts(prods);
-      checkLoadingComplete();
-    }, (error) => {
-      console.error('Error loading artist products:', error);
-      checkLoadingComplete();
+    const unsubArtists = subscribeToTable('artists', async () => {
+      const arts = await queryDocuments<any>('artists');
+      setArtists(arts || []);
+    });
+
+    const unsubProducts = subscribeToTable('artist_products', async () => {
+      const prods = await queryDocuments<any>('artist_products');
+      setArtistProducts((prods || []).map(p => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
     });
 
     // Fallback timeout in case listeners don't fire
@@ -113,9 +99,9 @@ const AdminDashboard: React.FC = () => {
 
     return () => {
       clearTimeout(timeout);
-      unsubApplications();
-      unsubArtists();
-      unsubProducts();
+      if (unsubApplications) unsubApplications();
+      if (unsubArtists) unsubArtists();
+      if (unsubProducts) unsubProducts();
     };
   }, []);
 

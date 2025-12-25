@@ -177,6 +177,7 @@ export interface CartItem extends Product {
   selectedChainStyle?: string; // If pendant
   selectedChainLength?: string; // If pendant
   voucherMeta?: VoucherMeta; // For Gift Cards
+  vaultItem?: boolean;
   customDetails?: {
     stone: string;
     stoneImage: string;
@@ -202,16 +203,16 @@ export interface AffiliateStats {
   adminNote?: string; // Feedback from admin
   parentId?: string; // ID of the recruiter (Upline / Parent Affiliate)
   // New vault and milestone tracking
-  vaultPurchasesThisMonth: number; // Track vault purchases for limits
-  membershipMonths: number; // Track consecutive membership months for vault limits
-  weeklyMilestones: {
+  vaultPurchasesThisMonth?: number; // Track vault purchases for limits
+  membershipMonths?: number; // Track consecutive membership months for vault limits
+  weeklyMilestones?: {
     membershipsSold: number;
     salesValue: number;
     vaultItemsSold: number;
     weekStart: string; // ISO date of week start
   };
   paypalEmail?: string; // For international payouts
-  location: 'south_africa' | 'international'; // Determines payout method
+  location?: 'south_africa' | 'international'; // Determines payout method
 }
 
 export interface AffiliateLeaderboardItem {
@@ -234,12 +235,16 @@ export interface ShippingAddress {
 
 export interface User {
   id: string;
+  uid?: string; // Firebase UID
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   password?: string; // For demo authentication
   birthday?: string; // ISO Date YYYY-MM-DD
   isMember: boolean; // Paid membership status
   membershipTier?: 'none' | 'basic' | 'premium' | 'deluxe' | 'Spoil Me' | 'Basic' | 'Premium' | 'Deluxe Boss' | 'Insider Club' | 'Gold Member' | 'Deluxe Vault';
+  membershipMonths?: number;
   membershipStatus?: 'active' | 'trial' | 'expired' | 'cancelled';
   trialExpiresAt?: Date;
   nextCreditDrop?: Date;
@@ -260,7 +265,7 @@ export interface User {
   currencyLocked?: boolean;
   affiliateStoreConfig?: {
     products: string[];
-    strategy: { discount: number; commission: number };
+    strategy: { d: number; c: number };
     currency: 'ZAR' | 'USD';
     lastUpdated: string;
   };
@@ -268,6 +273,8 @@ export interface User {
   wishlist: string[];
   notifications: Notification[];
   isAdmin: boolean;
+  isActive?: boolean;
+  createdAt?: string;
   socialRewards?: {
     tiktok?: boolean;
     twitter?: boolean;

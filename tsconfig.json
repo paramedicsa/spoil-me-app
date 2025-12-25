@@ -15,13 +15,26 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
+    "baseUrl": ".",
     "jsx": "react-jsx",
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@repo/*": [
+        "repo/*"
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "types": ["vite/client", "node"]
+  },
+  "exclude": [
+    "dist",
+    "build_tmp",
+    "tmp_service_worker.js",
+    "tmp_deployed_index_js.js",
+    "tmp_deployed_index.html",
+    "tmp_*"
+  ]
 }

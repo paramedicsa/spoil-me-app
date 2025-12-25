@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { getDocument, subscribeToTable } from '@repo/utils/supabaseClient';
 
 // Default fallback (Safety net)
 const DEFAULT_CONFIG = {
@@ -19,14 +18,20 @@ export const useAdConfig = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Real-time listener: If Admin changes price, Artist sees it instantly
-    const unsub = onSnapshot(doc(db, 'settings', 'ad_config'), (doc) => {
-      if (doc.exists()) {
-        setConfig(doc.data() as any);
-      }
+    let unsub: (() => void) | null = null;
+    const load = async () => {
+      const cfg = await getDocument<any>('settings', 'ad_config');
+      if (cfg) setConfig(cfg);
       setLoading(false);
+    };
+    load();
+
+    unsub = subscribeToTable('settings', async () => {
+      const cfg = await getDocument<any>('settings', 'ad_config');
+      if (cfg) setConfig(cfg);
     });
-    return () => unsub();
+
+    return () => { if (unsub) unsub(); };
   }, []);
 
   return { packages: config.packages, socialAddon: config.socialAddon, loading };

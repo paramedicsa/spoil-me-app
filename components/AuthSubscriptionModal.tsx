@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, X, Calendar, User, Mail, Lock, Heart } from 'lucide-react';
-import { auth, db } from '../firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { signUpWithEmail } from '@repo/utils/supabaseClient';
 
 interface AuthSubscriptionModalProps {
   isOpen: boolean;
@@ -74,22 +72,18 @@ const AuthSubscriptionModal: React.FC<AuthSubscriptionModalProps> = ({
     setIsLoading(true);
 
     try {
-      // 1. Create Authentication User
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
-
-      // 2. Save Extended Profile to Firestore
-      await setDoc(doc(db, 'users', user.uid), {
+      // Use Supabase sign up helper which also creates the profile row
+      await signUpWithEmail(formData.email, formData.password, {
         firstName: formData.firstName,
         lastName: formData.lastName,
         dob: formData.dob,
         gender: formData.gender,
         favoriteColor: formData.favoriteColor,
         email: formData.email,
-        createdAt: new Date(),
-        membershipTier: 'none', // Will update after payment
+        createdAt: new Date().toISOString(),
+        membershipTier: 'none',
         role: 'user',
-        affiliateCode: user.uid.substring(0, 8).toUpperCase(),
+        affiliateCode: '', // will be set server-side or on first update
         affiliateStats: {
           status: 'none',
           totalSalesCount: 0,
@@ -113,7 +107,7 @@ const AuthSubscriptionModal: React.FC<AuthSubscriptionModalProps> = ({
         isMember: false
       });
 
-      // 3. Close Modal & Trigger Payment
+      // Close modal & proceed with payment flow
       onClose();
       onSuccess();
 

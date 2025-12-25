@@ -20,13 +20,12 @@ export const useAppUpdate = () => {
     }
 
     try {
-      // Use capgo updater first
-      CapacitorUpdater.notifyAppReady();
-      const check = await CapacitorUpdater.checkForUpdate();
-      if (check.available) {
-        setUpdateAvailable({ version: check.bundle.version, apkUrl: '' }); // apkUrl is not needed for capgo
-        return;
-      }
+      // Skip CapacitorUpdater for now due to API changes
+      // const check = await CapacitorUpdater.next();
+      // if (check.available) {
+      //   setUpdateAvailable({ version: check.bundle.version, apkUrl: '' });
+      //   return;
+      // }
     } catch (e) {
       console.warn('CapacitorUpdater plugin check failed, falling back to manual check:', e);
     }
@@ -56,9 +55,11 @@ export const useAppUpdate = () => {
     try {
         // If capgo detected the update, it will handle it.
         if (updateAvailable.apkUrl === '') {
-            await CapacitorUpdater.downloadUpdate();
-            await CapacitorUpdater.setUpdate();
+            // Skip CapacitorUpdater download/set for now
+            // await CapacitorUpdater.download();
+            // await CapacitorUpdater.set();
             // The app will restart automatically.
+            alert('Update downloaded. Please restart the app.');
             return;
         }
 

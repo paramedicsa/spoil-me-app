@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, ExternalLink, DollarSign, Package, Truck } from 'lucide-react';
 import AdminAdPricing from './AdminAdPricing';
+import AdminAdRevenue from './AdminAdRevenue';
 
 interface PudoCostItem {
   name: string;

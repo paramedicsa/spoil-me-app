@@ -10,7 +10,7 @@ const StoreBuilder: React.FC = () => {
   const { user, products, currency, updateUser } = useStore();
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStrategy, setSelectedStrategy] = useState<{ discount: number; commission: number } | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<{ d: number; c: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Get user's tier
@@ -57,17 +57,17 @@ const StoreBuilder: React.FC = () => {
 
   const getDiscountedPrice = (product: Product) => {
     if (!selectedStrategy) return product.price;
-    const discountAmount = product.price * (selectedStrategy.discount / 100);
+    const discountAmount = product.price * (selectedStrategy.d / 100);
     return product.price - discountAmount;
   };
 
   const getDiscountedPriceUSD = (product: Product) => {
     if (!selectedStrategy) return product.priceUSD;
-    const discountAmount = product.priceUSD * (selectedStrategy.discount / 100);
+    const discountAmount = product.priceUSD * (selectedStrategy.d / 100);
     return product.priceUSD - discountAmount;
   };
 
-  if (!user.affiliateStats?.status === 'approved') {
+  if (user.affiliateStats?.status !== 'approved') {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center">
         <h1 className="text-2xl font-bold text-white mb-4">Access Denied</h1>
@@ -111,17 +111,17 @@ const StoreBuilder: React.FC = () => {
               key={index}
               onClick={() => setSelectedStrategy(option)}
               className={`p-4 rounded-lg border transition-all ${
-                selectedStrategy?.discount === option.discount && selectedStrategy?.commission === option.commission
+                selectedStrategy?.d === option.d && selectedStrategy?.c === option.c
                   ? 'bg-pink-900/20 border-pink-500 text-pink-400'
                   : 'bg-zinc-800 border-gray-700 text-gray-300 hover:border-gray-500'
               }`}
             >
               <div className="text-center">
                 <div className="text-2xl font-bold mb-1">
-                  {option.discount}% OFF / {option.commission}% Commission
+                  {option.d}% OFF / {option.c}% Commission
                 </div>
                 <div className="text-xs text-gray-500">
-                  Give customers {option.discount}% discount, earn {option.commission}% commission
+                  Give customers {option.d}% discount, earn {option.c}% commission
                 </div>
               </div>
             </button>
@@ -232,7 +232,7 @@ const StoreBuilder: React.FC = () => {
                         </div>
                         {selectedStrategy && (
                           <div className="text-xs bg-pink-900/20 text-pink-400 px-2 py-1 rounded">
-                            {selectedStrategy.discount}% OFF
+                            {selectedStrategy.d}% OFF
                           </div>
                         )}
                       </div>
@@ -250,7 +250,7 @@ const StoreBuilder: React.FC = () => {
                     <div>
                       <h3 className="text-lg font-bold text-green-400">Store Ready!</h3>
                       <p className="text-sm text-green-300">
-                        Your VIP store is configured. Customers will see {selectedStrategy.discount}% off these products and you'll earn {selectedStrategy.commission}% commission.
+                        Your VIP store is configured. Customers will see {selectedStrategy.d}% off these products and you'll earn {selectedStrategy.c}% commission.
                       </p>
                     </div>
                   </div>

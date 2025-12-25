@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../context/StoreContext';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
-import { getFirestore, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { getDocument, updateDocument } from '@repo/utils/supabaseClient';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 interface Props {
@@ -35,19 +35,14 @@ const persistAcceptance = async (uid: string | null, planId: string) => {
   // Try Firestore first (if initialized)
   try {
     if (uid) {
-      const db = getFirestore();
-      const userDoc = doc(db, 'users', uid);
-      // Merge an acceptedPlans object
-      await setDoc(
-        userDoc,
-        { acceptedPlans: { [planId]: true } },
-        { merge: true }
-      );
+      // Use Supabase upsert/update on users table; merge acceptedPlans
+      const existing = await getDocument<any>('users', uid);
+      const merged = { ...(existing || {}), acceptedPlans: { ...((existing && existing.acceptedPlans) || {}), [planId]: true } };
+      await updateDocument('users', uid, merged);
       return;
     }
   } catch (e) {
-    // Firestore might not be initialized; fallback to localStorage below
-    console.warn('Firestore accept save failed, falling back to localStorage', e);
+    console.warn('Supabase accept save failed, falling back to localStorage', e);
   }
 
   const storageKey = `accepted_terms_${uid || 'guest'}_${planId}`;
@@ -59,16 +54,11 @@ const checkAccepted = async (uid: string | null, planId: string) => {
   const storageKey = `accepted_terms_${uid || 'guest'}_${planId}`;
   if (localStorage.getItem(storageKey)) return true;
 
-  // Try Firestore read (best-effort)
+  // Try Supabase read (best-effort)
   try {
     if (uid) {
-      const db = getFirestore();
-      const userRef = doc(db, 'users', uid);
-      const snap = await (await import('firebase/firestore')).getDoc(userRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data?.acceptedPlans?.[planId]) return true;
-      }
+      const row = await getDocument<any>('users', uid);
+      if (row && row.acceptedPlans && row.acceptedPlans[planId]) return true;
     }
   } catch (e) {
     // ignore read errors
@@ -126,7 +116,7 @@ const SubscriptionTermsModal: React.FC<Props> = ({ plan, isOpen, onClose, initia
 
   const handleAgreeProceed = useCallback(async () => {
     // Persist acceptance (Firestore or localStorage)
-    await persistAcceptance(currentUser?.uid || null, plan.id);
+    await persistAcceptance((currentUser as any)?.id || (currentUser as any)?.uid || null, plan.id);
     setAcceptedAlready(true);
     // Directly move to payment view
     setView('payment');
@@ -204,7 +194,7 @@ const SubscriptionTermsModal: React.FC<Props> = ({ plan, isOpen, onClose, initia
             <div className="mb-4">
               {/* PayPal Buttons */}
               <PayPalScriptProvider options={{
-                "client-id": "Ac_QfTprTRIS3Abo2dMzGbDpCiw_rs9Zv5-Rhn5dgebhUj4E0hd7hG2LBaFB9iSL6k4cIt5uqmWeNC27",
+                clientId: "Ac_QfTprTRIS3Abo2dMzGbDpCiw_rs9Zv5-Rhn5dgebhUj4E0hd7hG2LBaFB9iSL6k4cIt5uqmWeNC27",
                 currency: "USD",
                 intent: "subscription",
                 vault: true,
@@ -283,7 +273,7 @@ const SubscriptionTermsModal: React.FC<Props> = ({ plan, isOpen, onClose, initia
             {/* PayPal Button */}
             <div className="w-full relative z-10">
               <PayPalScriptProvider options={{
-                "client-id": "Ac_QfTprTRIS3Abo2dMzGbDpCiw_rs9Zv5-Rhn5dgebhUj4E0hd7hG2LBaFB9iSL6k4cIt5uqmWeNC27",
+                clientId: "Ac_QfTprTRIS3Abo2dMzGbDpCiw_rs9Zv5-Rhn5dgebhUj4E0hd7hG2LBaFB9iSL6k4cIt5uqmWeNC27",
                 currency: "USD",
                 intent: "subscription",
                 vault: true,

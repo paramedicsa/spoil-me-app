@@ -25,7 +25,11 @@ const ShippingProgressBar: React.FC<ShippingProgressBarProps> = ({
   }
 
   const getCurrencySymbol = () => curr === 'ZAR' ? 'R' : '$';
-  const getPrice = (zarPrice: number, usdPrice?: number) => curr === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+  const getPrice = (zarPrice: number, usdPrice?: number) => {
+    if (curr === 'ZAR') return zarPrice;
+    if (curr === 'USD') return usdPrice !== undefined ? usdPrice : 0; // Don't fallback to ZAR price
+    return zarPrice;
+  };
 
   const threshold = getPrice(FREE_SHIPPING_THRESHOLD);
   const amountLeft = threshold - subtotal;

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, X, Mail, Lock, ArrowRight } from 'lucide-react';
-import { auth } from '../firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmail } from '@repo/utils/supabaseClient';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -43,11 +42,11 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      await signInWithEmail(formData.email, formData.password);
       onLoginSuccess();
     } catch (error: any) {
-      console.error("Login Error", error);
-      alert(error.message || "Login failed. Please check your credentials.");
+      console.error('Login Error', error);
+      alert(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }

@@ -2,25 +2,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 // Fix: Added Winner and Order to import
 import { Product, Category, CartItem, User, SpecialOffer, Voucher, Notification, VoucherMeta, AffiliateLeaderboardItem, PackagingItem, EarringMaterial, AffiliateStats, ShippingAddress, Winner, Order, VaultItem, CommissionRecord, AffiliatePayout, AffiliateMilestone } from '../types';
 import { INITIAL_USER, INITIAL_SPECIALS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../constants';
-import { db, storage, auth, app } from '../firebaseConfig';
-import { getDownloadURL, ref as sRef, getStorage } from 'firebase/storage';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import {
-  collection, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  updateDoc, 
-  query, 
-  orderBy,
-  getDocs,
-  where,
-  arrayUnion,
-  getDoc,
-  addDoc,
-  serverTimestamp
-} from 'firebase/firestore';
+import supabase, { isSupabaseConfigured } from '../src/supabaseClient';
+import { initializePushNotifications } from '../utils/pushNotifications';
+import { callServerFunction } from '../utils/supabaseClient';
 
 interface StoreContextType {
   products: Product[];
@@ -36,12 +20,15 @@ interface StoreContextType {
   isStickyProgressBarVisible: boolean;
   setIsStickyProgressBarVisible: (isVisible: boolean) => void;
   orders: Order[];
-  
-  // Currency
-  currency: 'ZAR' | 'USD';
-  toggleCurrency: () => void;
 
-  // Presets
+  // Add isDemoMode to match Provider value
+  isDemoMode: boolean;
+  isLoading: boolean;
+  dbConnectionError: string | null;
+  db: any;
+  isSupabaseConfigured?: boolean;
+
+  // Packaging / material presets
   packagingPresets: PackagingItem[];
   materialPresets: EarringMaterial[];
   savePackagingPreset: (item: PackagingItem) => void;
@@ -49,31 +36,35 @@ interface StoreContextType {
   saveMaterialPreset: (item: EarringMaterial) => void;
   deleteMaterialPreset: (name: string) => void;
 
-  isLoading: boolean;
-  isDemoMode: boolean;
-  dbConnectionError: string | null;
-  
-  // Auth
-  login: (email: string, pass: string) => Promise<boolean>;
-  register: (user: Partial<User>) => Promise<boolean>;
-  logout: () => void;
-  updateUserAddress: (address: ShippingAddress) => Promise<void>;
+  // Currency
+  currency: 'ZAR' | 'USD';
+  setCurrency: (c: 'ZAR' | 'USD') => void;
+  toggleCurrency: () => void;
 
-  // Actions
+  // Currency
+  addSpecial: (special: SpecialOffer) => void;
+  resetStore: () => void;
+  seedTestUsers: () => Promise<void>;
+  getAllUsers: () => Promise<User[]>;
+  runDataDiagnostics: () => { status: string; details: string };
+  adminAdjustPoints: (userId: string, points: number) => Promise<void>;
+  login: (email: string, pass: string) => Promise<boolean>;
+  register: (userData: Partial<User>) => Promise<boolean>;
+  logout: () => void;
+  authErrorMessage: string | null;
+  clearAuthError: () => void;
   addToCart: (product: Product, options?: Partial<CartItem>) => void;
   removeFromCart: (productId: string, options?: Partial<CartItem>) => void;
   updateCartQuantity: (productId: string, quantity: number, options?: Partial<CartItem>) => void;
   clearCart: () => void;
   toggleWishlist: (productId: string) => void;
-  checkout: (orderData: Omit<Order, 'id' | 'orderNumber' | 'date' | 'customerName' | 'customerEmail' | 'status'> & { pointsToRedeem?: number }) => Promise<Order>;
+  checkout: (orderData: any) => Promise<Order>;
   submitReview: (productId: string, rating: number, content: string, notificationId: string) => Promise<void>;
-  shareProduct: (productId: string) => void;
-  claimSocialReward: (platform: 'tiktok' | 'twitter' | 'whatsapp' | 'facebook' | 'pinterest', handle?: string) => Promise<void>;
-  addSystemNotification: (title: string, message: string, type?: 'system' | 'review_request' | 'affiliate_msg') => void;
+  addSystemNotification: (title: string, message: string, type?: any) => void;
   processGiftVoucherPurchase: (amount: number, meta: VoucherMeta) => Promise<void>;
-  
-  // Affiliate Actions
-  applyForAffiliate: (data: { name: string; surname: string; dob: string; gender: string; reason: string; socials: string }) => Promise<void>;
+
+  // Affiliate / artist
+  applyForAffiliate: (data: any) => Promise<void>;
   approveAffiliate: (userId: string, note?: string) => Promise<void>;
   rejectAffiliate: (userId: string, note?: string) => Promise<void>;
   sendAffiliateMessage: (userId: string, message: string) => Promise<void>;
@@ -82,11 +73,10 @@ interface StoreContextType {
   simulateAffiliateSale: (code: string, amount: number) => Promise<{ success: boolean; message: string }>;
   updateAffiliateTier: (userId: string, newRate: number) => Promise<void>;
   assignAffiliateParent: (childId: string, parentId: string) => Promise<void>;
-  
-  // Artist Actions
-  applyForArtist: (data: { name: string; surname: string; artistTradeName?: string; contactNumber: string; email: string; productImages: string[] }) => Promise<void>;
 
-  // Admin Actions
+  applyForArtist: (data: any) => Promise<void>;
+
+  // Products / categories / orders
   addProduct: (product: Product) => Promise<void>;
   updateProduct: (product: Product) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
@@ -96,30 +86,40 @@ interface StoreContextType {
   addCategory: (category: Category) => Promise<void>;
   updateCategory: (category: Category) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
-  replaceCategories: (categories: Category[]) => Promise<void>; 
-  addSpecial: (special: SpecialOffer) => void;
-  resetStore: () => void;
-  seedTestUsers: () => Promise<void>;
-  getAllUsers: () => Promise<User[]>;
-  runDataDiagnostics: () => { status: string; details: string };
-  adminAdjustPoints: (userId: string, points: number) => Promise<void>;
-  
-  // Voucher Actions
+  replaceCategories: (newCategories: Category[]) => Promise<void>;
+
+  // Vouchers & helpers
   addVoucher: (voucher: Voucher) => void;
   deleteVoucher: (code: string) => void;
-  applyExternalVoucher: (code: string) => boolean; 
+  applyExternalVoucher: (code: string) => boolean;
   setAppliedVoucher: (voucher: Voucher | null) => void;
+  shareProduct: (productId: string) => Promise<void>;
+  claimSocialReward: (platform: 'tiktok'|'twitter'|'whatsapp'|'facebook'|'pinterest', handle?: string) => Promise<void>;
+  updateUserAddress: (address: ShippingAddress) => Promise<void>;
+  
+  // Voucher Actions
+  
 
   // Helpers
   getCartTotal: () => number;
+
+  // Account convenience: update user profile fields
+  updateUser: (fields: Partial<User>) => Promise<void>;
+  // Dev helper: sign in using local dev admin stored in localStorage
+  signInWithLocalDevAdmin: () => Promise<{ ok: boolean; message?: string }>;
 
   // Admin Winner Override
   manualWinner: Winner | null;
   setManualWinner: (winner: Winner | null) => void;
   auth: any;
 
+  // Debug / Data Source
+  dataSource?: 'supabase' | 'local' | 'demo';
+
   // Account Management
   closeAccount: (reason: string) => Promise<void>;
+  // Convenience alias: legacy name used in some components
+  currentUser?: User;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -170,25 +170,32 @@ const sanitizeFirestoreData = (data: any, seen = new WeakSet()): any => {
   */
 
   const sanitized: any = {};
-  for (const key in data) {
+    for (const key in data) {
       // Exclude internal Firebase keys and complex objects we don't need in LocalStorage
       if (
-          key.startsWith('_') ||
-          key === 'auth' ||
-          key === 'firestore' ||
-          key === 'app' ||
-          key === 'metadata' ||
-          key === 'proactiveRefresh' ||
-          key === 'providerData' ||
-          key === 'stsTokenManager'
+        key.startsWith('_') ||
+        key === 'auth' ||
+        key === 'firestore' ||
+        key === 'proactiveRefresh' ||
+        key === 'providerData'
       ) continue;
 
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-          const val = sanitizeFirestoreData(data[key], seen);
-          if (val !== undefined && val !== null) sanitized[key] = val;
+        const val = sanitizeFirestoreData((data as any)[key], seen);
+        if (val !== undefined && val !== null) sanitized[key] = val;
       }
-  }
+    }
   return sanitized;
+};
+
+// Normalize DB user rows to the app User shape (map snake_case, ensure booleans)
+const normalizeUserRow = (row: any): User => {
+  if (!row) return null as any;
+  const u: any = { ...row };
+  if (u.is_admin !== undefined) u.isAdmin = Boolean(u.is_admin);
+  if (u.isAdmin === undefined) u.isAdmin = false;
+  if (u.created_at && !u.createdAt) u.createdAt = typeof u.created_at === 'string' ? u.created_at : (u.created_at.toISOString ? u.created_at.toISOString() : String(u.created_at));
+  return u as User;
 };
 
 const generateMonthlyLeaderboard = (): AffiliateLeaderboardItem[] => {
@@ -368,7 +375,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [affiliateLeaderboard, setAffiliateLeaderboard] = useState<AffiliateLeaderboardItem[]>([]);
   const [memberCount, setMemberCount] = useState(0);
   const [weeklyWinners, setWeeklyWinners] = useState<Winner[]>([]);
-  const [isDemoMode, setIsDemoMode] = useState(!db);
+  const [dataSource, setDataSource] = useState<'supabase'|'local'|'demo'>('local');
+  const [isDemoMode, setIsDemoMode] = useState(!isSupabaseConfigured);
+  const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
   const [isStickyProgressBarVisible, setIsStickyProgressBarVisible] = useState(false);
 
   const [packagingPresets, setPackagingPresets] = useState<PackagingItem[]>([]);
@@ -400,8 +409,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         let t = s += 0x6D2B79F5;
         t = Math.imul(t ^ t >>> 15, t | 1);
         t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-        setMemberCount(780 + Math.floor(seededRandom(seed) * 15));
+        return (t >>> 0) / 4294967296; // Return a number between 0 and 1
     };
+    setMemberCount(780 + Math.floor(seededRandom(seed) * 15));
 
     try {
         const localPack = localStorage.getItem('spv_packaging_presets');
@@ -434,26 +444,117 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
+  // Helper: update arbitrary fields for a user in Supabase users table
+  const updateUserFields = async (userId: string, fields: Partial<User>) => {
+    if (isDemoMode) return;
+    try {
+      await supabase.from('users').update(sanitizeFirestoreData(fields)).eq('id', userId);
+    } catch (err) {
+      console.error('Failed to update user fields in Supabase:', err);
+    }
+  };
+
+  const pushToIndividual = async (userId: string, title: string, body: string, url: string = '/#/notifications') => {
+    if (isDemoMode || !isSupabaseConfigured) return;
+    try {
+      await callServerFunction('send-push', {
+        title,
+        body,
+        targetGroup: 'individual',
+        targetId: userId,
+        url
+      });
+    } catch (err) {
+      console.warn('pushToIndividual failed:', err);
+    }
+  };
+
+  const appendNotificationToUser = async (userId: string, notification: Notification) => {
+    if (isDemoMode) return;
+    try {
+      const { data: userRow } = await supabase.from('users').select('notifications').eq('id', userId).maybeSingle();
+      const existing = (userRow && (userRow as any).notifications) || [];
+      const notifications = [notification, ...existing];
+      await supabase.from('users').update({ notifications }).eq('id', userId);
+    } catch (err) {
+      console.error('Failed to append notification to user:', err);
+    }
+  };
+
+  // Convenience: update partial user fields and persist locally and remotely
+  const updateUser = async (fields: Partial<User>) => {
+    const updatedUser: User = { ...user, ...fields } as User;
+    setUser(updatedUser);
+    persistUser(updatedUser);
+    if (!isDemoMode && user.id && user.id !== 'guest') {
+      await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
+    }
+  };
+
+  // Dev helper: sign in using the local dev admin stored in localStorage (if any)
+  const signInWithLocalDevAdmin = async (): Promise<{ ok: boolean; message?: string }> => {
+    try {
+      if (typeof window === 'undefined') return { ok: false, message: 'Not in browser' };
+      const raw = localStorage.getItem('spv_dev_admin');
+      if (!raw) return { ok: false, message: 'No local dev admin found' };
+      const profile = JSON.parse(raw);
+      const userObj: User = { ...INITIAL_USER, ...profile, id: profile.id || 'admin_local', email: profile.email } as User;
+      setUser(userObj);
+      persistUser(userObj);
+      console.log('signInWithLocalDevAdmin: signed in as local dev admin', userObj.email);
+      return { ok: true, message: 'Signed in as local dev admin' };
+    } catch (err: any) {
+      console.warn('signInWithLocalDevAdmin failed:', err);
+      return { ok: false, message: err?.message || String(err) };
+    }
+  };
+
+  const clearAuthError = () => setAuthErrorMessage(null);
+
   // REAL-TIME USER SYNC
   useEffect(() => {
-      if (!db || isDemoMode || !user.id || user.id === 'guest') return;
+      if (isDemoMode || !user.id || user.id === 'guest' || !isSupabaseConfigured) return;
 
-      const unsubUser = onSnapshot(doc(db, 'users', user.id), (docSnap) => {
-          if (docSnap.exists()) {
-              const remoteData = docSnap.data() as User;
-              setUser(prev => {
-                  const merged = { ...prev, ...remoteData };
-                  persistUser(merged); // FIX: Use the safe helper function to prevent circular JSON error.
-                  return merged;
-              });
-          }
-      }, (error) => {
-          if (error.code === 'not-found' && error.message.includes('default')) {
-              setDbConnectionError("Database ID Mismatch. Please clear browser cache.");
-          }
-      });
+      let cancelled = false;
 
-      return () => unsubUser();
+      // Initial fetch of up-to-date user row from Supabase (skip when supabase not configured)
+      (async () => {
+        try {
+          const { data: u, error } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+          if (!cancelled && !error && u) {
+            const merged = { ...user, ...u } as User;
+            setUser(merged);
+            persistUser(merged);
+          }
+        } catch (err) {
+          console.warn('Failed to fetch user from Supabase:', err);
+        }
+      })();
+
+      // Subscribe to realtime user updates via Supabase
+      const chan = supabase
+        .channel(`users:${user.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${user.id}` }, (payload) => {
+          const newRow = (payload as any).new;
+          if (newRow) {
+            const merged = { ...user, ...newRow } as User;
+            setUser(merged);
+            persistUser(merged);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        cancelled = true;
+        try { chan.unsubscribe(); } catch (_) {}
+      };
+  }, [user.id, isDemoMode]);
+
+  // Push token registration (best-effort)
+  useEffect(() => {
+    if (isDemoMode || !isSupabaseConfigured) return;
+    if (!user?.id || user.id === 'guest') return;
+    initializePushNotifications(user.id, user.name || (user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : undefined));
   }, [user.id, isDemoMode]);
 
   const savePackagingPreset = (item: PackagingItem) => {
@@ -492,98 +593,91 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const login = async (email: string, pass: string): Promise<boolean> => {
     const normalizedEmail = email.trim().toLowerCase();
-    let loggedInUser: User | null = null;
+    setAuthErrorMessage(null);
 
-    // Try Firebase Auth sign in for all users
-    if (auth) {
-      try {
-        const cred = await signInWithEmailAndPassword(auth, normalizedEmail, pass);
-        const firebaseUser = cred.user;
-        const uid = firebaseUser.uid;
+    try {
+      // 1. Perform supabase.auth.signInWithPassword
+      const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: pass });
 
-        // Get user data from Firestore
-        if (db) {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', uid));
-            if (userDoc.exists()) {
-              loggedInUser = { ...sanitizeFirestoreData(userDoc.data()), id: uid } as User;
-            } else {
-              // Create basic user data
-              loggedInUser = {
-                ...INITIAL_USER,
-                id: uid,
-                email: normalizedEmail,
-                name: firebaseUser.displayName || '',
-                isAdmin: normalizedEmail === 'spoilmevintagediy@gmail.com'
-              };
-              // Save to Firestore
-              await setDoc(doc(db, 'users', uid), sanitizeFirestoreData(loggedInUser));
-            }
-          } catch (err) {
-            console.error("Error getting user from Firestore:", err);
-            // Fallback to basic user
-            loggedInUser = {
-              ...INITIAL_USER,
-              id: uid,
-              email: normalizedEmail,
-              name: firebaseUser.displayName || '',
-              isAdmin: normalizedEmail === 'spoilmevintagediy@gmail.com'
-            };
-          }
-        } else {
-          loggedInUser = {
-            ...INITIAL_USER,
-            id: uid,
-            email: normalizedEmail,
-            name: firebaseUser.displayName || '',
-            isAdmin: normalizedEmail === 'spoilmevintagediy@gmail.com'
-          };
+      if (error) {
+        console.warn('Supabase signInWithPassword failed:', error.message);
+        setAuthErrorMessage(error.message || 'Sign-in failed.');
+        return false;
+      }
+
+      if (!data?.user) {
+        setAuthErrorMessage('Authentication failed - no user data returned.');
+        return false;
+      }
+
+      const uid = data.user.id;
+
+      // 2. IMMEDIATELY after auth, fetch the user's profile from the 'users' table using their ID
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+      if (profileError) {
+        console.warn('Failed to fetch user profile:', profileError);
+        // Create a basic profile if it doesn't exist
+        const basicUser: User = {
+          ...INITIAL_USER,
+          id: uid,
+          email: normalizedEmail,
+          name: data.user.user_metadata?.full_name || ''
+        } as User;
+        try {
+          await supabase.from('users').upsert([sanitizeFirestoreData(basicUser)]);
+        } catch (e) {
+          console.warn('Failed to create basic user profile:', e);
         }
-      } catch (authErr) {
-        console.warn('Firebase Auth sign in failed:', authErr);
-        // Fall back to test users or Firestore password
-      }
-    }
-
-    // If not logged in via Auth, try test users
-    if (!loggedInUser && pass === 'test') {
-      if (normalizedEmail === 'eliz@gmail.com') {
-        loggedInUser = { ...INITIAL_USER, id: 'u1', name: 'Elize Test 1', email: 'eliz@gmail.com', isMember: false, membershipTier: 'none' };
-      } else if (normalizedEmail === 'anna@gmail.com') {
-        loggedInUser = { ...INITIAL_USER, id: 'u2', name: 'Anna Test 2', email: 'anna@gmail.com', isMember: true, membershipTier: 'basic', loyaltyPoints: 100 };
-      }
-    }
-
-    // If still not logged in, try Firestore password (for legacy users)
-    if (!loggedInUser && db) {
-      try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', normalizedEmail));
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          // IMPORTANT: Sanitize raw Firestore data before storing/stringifying
-          const userDoc = sanitizeFirestoreData(snapshot.docs[0].data()) as User;
-          if (userDoc.password === pass) {
-            loggedInUser = { ...userDoc, id: snapshot.docs[0].id };
-          }
+        // 3. Merge this profile data (using basic profile since fetch failed)
+        let loggedInUser = normalizeUserRow(basicUser);
+        // 4. HARDCODE A SAFETY CHECK: If email === 'spoilmevintagediy@gmail.com', force isAdmin = true
+        if (normalizedEmail === 'spoilmevintagediy@gmail.com') {
+          loggedInUser.isAdmin = true;
         }
-      } catch (err) {
-        console.error("Error logging in via DB:", err);
-      }
-    }
+        // 5. Remove any old code that tries to insert isAdmin (camelCase) into the database. Only use is_admin (snake_case)
+        // (This is already handled by sanitizeFirestoreData which converts camelCase to snake_case)
 
-    if (loggedInUser) {
+        // Check if account is marked for deletion
+        if (loggedInUser.isActive === false) {
+          setAuthErrorMessage('Account is deactivated.');
+          return false;
+        }
+
+        setUser(loggedInUser);
+        persistUser(loggedInUser);
+        sendUserDataToServiceWorker(loggedInUser);
+        return true;
+      }
+
+      // 3. Merge this profile data (using fetched profile)
+      let loggedInUser = normalizeUserRow({ ...(profile as any), id: uid });
+
+      // 4. HARDCODE A SAFETY CHECK: If email === 'spoilmevintagediy@gmail.com', force isAdmin = true
+      if (normalizedEmail === 'spoilmevintagediy@gmail.com') {
+        loggedInUser.isAdmin = true;
+      }
+
       // Check if account is marked for deletion
       if (loggedInUser.isActive === false) {
-        return false; // Prevent login for inactive accounts
+        setAuthErrorMessage('Account is deactivated.');
+        return false;
       }
+
       setUser(loggedInUser);
       persistUser(loggedInUser);
       sendUserDataToServiceWorker(loggedInUser);
       return true;
+
+    } catch (err: any) {
+      console.warn('Login error:', err);
+      setAuthErrorMessage(err?.message || String(err));
+      return false;
     }
-    return false;
   };
 
   const register = async (userData: Partial<User>) => {
@@ -605,8 +699,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } as User;
 
       try {
-          if (!isDemoMode && db) {
-              await setDoc(doc(db, 'users', newUser.id), sanitizeFirestoreData(newUser));
+          if (!isDemoMode) {
+              // If a password is provided, create Supabase Auth user first
+              if ((userData as any).password && userData.email) {
+                  const { data, error } = await supabase.auth.signUp({ email: userData.email!, password: (userData as any).password });
+                  if (error) {
+                      console.warn('Supabase signUp failed:', error.message);
+                  } else if (data?.user) {
+                      newUser.id = data.user.id;
+                  }
+              }
+              // Upsert into users table
+              await supabase.from('users').upsert([sanitizeFirestoreData(newUser)]);
           }
           setUser(newUser);
           persistUser(newUser);
@@ -622,15 +726,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const logout = () => {
     setUser(INITIAL_USER);
     localStorage.removeItem('spv_active_user');
+    try { supabase.auth.signOut(); } catch (e) { /* ignore */ }
   };
 
   const updateUserAddress = async (address: ShippingAddress) => {
       const updatedUser = { ...user, shippingAddress: address };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if (!isDemoMode && db && user.id !== 'guest') {
+      if (!isDemoMode && user.id !== 'guest') {
           try {
-              await updateDoc(doc(db, 'users', user.id), { shippingAddress: address });
+              await supabase.from('users').update({ shippingAddress: address }).eq('id', user.id);
           } catch (e) {
               console.error("Error saving address to DB", e);
           }
@@ -638,8 +743,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const seedTestUsers = async () => {
-      if (isDemoMode || !db) {
-          alert("Database not connected. Cannot seed users.");
+      if (isDemoMode) {
+          alert("Cannot seed users in Demo Mode.");
           return;
       }
       const usersToCreate: User[] = [
@@ -650,7 +755,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       ];
       try {
           for (const u of usersToCreate) {
-              await setDoc(doc(db, 'users', u.id), sanitizeFirestoreData(u));
+              try {
+                const { error } = await supabase.from('users').upsert([sanitizeFirestoreData(u)]);
+                if (error) throw error;
+              } catch (err) {
+                console.error('Failed to upsert test user into Supabase:', err);
+              }
           }
           alert("Test Users Created!");
       } catch (error) {
@@ -659,19 +769,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   useEffect(() => {
-    console.log('Loading products, isDemoMode:', isDemoMode, 'db:', !!db);
-    if (isDemoMode) {
+    console.log('Loading products, isDemoMode:', isDemoMode, 'isSupabaseConfigured:', isSupabaseConfigured);
+      console.log('Loading products, isDemoMode:', isDemoMode, 'isSupabaseConfigured:', isSupabaseConfigured);
+    if (isDemoMode || !isSupabaseConfigured) {
+      // If Supabase isn't configured, fall back to local storage/demo data so the app still works in dev without env vars
+      setDataSource(isDemoMode ? 'demo' : 'local');
+      if (!isSupabaseConfigured) setDbConnectionError('Supabase not configured; running with local/demo data. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable Supabase.');
       const localProds = localStorage.getItem('spv_products');
-      // If no local products found, seed with INITIAL_PRODUCTS so admin has data to work with in Demo Mode
       const parsedProds = localProds ? JSON.parse(localProds) : INITIAL_PRODUCTS;
-      const publishedProds = parsedProds.filter((p: Product) => p.status === 'published');
+      const publishedProds = (parsedProds as any[]).filter((p: any) => p.status === 'published');
       setProducts(publishedProds);
       const localCats = localStorage.getItem('spv_categories');
-      // If no local categories found, seed with INITIAL_CATEGORIES to populate dropdowns
       setCategories(localCats ? JSON.parse(localCats) : INITIAL_CATEGORIES);
-      // Persist seeded demo data back to localStorage for persistence across reloads
-      try { localStorage.setItem('spv_products', JSON.stringify(parsedProds)); } catch(_) {}
-      try { localStorage.setItem('spv_categories', JSON.stringify(localCats ? JSON.parse(localCats) : INITIAL_CATEGORIES)); } catch(_) {}
       const localVouchers = localStorage.getItem('spv_vouchers');
       if (localVouchers) setVouchers(JSON.parse(localVouchers));
       const localOrders = localStorage.getItem('spv_orders');
@@ -689,142 +798,290 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, 5000);
 
     try {
-      const qProducts = query(collection(db!, "products"), where('status', '==', 'published'), orderBy("createdAt", "desc"));
       const imageURLCache = new Map<string, string>();
       const normalizeImage = async (img: any): Promise<string | null> => {
           if (!img) return null;
           if (typeof img === 'string') {
               if (img.startsWith('http') || img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('/')) return img;
-              if (img.startsWith('gs://')) {
-                  try {
-                      const gsMatch = img.match(/^gs:\/\/([^/]+)\/(.+)$/);
-                      if (gsMatch) {
+                    if (img.startsWith('gs://')) {
+                      // Convert gs:// Firebase Storage references to a public Firebase download URL
+                      try {
+                        const gsMatch = img.match(/^gs:\/\/([^/]+)\/(.+)$/);
+                        if (gsMatch) {
                           const bucket = gsMatch[1];
                           const path = gsMatch[2];
-                          if (imageURLCache.has(img)) return imageURLCache.get(img)!;
-                          if (bucket === 'spoilme-edee0.firebasestorage.app' || bucket === 'spoilme-edee0.appspot.com') {
-                              if (storage) {
-                                  const url = await getDownloadURL(sRef(storage, decodeURIComponent(path)));
-                                  imageURLCache.set(img, url);
-                                  return url;
-                              }
-                          } else {
-                              // Different bucket
-                              if (app) {
-                                  const tempStorage = getStorage(app, `gs://${bucket}`);
-                                  const url = await getDownloadURL(sRef(tempStorage, decodeURIComponent(path)));
-                                  imageURLCache.set(img, url);
-                                  return url;
-                              }
-                          }
+                          const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media`;
+                          imageURLCache.set(img, url);
+                          return url;
+                        }
+                      } catch (err) {
+                        console.error('Failed to convert gs:// URL to a public URL', img, err);
+                        return null;
                       }
-                  } catch (err) {
-                      console.error('Failed to convert gs:// URL to downloadURL', img, err);
-                      return null;
-                  }
               }
-              // If it's a path-like string (e.g., 'products/..jpg') try to resolve
-              if (!img.startsWith('http') && storage) {
+                // If it's a path-like string (e.g., 'products/..jpg') try to resolve via Supabase Storage
+                if (!img.startsWith('http')) {
                   try {
-                      if (imageURLCache.has(img)) return imageURLCache.get(img)!;
-                      const url = await getDownloadURL(sRef(storage, img));
-                      imageURLCache.set(img, url);
-                      return url;
+                    if (imageURLCache.has(img)) return imageURLCache.get(img)!;
+                    const bucketsToTry = ['public', 'products', 'images', 'spoilme'];
+                    for (const b of bucketsToTry) {
+                      try {
+                        const { data } = supabase.storage.from(b).getPublicUrl(img);
+                        if (data && (data as any).publicUrl) {
+                          imageURLCache.set(img, (data as any).publicUrl);
+                          return (data as any).publicUrl;
+                        }
+                      } catch (_) { /* ignore and try next */ }
+                    }
                   } catch (err) {
-                      // Not a storage path - leave as-is
+                    // Not a storage path - leave as-is
                   }
-              }
+                }
               return img;
           } else if (typeof img === 'object') {
-              if (img.fullPath) {
+                if (img.fullPath || img.path) {
                   try {
-                      const key = img.fullPath + '::fullPath';
-                      if (imageURLCache.has(key)) return imageURLCache.get(key)!;
-                      if (storage) {
-                          const url = await getDownloadURL(sRef(storage, img.fullPath));
-                          imageURLCache.set(key, url);
-                          return url;
-                      }
+                    const path = img.fullPath || img.path;
+                    const key = path + '::path';
+                    if (imageURLCache.has(key)) return imageURLCache.get(key)!;
+                    const bucketsToTry = ['public', 'products', 'images', 'spoilme'];
+                    for (const b of bucketsToTry) {
+                      try {
+                        const { data } = supabase.storage.from(b).getPublicUrl(path);
+                        if (data && (data as any).publicUrl) {
+                          imageURLCache.set(key, (data as any).publicUrl);
+                          return (data as any).publicUrl;
+                        }
+                      } catch (_) { /* ignore */ }
+                    }
                   } catch (err) {
-                      console.error('Failed to convert storage object fullPath to downloadURL', img, err);
-                      return null;
+                    console.error('Failed to convert storage object path to public URL', img, err);
+                    return null;
                   }
-              }
-              if (img.path) {
-                  try {
-                      const key = img.path + '::path';
-                      if (imageURLCache.has(key)) return imageURLCache.get(key)!;
-                      if (storage) {
-                          const url = await getDownloadURL(sRef(storage, img.path));
-                          imageURLCache.set(key, url);
-                          return url;
-                      }
-                  } catch (err) {
-                      console.error('Failed to convert storage object path to downloadURL', img, err);
-                      return null;
-                  }
-              }
+                }
           }
           return null;
       };
 
-      const unsubProducts = onSnapshot(qProducts, async (snapshot) => {
-          console.log('Firestore snapshot received, docs count:', snapshot.docs.length);
-          clearTimeout(safetyTimeout);
-          const productData = await Promise.all(snapshot.docs.map(async docSnap => {
-              const raw = { ...sanitizeFirestoreData(docSnap.data()), id: docSnap.id } as Product;
-              console.log('Raw product:', raw.id, 'images:', raw.images);
+      const parseMaybeJson = (value: any) => {
+        if (typeof value !== 'string') return value;
+        const s = value.trim();
+        if (!s) return value;
+        const looksJson = (s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'));
+        if (!looksJson) return value;
+        try {
+          return JSON.parse(s);
+        } catch {
+          return value;
+        }
+      };
+
+      const coalesce = <T,>(...values: T[]) => {
+        for (const v of values) {
+          // keep 0/false, but ignore null/undefined/empty string
+          if (v !== null && v !== undefined && (typeof v !== 'string' || v.trim() !== '')) return v;
+        }
+        return undefined;
+      };
+
+      const normalizeProductRow = async (row: any): Promise<Product> => {
+        // Normalize snake_case keys from Supabase to camelCase (best-effort)
+        const normalized: any = {};
+        Object.entries(row || {}).forEach(([k, v]) => {
+          const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+          normalized[camel] = v;
+        });
+
+        // Parse JSON-ish fields
+        normalized.options = parseMaybeJson(normalized.options);
+        const options = (normalized.options && typeof normalized.options === 'object' && !Array.isArray(normalized.options))
+          ? normalized.options
+          : {};
+
+        // Fix common field mismatches / aliases
+        normalized.id = coalesce(normalized.id, row?.id) as any;
+        normalized.code = coalesce(normalized.code, normalized.sku, row?.sku, row?.code, options?.sku, options?.code) as any;
+
+        // USD naming mismatch (app expects priceUSD etc.)
+        const priceUSD = coalesce(normalized.priceUSD, normalized.priceUsd, row?.price_usd, row?.priceUSD, options?.priceUSD, options?.priceUsd);
+        if (priceUSD !== undefined) normalized.priceUSD = typeof priceUSD === 'number' ? priceUSD : parseFloat(String(priceUSD)) || 0;
+
+        const compareAtPriceUSD = coalesce(
+          normalized.compareAtPriceUSD,
+          normalized.compareAtPriceUsd,
+          row?.compare_at_price_usd,
+          row?.compareAtPriceUSD,
+          options?.compareAtPriceUSD,
+          options?.compareAtPriceUsd
+        );
+        if (compareAtPriceUSD !== undefined) normalized.compareAtPriceUSD = typeof compareAtPriceUSD === 'number' ? compareAtPriceUSD : parseFloat(String(compareAtPriceUSD)) || 0;
+
+        const memberPriceUSD = coalesce(
+          normalized.memberPriceUSD,
+          normalized.memberPriceUsd,
+          row?.member_price_usd,
+          row?.memberPriceUSD,
+          options?.memberPriceUSD,
+          options?.memberPriceUsd
+        );
+        if (memberPriceUSD !== undefined) normalized.memberPriceUSD = typeof memberPriceUSD === 'number' ? memberPriceUSD : parseFloat(String(memberPriceUSD)) || 0;
+
+        // Merge key display fields from options JSON if missing
+        if (!normalized.type && options?.type) normalized.type = options.type;
+        if ((!normalized.colors || (Array.isArray(normalized.colors) && normalized.colors.length === 0)) && options?.colors) normalized.colors = options.colors;
+        if ((!normalized.tags || (Array.isArray(normalized.tags) && normalized.tags.length === 0)) && options?.tags) normalized.tags = options.tags;
+        if (!normalized.material && options?.material) normalized.material = options.material;
+        if (!normalized.description && options?.description) normalized.description = options.description;
+        if (!normalized.name && options?.name) normalized.name = options.name;
+
+        // createdAt / updatedAt
+        if (!normalized.createdAt && row?.created_at) {
+          try {
+            normalized.createdAt = typeof row.created_at === 'string'
+              ? row.created_at
+              : row.created_at?.toISOString
+                ? row.created_at.toISOString()
+                : String(row.created_at);
+          } catch {
+            normalized.createdAt = String(row.created_at);
+          }
+        }
+        if (!normalized.updatedAt && row?.updated_at) {
+          try {
+            normalized.updatedAt = typeof row.updated_at === 'string'
+              ? row.updated_at
+              : row.updated_at?.toISOString
+                ? row.updated_at.toISOString()
+                : String(row.updated_at);
+          } catch {
+            normalized.updatedAt = String(row.updated_at);
+          }
+        }
+
+        // Ensure arrays exist (and parse if stored as JSON string)
+        const imagesParsed = parseMaybeJson(normalized.images);
+        normalized.images = Array.isArray(imagesParsed) ? imagesParsed : (imagesParsed ? [imagesParsed] : []);
+        const tagsParsed = parseMaybeJson(normalized.tags);
+        normalized.tags = Array.isArray(tagsParsed) ? tagsParsed : (tagsParsed ? [tagsParsed] : []);
+        const colorsParsed = parseMaybeJson(normalized.colors);
+        normalized.colors = Array.isArray(colorsParsed) ? colorsParsed : (colorsParsed ? [colorsParsed] : []);
+        const seoParsed = parseMaybeJson(normalized.seoKeywords);
+        normalized.seoKeywords = Array.isArray(seoParsed) ? seoParsed : (seoParsed ? [seoParsed] : []);
+
+        const reviewsParsed = parseMaybeJson(normalized.reviews);
+        normalized.reviews = Array.isArray(reviewsParsed) ? reviewsParsed : (reviewsParsed ? [reviewsParsed] : []);
+
+        // Resolve any storage URLs (gs:// or storage paths)
+        try {
+          if (normalized.images && Array.isArray(normalized.images)) {
+            const resolved = await Promise.all(normalized.images.map(async (img: any) => await normalizeImage(img)));
+            normalized.images = resolved.filter(Boolean) as string[];
+          }
+        } catch (err) {
+          console.error('Failed resolving product images for', normalized.id || row?.id, err);
+        }
+
+        return normalized as Product;
+      };
+
+      // Fetch products, categories, and orders from Supabase
+      const fetchAll = async () => {
+        try {
+          const { data: prodData, error: prodErr } = await supabase.from('products').select('*').eq('status', 'published').order('created_at', { ascending: false });
+          
+          // --- DEBUGGING START ---
+          console.log("🔥 SUPABASE ERROR:", prodErr);
+          console.log("✅ SUPABASE DATA:", prodData);
+          // --- DEBUGGING END ---
+          
+          if (!prodErr && prodData) {
+            const productData = await Promise.all((prodData as any[]).map(async (row) => await normalizeProductRow(row)));
+            console.log('Loaded products from Supabase:', productData.length);
+            setDataSource('supabase');
+            if (productData.length === 0) {
               try {
-                  if (raw.images && Array.isArray(raw.images)) {
-                      const resolved = await Promise.all(raw.images.map(async (img) => await normalizeImage(img)));
-                      raw.images = resolved.filter(Boolean) as string[];
-                      console.log('Resolved images for', raw.id, ':', raw.images);
-                  }
+                const { data: anyProducts } = await supabase.from('products').select('*').limit(5);
+                console.warn('No published products found — sample rows from products table:', anyProducts);
               } catch (err) {
-                  console.error('Failed resolving product images for', raw.id, err);
+                console.warn('Failed to fetch sample products for debug:', err);
               }
-              return raw;
-          }));
-          setProducts(productData);
-          console.log('Loaded products and resolved images (first 5):', productData.slice(0,5).map(p => ({ id: p.id, images: p.images })));
-        },
-        (error) => {
-            console.log('Firestore products error:', error);
-            console.error('Detailed Firestore products error:', {
-                message: error.message,
-                code: error.code,
-                stack: error.stack,
-                name: error.name
-            });
-            clearTimeout(safetyTimeout);
-            setDbConnectionError(error.message);
-            // setIsDemoMode(true); // Temporarily disabled
-            setIsLoading(false);
-        }
-      );
+            }
+            setProducts(productData);
+          }
+            else if (prodErr && String(prodErr?.message || prodErr?.code || '').toLowerCase().includes('permission')) {
+            // fallback to server endpoint that uses the service role key
+            try {
+              const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+              const apiBase = isLocal ? `http://${window.location.hostname}:3001/api` : (process.env.REACT_APP_API_URL || '/api');
+              const resp = await fetch(`${apiBase}/products?limit=100`);
+                if (resp.ok) {
+                  const j = await resp.json();
+                  const fromServer = Array.isArray(j.products) ? j.products : [];
+                  const productData = await Promise.all((fromServer as any[]).map(async (row) => await normalizeProductRow(row)));
+                  console.log('Loaded products from server endpoint:', productData.length);
+                  setDataSource('supabase');
+                  setProducts(productData);
+                }
+              } catch (err2) {
+                console.warn('Fallback to /api/products failed:', err2);
+              }
+            }
 
-      const unsubCategories = onSnapshot(collection(db!, "categories"), (snapshot) => {
-          console.log('Categories snapshot received, docs count:', snapshot.docs.length);
-          const categoryData = snapshot.docs.map(doc => ({ ...sanitizeFirestoreData(doc.data()), id: doc.id } as Category));
-          setCategories(categoryData);
-        }, (error) => {
-            console.log('Firestore categories error:', error);
-        }
-      );
+          const { data: catData, error: catErr } = await supabase.from('categories').select('*').order('created_at', { ascending: false });
+          if (!catErr && catData && catData.length > 0) {
+            const mappedCats = await Promise.all((catData as any[]).map(async (row) => {
+              const normalized: any = {};
+              Object.entries(row).forEach(([k, v]) => {
+                const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+                normalized[camel] = v;
+              });
+              // Resolve image if needed
+              try {
+                if (normalized.image) {
+                  const resolved = await normalizeImage(normalized.image);
+                  if (resolved) normalized.image = resolved;
+                }
+              } catch (err) {
+                // ignore
+              }
+              return normalized as Category;
+            }));
+            setCategories(mappedCats);
+          } else {
+            // Fallback to initial categories if none found in Supabase
+            setCategories(INITIAL_CATEGORIES);
+          }
 
-      const qOrders = user.isAdmin
-            ? query(collection(db!, 'orders'), orderBy('date', 'desc'))
-            : query(collection(db!, 'orders'), where('customerEmail', '==', user.email), orderBy('date', 'desc'));
-      const unsubOrders = onSnapshot(qOrders, (snapshot) => {
-          console.log('Orders snapshot received, docs count:', snapshot.docs.length);
-          const orderData = snapshot.docs.map(doc => ({ ...sanitizeFirestoreData(doc.data()), id: doc.id } as Order));
-          setOrders(orderData);
+          // Orders: admins see all, customers see their orders
+          if (user?.isAdmin) {
+            const { data: ordersData } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+            if (ordersData) setOrders(ordersData as Order[]);
+          } else if (user?.email) {
+            const { data: ordersData } = await supabase.from('orders').select('*').eq('customer_email', user.email).order('created_at', { ascending: false });
+            if (ordersData) setOrders(ordersData as Order[]);
+          }
+
+          clearTimeout(safetyTimeout);
           setIsLoading(false);
-      }, () => {
-          setIsLoading(false);
-      });
+        } catch (err) {
+          console.warn('Supabase fetch failed, falling back to Firestore where available:', err);
+        }
+      };
 
-      return () => { clearTimeout(safetyTimeout); unsubProducts(); unsubCategories(); unsubOrders(); };
+      // Only fetch if Supabase is configured to avoid proxy errors
+      if (isSupabaseConfigured) {
+        fetchAll();
+
+        // Realtime subscriptions (best-effort). Subscribe to products, categories, orders changes.
+        const prodChan = supabase.channel('public:products').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchAll()).subscribe();
+        const catChan = supabase.channel('public:categories').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchAll()).subscribe();
+        const ordersChan = supabase.channel('public:orders').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchAll()).subscribe();
+
+        return () => { clearTimeout(safetyTimeout); try { prodChan.unsubscribe(); } catch(_){} try { catChan.unsubscribe(); } catch(_){} try { ordersChan.unsubscribe(); } catch(_){} };
+      } else {
+        // When Supabase isn't configured we don't set up realtime channels
+        return () => { clearTimeout(safetyTimeout); };
+      }
     } catch (error) {
       console.log('Try-catch error in products useEffect:', error);
       clearTimeout(safetyTimeout);
@@ -924,7 +1181,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const applicationData = {
           userId: user.id,
           status: 'pending',
-          appliedAt: serverTimestamp(),
+          appliedAt: new Date().toISOString(),
           autoApproveAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
           userEmail: user.email,
           userName: `${data.name} ${data.surname}`,
@@ -933,11 +1190,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           socials: data.socials
       };
 
-      if (!isDemoMode && db) {
+      if (!isDemoMode) {
           try {
-              await addDoc(collection(db, 'affiliate_applications'), applicationData);
+              await supabase.from('affiliate_applications').insert([applicationData]);
           } catch (error) {
-              console.error('Error submitting affiliate application:', error);
+              console.error('Error submitting affiliate application to Supabase:', error);
               throw error;
           }
       }
@@ -973,15 +1230,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if (!isDemoMode && db && user.id !== 'guest') {
-          await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      if (!isDemoMode && user.id !== 'guest') {
+          await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
       }
   };
 
   const approveAffiliate = async (userId: string, note?: string) => {
-      if (isDemoMode || !db) return;
-      const userRef = doc(db, 'users', userId);
-
+      if (isDemoMode) return;
       const notification: Notification = {
           id: `aff_status_${Date.now()}`,
           type: 'affiliate_msg',
@@ -991,18 +1246,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           isRead: false
       };
 
-      await updateDoc(userRef, {
-          'affiliateStats.status': 'approved',
-          'affiliateStats.commissionRate': 10,
-          'affiliateStats.adminNote': note || '',
-          notifications: arrayUnion(notification)
-      });
+      try {
+        const { data: u } = await supabase.from('users').select('notifications').eq('id', userId).maybeSingle();
+        const existing = (u && (u as any).notifications) || [];
+        await supabase.from('users').update({ affiliateStats: { status: 'approved', commissionRate: 10, adminNote: note || '' }, notifications: [notification, ...existing] }).eq('id', userId);
+        await pushToIndividual(userId, notification.title, notification.message, '/#/affiliate-program');
+      } catch (err) {
+        console.error('approveAffiliate failed:', err);
+      }
   };
 
   const rejectAffiliate = async (userId: string, note?: string) => {
-      if (isDemoMode || !db) return;
-      const userRef = doc(db, 'users', userId);
-
+      if (isDemoMode) return;
       const notification: Notification = {
           id: `aff_status_${Date.now()}`,
           type: 'affiliate_msg',
@@ -1011,16 +1266,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           date: new Date().toISOString(),
           isRead: false
       };
-
-      await updateDoc(userRef, {
-          'affiliateStats.status': 'rejected',
-          'affiliateStats.adminNote': note || '',
-          notifications: arrayUnion(notification)
-      });
+      try {
+        const { data: u } = await supabase.from('users').select('notifications').eq('id', userId).maybeSingle();
+        const existing = (u && (u as any).notifications) || [];
+        await supabase.from('users').update({ affiliateStats: { status: 'rejected', adminNote: note || '' }, notifications: [notification, ...existing] }).eq('id', userId);
+        await pushToIndividual(userId, notification.title, notification.message, '/#/notifications');
+      } catch (err) {
+        console.error('rejectAffiliate failed:', err);
+      }
   };
 
   const sendAffiliateMessage = async (userId: string, message: string) => {
-      if (isDemoMode || !db) return;
+      if (isDemoMode) return;
       const notification: Notification = {
           id: `aff_msg_${Date.now()}`,
           type: 'affiliate_msg',
@@ -1029,36 +1286,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           date: new Date().toISOString(),
           isRead: false
       };
-      const userSnap = await getDocs(query(collection(db, 'users'), where('id', '==', userId)));
-      if(!userSnap.empty) {
-          await updateDoc(userSnap.docs[0].ref, { notifications: [notification, ...userSnap.docs[0].data().notifications] });
-      }
+      await appendNotificationToUser(userId, notification);
+      await pushToIndividual(userId, notification.title, notification.message, '/#/notifications');
   };
 
   const updateAffiliateTier = async (userId: string, newRate: number) => {
       if (isDemoMode) return;
-      if (!db) return;
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-          'affiliateStats.commissionRate': newRate
-      });
+      await updateUserFields(userId, { affiliateStats: { ...(user.affiliateStats || {}), commissionRate: newRate } as any });
   };
 
   const assignAffiliateParent = async (childId: string, parentId: string) => {
       if (isDemoMode) return;
-      if (!db) return;
-      const userRef = doc(db, 'users', childId);
-      await updateDoc(userRef, {
-          'affiliateStats.parentId': parentId
-      });
+      await updateUserFields(childId, { affiliateStats: { ...(user.affiliateStats || {}), parentId } as any });
   };
 
   const buyAffiliateContent = async () => {
       const updatedUser: User = { ...user, affiliateStats: { ...(user.affiliateStats as AffiliateStats), hasContentAccess: true } };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if (!isDemoMode && db && user.id !== 'guest') {
-          await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      if (!isDemoMode && user.id !== 'guest') {
+          await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
       }
   };
 
@@ -1066,25 +1313,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const updatedUser: User = { ...user, affiliateStats: { ...(user.affiliateStats as AffiliateStats), isElite: true } };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if (!isDemoMode && db && user.id !== 'guest') {
-          await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      if (!isDemoMode && user.id !== 'guest') {
+          await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
       }
   };
 
   const simulateAffiliateSale = async (code: string, amount: number): Promise<{ success: boolean; message: string }> => {
-      if (!db && !isDemoMode) return { success: false, message: "Database not ready" };
+      if (!isDemoMode && !supabase) return { success: false, message: "Database not ready" };
       let targetUser: User | null = null;
-      let targetUserRef = null;
 
       if (isDemoMode) {
           if (user.affiliateCode === code) targetUser = user;
           else return { success: false, message: "In Demo Mode, only your own code works." };
       } else {
-          const q = query(collection(db!, 'users'), where('affiliateCode', '==', code));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-              targetUser = { ...snap.docs[0].data(), id: snap.docs[0].id } as User;
-              targetUserRef = snap.docs[0].ref;
+          const { data: found, error } = await supabase.from('users').select('*').eq('affiliateCode', code).limit(1).maybeSingle();
+          if (found && !error) {
+            targetUser = found as User;
           }
       }
 
@@ -1108,44 +1352,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       if (isDemoMode) {
           setUser({ ...targetUser, affiliateStats: newStats });
-      } else if (targetUserRef) {
+      } else {
           const notif: Notification = { id: `sale_${Date.now()}`, type: 'system', title: 'New Partnership Sale!', message: `You earned R${commission.toFixed(2)} commission!`, date: new Date().toISOString(), isRead: false };
-          await updateDoc(targetUserRef, { affiliateStats: newStats, notifications: [notif, ...(targetUser.notifications || [])] });
-
-          // --- PARENT COMMISSION LOGIC (1%) ---
-          if (stats.parentId) {
-              try {
-                  const parentRef = doc(db, 'users', stats.parentId);
-                  const parentDoc = await getDoc(parentRef);
-                  if (parentDoc.exists()) {
-                      const parentData = parentDoc.data() as User;
-                      const currentParentStats = parentData.affiliateStats || { status: 'approved', totalSalesCount: 0, totalSalesValue: 0, commissionRate: 10, balance: 0, recurringBalance: 0 };
-
-                      const parentCommission = amount * 0.01; // 1% of sale amount
-
-                      const newParentStats = {
-                          ...currentParentStats,
-                          balance: (currentParentStats.balance || 0) + parentCommission
-                      };
-
-                      const parentNotif: Notification = {
-                          id: `sub_sale_${Date.now()}`,
-                          type: 'system',
-                          title: 'Downline Sale Bonus',
-                          message: `You earned R${parentCommission.toFixed(2)} from a recruit's sale!`,
-                          date: new Date().toISOString(),
-                          isRead: false
-                      };
-
-                      await updateDoc(parentRef, {
-                          affiliateStats: newParentStats,
-                          notifications: [parentNotif, ...(parentData.notifications || [])]
-                      });
-                  }
-              } catch (err) {
-                  console.error("Failed to process parent commission", err);
-              }
+          try {
+            await supabase.from('users').update({ affiliateStats: newStats, notifications: [notif, ...(targetUser.notifications || [])] }).eq('id', targetUser.id);
+          } catch (err) {
+            console.error('Failed to update affiliate user after sale:', err);
           }
+
+          // Parent commission logic (if applicable) handled in processAffiliateCommissions or via the parent update routines.
       }
       return { success: true, message: `Sale simulated! Added R${commission.toFixed(2)}.` };
   };
@@ -1159,51 +1374,50 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }
           return;
       }
-      if (!db) return;
       if (user.id === userId) {
            const updated = { ...user, loyaltyPoints: user.loyaltyPoints + points };
            setUser(updated);
            persistUser(updated);
-           await updateDoc(doc(db, 'users', userId), { loyaltyPoints: updated.loyaltyPoints });
+           await supabase.from('users').update({ loyaltyPoints: updated.loyaltyPoints }).eq('id', userId);
       } else {
-           const snap = await getDocs(query(collection(db, 'users'), where('id', '==', userId)));
-           if (!snap.empty) {
-               await updateDoc(snap.docs[0].ref, { loyaltyPoints: (snap.docs[0].data().loyaltyPoints || 0) + points });
+           try {
+             const { data: target } = await supabase.from('users').select('loyaltyPoints').eq('id', userId).maybeSingle();
+             const newPoints = ((target && (target as any).loyaltyPoints) || 0) + points;
+             await supabase.from('users').update({ loyaltyPoints: newPoints }).eq('id', userId);
+           } catch (err) {
+             console.error('adminAdjustPoints failed:', err);
            }
       }
   };
 
   const getAllUsers = async (): Promise<User[]> => {
-      if (isDemoMode || !db) return [];
-      const snapshot = await getDocs(query(collection(db, 'users')));
-      // IMPORTANT: Sanitize raw Firestore data to prevent circular JSON errors
-      return snapshot.docs.map(d => ({ ...sanitizeFirestoreData(d.data()), id: d.id } as User));
+      if (isDemoMode) return [];
+      try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) throw error;
+        return (data || []).map(d => sanitizeFirestoreData(d) as User);
+      } catch (err) {
+        console.error('getAllUsers failed:', err);
+        return [];
+      }
   };
 
   // Ensure the client has a fresh ID token with admin claims (if available).
   const ensureAdminToken = async () => {
-    if (!auth) return; // FIX: Ensure auth object exists
+    // Supabase uses session tokens managed by the client. No special admin token refresh required here.
     try {
-      const current = auth.currentUser;
-      if (current) {
-        // Force refresh token so recent custom claims are present
-        await current.getIdToken(true);
-        console.log('ensureAdminToken: refreshed existing user token');
-        return;
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        console.log('ensureAdminToken: session active');
       }
-      // No current user - attempt to sign in with the known admin creds (best-effort)
-      await signInWithEmailAndPassword(auth, 'spoilmevintagediy@gmail.com', 'admin@spoilme');
-      if (auth.currentUser) await auth.currentUser.getIdToken(true);
-      console.log('ensureAdminToken: signed in as admin and refreshed token');
     } catch (e) {
-      console.warn('ensureAdminToken failed:', e);
-      // Do not throw; write flow will handle fallback
+      console.warn('ensureAdminToken check failed:', e);
     }
   };
 
-  // Sync any locally-saved products to Firestore when admin is available.
+  // Sync any locally-saved products to Supabase when available.
   const syncLocalProducts = async () => {
-    if (!db || !auth) return;
+    if (isDemoMode) return;
     try {
       const local = localStorage.getItem('spv_products');
       if (!local) return;
@@ -1213,7 +1427,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       for (const p of parsed) {
         try {
           const safe = sanitizeFirestoreData(p);
-          await setDoc(doc(db, 'products', safe.id), safe);
+          try {
+            const { error } = await supabase.from('products').upsert([safe]);
+            if (error) throw error;
+            console.log('syncLocalProducts: pushed product to Supabase', safe.id);
+          } catch (err) {
+            console.warn('syncLocalProducts: Supabase push failed, saving back to local storage instead:', err);
+            try {
+              const existing = JSON.parse(localStorage.getItem('spv_products') || '[]');
+              localStorage.setItem('spv_products', JSON.stringify([safe, ...existing]));
+            } catch (_) {}
+          }
           console.log('syncLocalProducts: pushed product', safe.id);
         } catch (err) {
           console.warn('syncLocalProducts: failed to push product', p.id, err);
@@ -1233,19 +1457,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const newProducts = [safeProduct, ...products];
       setProducts(newProducts);
 
-      if (!isDemoMode && db) {
+      if (!isDemoMode && isSupabaseConfigured) {
         // --- Simplified, guaranteed-write flow ---
         try {
-          // Force refresh token immediately before write to ensure custom claims are fresh
-          if (auth && auth.currentUser) {
-            await auth.currentUser.getIdToken(true);
-            console.log('Forced fresh ID token before write.');
-          }
 
           // >>> DEBUG LOG <<<
           console.log("DEBUG: Final Product Data to Firestore (Add):", JSON.stringify(safeProduct, null, 2));
 
-          await setDoc(doc(db, "products", safeProduct.id), safeProduct);
+          try {
+            const { error } = await supabase.from('products').upsert([safeProduct]);
+            if (error) throw error;
+            setDbConnectionError(null);
+          } catch (err) {
+            console.warn('Supabase addProduct failed, saving to local storage instead:', err);
+            try {
+              const existing = JSON.parse(localStorage.getItem('spv_products') || '[]');
+              localStorage.setItem('spv_products', JSON.stringify([safeProduct, ...existing]));
+            } catch (_) {}
+          }
           setDbConnectionError(null); // Clear any old error
         } catch (err: any) {
           console.error('CRITICAL FIRESTORE ERROR (addProduct):', err, 'Product:', safeProduct);
@@ -1276,19 +1505,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
      const updated = products.map(p => p.id === safeProduct.id ? safeProduct : p);
      setProducts(updated);
 
-     if (!isDemoMode && db) {
+    if (!isDemoMode && isSupabaseConfigured) {
        try {
-         // Force refresh token immediately before write
-         if (auth && auth.currentUser) {
-           await auth.currentUser.getIdToken(true);
-           console.log('Forced fresh ID token before write.');
-         }
 
          // >>> DEBUG LOG <<<
          console.log("DEBUG: Final Product Data to Firestore (Update):", JSON.stringify(safeProduct, null, 2));
 
-         await setDoc(doc(db, "products", safeProduct.id), safeProduct);
-         setDbConnectionError(null);
+         try {
+           const { error } = await supabase.from('products').update(safeProduct).eq('id', safeProduct.id);
+           if (error) throw error;
+           setDbConnectionError(null);
+         } catch (err) {
+           console.warn('Supabase updateProduct failed, saving to local storage instead:', err);
+           try {
+             const existing = JSON.parse(localStorage.getItem('spv_products') || '[]');
+             const updated = existing.map((p: any) => p.id === safeProduct.id ? safeProduct : p);
+             localStorage.setItem('spv_products', JSON.stringify(updated));
+           } catch (_) {}
+         }
        } catch (err: any) {
          console.error('CRITICAL FIRESTORE ERROR (updateProduct):', err, 'Product:', safeProduct);
          try {
@@ -1316,16 +1550,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const updated = products.filter(p => p.id !== productId);
     setProducts(updated);
 
-    if (!isDemoMode && db) {
+    if (!isDemoMode && isSupabaseConfigured) {
       try {
-        // Force refresh token immediately before delete
-        if (auth && auth.currentUser) {
-          await auth.currentUser.getIdToken(true);
-          console.log('Forced fresh ID token before write.');
-        }
 
-        console.log("DEBUG: Final Product Delete to Firestore:", productId);
-        await deleteDoc(doc(db, "products", productId));
+        console.log("DEBUG: Final Product Delete to Supabase/Firestore:", productId);
+        try {
+          const { error } = await supabase.from('products').delete().eq('id', productId);
+          if (error) throw error;
+        } catch (err) {
+          console.warn('Supabase deleteProduct failed, removing from local storage instead:', err);
+          try {
+            const existing = JSON.parse(localStorage.getItem('spv_products') || '[]');
+            localStorage.setItem('spv_products', JSON.stringify(existing.filter((p: any) => p.id !== productId)));
+          } catch (_) {}
+        }
         setDbConnectionError(null);
       } catch (err: any) {
         console.error('CRITICAL FIRESTORE ERROR (deleteProduct):', err, 'productId:', productId);
@@ -1348,31 +1586,60 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const addOrder = async (order: Order) => {
     const safeOrder = sanitizeFirestoreData(order);
     setOrders(prev => [safeOrder, ...prev]);
-    if (!isDemoMode && db) {
-        await setDoc(doc(db, "orders", safeOrder.id), safeOrder);
+    if (!isDemoMode && isSupabaseConfigured) {
+        try {
+          const { error } = await supabase.from('orders').upsert([safeOrder]);
+          if (error) throw error;
+        } catch (err) {
+          console.error('Failed to addOrder to Supabase, saving to local storage instead:', err);
+          try { const existing = JSON.parse(localStorage.getItem('spv_orders') || '[]'); localStorage.setItem('spv_orders', JSON.stringify([safeOrder, ...existing])); } catch(_) {}
+        }
     }
   };
 
   const updateOrder = async (order: Order) => {
     const safeOrder = sanitizeFirestoreData(order);
     setOrders(prev => prev.map(o => o.id === safeOrder.id ? safeOrder : o));
-    if (!isDemoMode && db) {
-        await updateDoc(doc(db, "orders", safeOrder.id), safeOrder);
+    if (!isDemoMode && isSupabaseConfigured) {
+        try {
+          const { error } = await supabase.from('orders').update(safeOrder).eq('id', safeOrder.id);
+          if (error) throw error;
+        } catch (err) {
+          console.error('Failed to updateOrder in Supabase, saving to local storage instead:', err);
+          try {
+            const existing = JSON.parse(localStorage.getItem('spv_orders') || '[]'); 
+            const updated = existing.map((o: any) => o.id === safeOrder.id ? safeOrder : o);
+            localStorage.setItem('spv_orders', JSON.stringify(updated));
+          } catch (_) {}
+        }
     }
   };
 
   const deleteOrder = async (orderId: string) => {
     setOrders(prev => prev.filter(o => o.id !== orderId));
-    if (!isDemoMode && db) {
-        await deleteDoc(doc(db, "orders", orderId));
+    if (!isDemoMode && isSupabaseConfigured) {
+        try {
+          const { error } = await supabase.from('orders').delete().eq('id', orderId);
+          if (error) throw error;
+        } catch (err) {
+          console.error('Failed to deleteOrder in Supabase, removing from local storage instead:', err);
+          try { const existing = JSON.parse(localStorage.getItem('spv_orders') || '[]'); localStorage.setItem('spv_orders', JSON.stringify(existing.filter((o:any) => o.id !== orderId))); } catch(_) {}
+        }
     }
   };
 
   const addCategory = async (category: Category) => {
     const safeCat = sanitizeFirestoreData(category);
     setCategories(prev => [...prev, safeCat]);
-    if (!isDemoMode && db) {
-        await setDoc(doc(db, "categories", safeCat.id), safeCat);
+    if (!isDemoMode && isSupabaseConfigured) {
+        try {
+          // upsert into Supabase categories table
+          const { error } = await supabase.from('categories').upsert([safeCat]);
+          if (error) throw error;
+        } catch (err) {
+          console.error('Supabase addCategory error, saving to local storage instead:', err);
+          try { const existing = JSON.parse(localStorage.getItem('spv_categories') || '[]'); localStorage.setItem('spv_categories', JSON.stringify([safeCat, ...existing])); } catch(_) {}
+        }
     } else {
         localStorage.setItem('spv_categories', JSON.stringify([...categories, safeCat]));
     }
@@ -1381,8 +1648,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updateCategory = async (category: Category) => {
     const safeCat = sanitizeFirestoreData(category);
     setCategories(prev => prev.map(c => c.id === safeCat.id ? safeCat : c));
-    if (!isDemoMode && db) {
-        await setDoc(doc(db, "categories", safeCat.id), safeCat);
+    if (!isDemoMode && isSupabaseConfigured) {
+        try {
+          const { error } = await supabase.from('categories').update(safeCat).eq('id', safeCat.id);
+          if (error) throw error;
+        } catch (err) {
+          console.error('Supabase updateCategory error, saving to local storage instead:', err);
+          try { const existing = JSON.parse(localStorage.getItem('spv_categories') || '[]'); const updated = existing.map((c:any) => c.id === safeCat.id ? safeCat : c); localStorage.setItem('spv_categories', JSON.stringify(updated)); } catch(_) {}
+        }
     } else {
         const updated = categories.map(c => c.id === safeCat.id ? safeCat : c);
         localStorage.setItem('spv_categories', JSON.stringify(updated));
@@ -1391,8 +1664,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const deleteCategory = async (categoryId: string) => {
     setCategories(prev => prev.filter(c => c.id !== categoryId));
-    if (!isDemoMode && db) {
-        await deleteDoc(doc(db, "categories", categoryId));
+    if (!isDemoMode && isSupabaseConfigured) {
+        try {
+          const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+          if (error) throw error;
+        } catch (err) {
+          console.error('Supabase deleteCategory error, removing from local storage instead:', err);
+          try { const existing = JSON.parse(localStorage.getItem('spv_categories') || '[]'); localStorage.setItem('spv_categories', JSON.stringify(existing.filter((c:any) => c.id !== categoryId))); } catch(_) {}
+        }
     } else {
         const updated = categories.filter(c => c.id !== categoryId);
         localStorage.setItem('spv_categories', JSON.stringify(updated));
@@ -1489,8 +1768,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setUser(updatedUser);
     persistUser(updatedUser);
 
-    if (!isDemoMode && db && user.id !== 'guest') {
-        await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+    if (!isDemoMode && user.id !== 'guest') {
+        await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
     }
 
     return newOrder;
@@ -1514,8 +1793,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
        const updatedUser = { ...user, notifications: [notification, ...user.notifications] };
        setUser(updatedUser);
        persistUser(updatedUser);
-       if (!isDemoMode && db && user.id !== 'guest') {
-           await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+       if (!isDemoMode && user.id !== 'guest') {
+           await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
        }
   };
 
@@ -1530,14 +1809,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const updatedUser = { ...user, loyaltyPoints: user.loyaltyPoints + 100, notifications: user.notifications.filter(n => n.id !== notificationId) };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if(!isDemoMode && db) await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      if(!isDemoMode && user.id !== 'guest') await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
   };
 
   const shareProduct = async (productId: string) => {
       const updatedUser = { ...user, loyaltyPoints: user.loyaltyPoints + 50 };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if (!isDemoMode && db && user.id !== 'guest') await updateDoc(doc(db, 'users', user.id), { loyaltyPoints: updatedUser.loyaltyPoints });
+      if (!isDemoMode && user.id !== 'guest') await updateUserFields(user.id, { loyaltyPoints: updatedUser.loyaltyPoints });
   };
 
   const claimSocialReward = async (platform: 'tiktok' | 'twitter' | 'whatsapp' | 'facebook' | 'pinterest', handle?: string) => {
@@ -1552,7 +1831,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if(!isDemoMode && db) await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      if(!isDemoMode && user.id !== 'guest') await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
   };
 
   const addSystemNotification = (title: string, message: string, type: any = 'system') => {
@@ -1580,313 +1859,152 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [manualWinner]);
 
   const processAffiliateCommissions = async (cart: CartItem[], orderId: string, affiliateCode: string) => {
-    if (!db && !isDemoMode) return;
+    if (isDemoMode) {
+      // In demo mode, just update local user if it matches
+      if (user.affiliateCode === affiliateCode) {
+        const stats = user.affiliateStats || { status: 'none', totalSalesCount: 0, totalSalesValue: 0, commissionRate: 10, balance: 0, recurringBalance: 0, weeklyMilestones: { membershipsSold:0, salesValue:0, vaultItemsSold:0, weekStart: '' } } as AffiliateStats;
+        const total = cart.reduce((s, i) => s + ((currency === 'ZAR' ? i.price : i.priceUSD) * i.quantity), 0);
+        const newStats = { ...stats, totalSalesCount: stats.totalSalesCount + cart.length, totalSalesValue: stats.totalSalesValue + total, balance: stats.balance + (total * (stats.commissionRate/100)) };
+        setUser({ ...user, affiliateStats: newStats });
+        persistUser({ ...user, affiliateStats: newStats });
+      }
+      return;
+    }
 
     try {
-      // Find the affiliate user
-      let affiliateUser: User | null = null;
-      let affiliateUserRef = null;
-
-      if (isDemoMode) {
-        if (user.affiliateCode === affiliateCode) affiliateUser = user;
-      } else {
-        const q = query(collection(db!, 'users'), where('affiliateCode', '==', affiliateCode));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          affiliateUser = { ...snap.docs[0].data(), id: snap.docs[0].id } as User;
-          affiliateUserRef = snap.docs[0].ref;
-        }
-      }
-
+      const { data: affiliateUser } = await supabase.from('users').select('*').eq('affiliateCode', affiliateCode).limit(1).maybeSingle();
       if (!affiliateUser || affiliateUser.affiliateStats?.status !== 'approved') return;
 
       const stats = affiliateUser.affiliateStats as AffiliateStats;
+      const standardItems = cart.filter(item => !item.vaultItem);
+      const vaultItems = cart.filter(item => item.vaultItem);
+
       let totalStandardCommission = 0;
       let totalVaultCommission = 0;
       let vaultItemsSold = 0;
       const commissionRecords: CommissionRecord[] = [];
 
-      // // Split items into standard and vault
-      const standardItems = cart.filter(item => !item.vaultItem);
-      const vaultItems = cart.filter(item => item.vaultItem);
-
-      // Process standard items (10-20% commission based on tier)
       for (const item of standardItems) {
         const basePrice = currency === 'ZAR' ? item.price : item.priceUSD;
-        const commissionRate = stats.commissionRate / 100; // Convert percentage to decimal
+        const commissionRate = stats.commissionRate / 100;
         const commissionAmount = basePrice * item.quantity * commissionRate;
-
         totalStandardCommission += commissionAmount;
-
-        commissionRecords.push({
-          id: `comm_${Date.now()}_${item.id}`,
-          affiliateId: affiliateUser.id,
-          orderId,
-          itemId: item.id,
-          itemName: item.name,
-          itemType: 'standard',
-          basePrice,
-          commissionRate: stats.commissionRate,
-          commissionAmount,
-          currency,
-          date: new Date().toISOString()
-        });
+        commissionRecords.push({ id: `comm_${Date.now()}_${item.id}`, affiliateId: affiliateUser.id, orderId, itemId: item.id, itemName: item.name, itemType: 'standard', basePrice, commissionRate: stats.commissionRate, commissionAmount, currency, date: new Date().toISOString() });
       }
 
-      // Process vault items (1% flat commission)
       for (const item of vaultItems) {
         const basePrice = currency === 'ZAR' ? item.price : item.priceUSD;
-        const commissionRate = 0.01; // 1% flat
-        const commissionAmount = basePrice * item.quantity * commissionRate;
-
+        const commissionAmount = basePrice * item.quantity * 0.01;
         totalVaultCommission += commissionAmount;
         vaultItemsSold += item.quantity;
-
-        commissionRecords.push({
-          id: `comm_${Date.now()}_${item.id}`,
-          affiliateId: affiliateUser.id,
-          orderId,
-          itemId: item.id,
-          itemName: item.name,
-          itemType: 'vault',
-          basePrice,
-          commissionRate: 1, // 1%
-          commissionAmount,
-          currency,
-          date: new Date().toISOString()
-        });
+        commissionRecords.push({ id: `comm_${Date.now()}_${item.id}`, affiliateId: affiliateUser.id, orderId, itemId: item.id, itemName: item.name, itemType: 'vault', basePrice, commissionRate: 1, commissionAmount, currency, date: new Date().toISOString() });
       }
 
       const totalCommission = totalStandardCommission + totalVaultCommission;
 
-      // Update affiliate stats
       const newStats: AffiliateStats = {
         ...stats,
         totalSalesCount: stats.totalSalesCount + cart.length,
         totalSalesValue: stats.totalSalesValue + cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
-        balance: stats.balance + totalCommission,
-        vaultPurchasesThisMonth: stats.vaultPurchasesThisMonth + vaultItemsSold,
+        balance: (stats.balance || 0) + totalCommission,
+        vaultPurchasesThisMonth: (stats.vaultPurchasesThisMonth || 0) + vaultItemsSold,
         weeklyMilestones: {
           ...stats.weeklyMilestones,
-          salesValue: stats.weeklyMilestones.salesValue + cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
-          vaultItemsSold: stats.weeklyMilestones.vaultItemsSold + vaultItemsSold
+          salesValue: (stats.weeklyMilestones?.salesValue || 0) + cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
+          vaultItemsSold: (stats.weeklyMilestones?.vaultItemsSold || 0) + vaultItemsSold
         }
       };
 
-      // Update commission tier based on total sales
+      // Adjust tier
       if (newStats.totalSalesValue >= 50000) newStats.commissionRate = 20;
       else if (newStats.totalSalesValue >= 15000) newStats.commissionRate = 15;
       else if (newStats.totalSalesValue >= 5000) newStats.commissionRate = 11;
 
-      // Process weekly milestones
-      const now = new Date();
-      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-      const weekStartISO = weekStart.toISOString().split('T')[0];
+      // Update affiliate user with new stats and a notification
+      const notif: Notification = { id: `commission_${Date.now()}`, type: 'system', title: 'New Commission Earned!', message: `You earned ${currency === 'ZAR' ? 'R' : '$'}${totalCommission.toFixed(2)} from this sale!`, date: new Date().toISOString(), isRead: false };
+      await supabase.from('users').update({ affiliateStats: newStats, notifications: [notif, ...(affiliateUser.notifications || [])] }).eq('id', affiliateUser.id);
 
-      // Reset weekly milestones if it's a new week
-      if (newStats.weeklyMilestones.weekStart !== weekStartISO) {
-        newStats.weeklyMilestones = {
-          membershipsSold: 0,
-          salesValue: cart.reduce((sum, item) => sum + ((currency === 'ZAR' ? item.price : item.priceUSD) * item.quantity), 0),
-          vaultItemsSold,
-          weekStart: weekStartISO
-        };
-      }
-
-      // Check for milestone achievements
-      const milestones: AffiliateMilestone[] = [];
-
-      // Sprinter: 5 memberships
-      if (newStats.weeklyMilestones.membershipsSold >= 5) {
-        const existing = localStorage.getItem(`milestone_${affiliateUser.id}_sprinter_${weekStartISO}`);
-        if (!existing) {
-          const bonus = currency === 'ZAR' ? 50 : 5;
-          newStats.balance += bonus;
-          milestones.push({
-            id: `milestone_${Date.now()}`,
-            affiliateId: affiliateUser.id,
-            type: 'sprinter',
-            achievedAt: new Date().toISOString(),
-            bonusAmount: bonus,
-            currency,
-            weekStart: weekStartISO
-          });
-          localStorage.setItem(`milestone_${affiliateUser.id}_sprinter_${weekStartISO}`, 'true');
-        }
-      }
-
-      // Big Spender: R5,000 / $300 sales
-      const salesThreshold = currency === 'ZAR' ? 5000 : 300;
-      if (newStats.weeklyMilestones.salesValue >= salesThreshold) {
-        const existing = localStorage.getItem(`milestone_${affiliateUser.id}_big_spender_${weekStartISO}`);
-        if (!existing) {
-          const bonus = currency === 'ZAR' ? 200 : 15;
-          newStats.balance += bonus;
-          milestones.push({
-            id: `milestone_${Date.now()}`,
-            affiliateId: affiliateUser.id,
-            type: 'big_spender',
-            achievedAt: new Date().toISOString(),
-            bonusAmount: bonus,
-            currency,
-            weekStart: weekStartISO
-          });
-          localStorage.setItem(`milestone_${affiliateUser.id}_big_spender_${weekStartISO}`, 'true');
-        }
-      }
-
-      // Vault King: 10 vault items
-      if (newStats.weeklyMilestones.vaultItemsSold >= 10) {
-        const existing = localStorage.getItem(`milestone_${affiliateUser.id}_vault_king_${weekStartISO}`);
-        if (!existing) {
-          const bonus = currency === 'ZAR' ? 100 : 8;
-          newStats.balance += bonus;
-          milestones.push({
-            id: `milestone_${Date.now()}`,
-            affiliateId: affiliateUser.id,
-            type: 'vault_king',
-            achievedAt: new Date().toISOString(),
-            bonusAmount: bonus,
-            currency,
-            weekStart: weekStartISO
-          });
-          localStorage.setItem(`milestone_${affiliateUser.id}_vault_king_${weekStartISO}`, 'true');
-        }
-      }
-
-      // Process team leader bonus (1% on sales from direct recruits)
+      // Parent commission
       if (stats.parentId) {
         try {
-          let parentUser: User | null = null;
-          let parentUserRef = null;
-
-          if (isDemoMode) {
-            // In demo mode, just skip parent commission
-          } else {
-            const parentQuery = query(collection(db!, 'users'), where('id', '==', stats.parentId));
-            const parentSnap = await getDocs(parentQuery);
-            if (!parentSnap.empty) {
-              parentUser = { ...parentSnap.docs[0].data(), id: parentSnap.docs[0].id } as User;
-              parentUserRef = parentSnap.docs[0].ref;
-            }
-          }
-
-          if (parentUser && parentUser.affiliateStats?.status === 'approved') {
-            const parentStats = parentUser.affiliateStats as AffiliateStats;
-            const teamBonus = totalCommission * 0.01; // 1% of affiliate's total commission
-
-            const updatedParentStats = {
-              ...parentStats,
-              balance: parentStats.balance + teamBonus
-            };
-
-            if (!isDemoMode && parentUserRef) {
-              await updateDoc(parentUserRef, { affiliateStats: updatedParentStats });
-
-              const parentNotif: Notification = {
-                id: `team_bonus_${Date.now()}`,
-                type: 'system',
-                title: 'Team Leader Bonus',
-                message: `You earned ${currency === 'ZAR' ? 'R' : '$'}${teamBonus.toFixed(2)} from a recruit's sale!`,
-                date: new Date().toISOString(),
-                isRead: false
-              };
-
-              await updateDoc(parentUserRef, { notifications: arrayUnion(parentNotif) });
-            }
+          const { data: parent } = await supabase.from('users').select('*').eq('id', stats.parentId).maybeSingle();
+          if (parent && parent.affiliateStats?.status === 'approved') {
+            const parentStats = parent.affiliateStats as AffiliateStats;
+            const parentCommission = totalCommission * 0.01;
+            const updatedParentStats = { ...parentStats, balance: (parentStats.balance || 0) + parentCommission };
+            const parentNotif: Notification = { id: `team_bonus_${Date.now()}`, type: 'system', title: 'Team Leader Bonus', message: `You earned ${currency === 'ZAR' ? 'R' : '$'}${parentCommission.toFixed(2)} from a recruit's sale!`, date: new Date().toISOString(), isRead: false };
+            await supabase.from('users').update({ affiliateStats: updatedParentStats, notifications: [parentNotif, ...(parent.notifications || [])] }).eq('id', parent.id);
           }
         } catch (err) {
-          console.error("Failed to process team leader bonus", err);
+          console.error('Failed to process parent commission', err);
         }
       }
 
-      // Update affiliate user
-      const updatedAffiliateUser = { ...affiliateUser, affiliateStats: newStats };
-
-      if (isDemoMode) {
-        if (affiliateUser.id === user.id) {
-          setUser(updatedAffiliateUser);
-          persistUser(updatedAffiliateUser);
-        }
-      } else if (affiliateUserRef) {
-        await updateDoc(affiliateUserRef, { affiliateStats: newStats });
-
-        // Add commission notification
-        const notif: Notification = {
-          id: `commission_${Date.now()}`,
-          type: 'system',
-          title: 'New Commission Earned!',
-          message: `You earned ${currency === 'ZAR' ? 'R' : '$'}${totalCommission.toFixed(2)} from this sale!`,
-          date: new Date().toISOString(),
-          isRead: false
-        };
-
-        await updateDoc(affiliateUserRef, { notifications: arrayUnion(notif) });
+      // Persist commission records to DB
+      try {
+        if (commissionRecords.length > 0) await supabase.from('commission_records').insert(commissionRecords);
+      } catch (err) {
+        console.error('Failed to persist commission_records to Supabase:', err);
+        const existingRecords = JSON.parse(localStorage.getItem('commission_records') || '[]');
+        localStorage.setItem('commission_records', JSON.stringify([...existingRecords, ...commissionRecords]));
       }
 
-      // Store commission records (in a real app, this would be saved to database)
-      const existingRecords = JSON.parse(localStorage.getItem('commission_records') || '[]');
-      localStorage.setItem('commission_records', JSON.stringify([...existingRecords, ...commissionRecords]));
-
-      // Store milestones
-      if (milestones.length > 0) {
-        const existingMilestones = JSON.parse(localStorage.getItem('affiliate_milestones') || '[]');
-        localStorage.setItem('affiliate_milestones', JSON.stringify([...existingMilestones, ...milestones]));
+      // Store milestones locally if needed
+      try {
+        const milestones: AffiliateMilestone[] = [];
+        const weekStartISO = new Date().toISOString().split('T')[0];
+        if (newStats.weeklyMilestones.membershipsSold >= 5) {
+          const existing = localStorage.getItem(`milestone_${affiliateUser.id}_sprinter_${weekStartISO}`);
+          if (!existing) {
+            const bonus = currency === 'ZAR' ? 50 : 5;
+            newStats.balance += bonus;
+            milestones.push({ id: `milestone_${Date.now()}`, affiliateId: affiliateUser.id, type: 'sprinter', achievedAt: new Date().toISOString(), bonusAmount: bonus, currency, weekStart: weekStartISO });
+            localStorage.setItem(`milestone_${affiliateUser.id}_sprinter_${weekStartISO}`, 'true');
+          }
+        }
+        if (milestones.length > 0) {
+          const existingMilestones = JSON.parse(localStorage.getItem('affiliate_milestones') || '[]');
+          localStorage.setItem('affiliate_milestones', JSON.stringify([...existingMilestones, ...milestones]));
+        }
+      } catch (err) {
+        console.warn('Failed processing affiliate milestones locally', err);
       }
 
     } catch (error) {
-      console.error("Failed to process affiliate commissions", error);
+      console.error('Failed to process affiliate commissions', error);
     }
   };
 
   const closeAccount = async (reason: string) => {
-      if (isDemoMode || !db || user.id === 'guest') return;
+      if (isDemoMode || user.id === 'guest') return;
 
       try {
-          // Create notification for admin
-          const adminNotification: Notification = {
-              id: `acct_close_admin_${Date.now()}`,
-              type: 'system',
-              title: 'Account Closure Request',
-              message: `${user.name} (${user.email}) has requested account closure. Reason: ${reason}`,
-              date: new Date().toISOString(),
-              isRead: false
-          };
+        const adminNotification: Notification = {
+            id: `acct_close_admin_${Date.now()}`,
+            type: 'system',
+            title: 'Account Closure Request',
+            message: `${user.name} (${user.email}) has requested account closure. Reason: ${reason}`,
+            date: new Date().toISOString(),
+            isRead: false
+        };
 
-          // Update user document
-          await updateDoc(doc(db, 'users', user.id), {
-              isActive: false,
-              closureReason: reason,
-              closureRequestedAt: new Date().toISOString(),
-              scheduledDeletionAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
-          });
+        // Update user to mark closure requested
+        await supabase.from('users').update({ isActive: false, closureReason: reason, closureRequestedAt: new Date().toISOString(), scheduledDeletionAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }).eq('id', user.id);
 
-          // Send notification to admin (assuming admin email is known)
-          const adminQuery = query(collection(db, 'users'), where('email', '==', 'spoilmevintagediy@gmail.com'));
-          const adminSnap = await getDocs(adminQuery);
-          if (!adminSnap.empty) {
-              await updateDoc(adminSnap.docs[0].ref, {
-                  notifications: arrayUnion(adminNotification)
-              });
-          }
+        // Notify admin
+        const { data: admin } = await supabase.from('users').select('notifications').eq('email', 'spoilmevintagediy@gmail.com').limit(1).maybeSingle();
+        if (admin) {
+          const existing = (admin as any).notifications || [];
+          await supabase.from('users').update({ notifications: [adminNotification, ...existing] }).eq('email', 'spoilmevintagediy@gmail.com');
+        }
 
-          // Create notification for user
-          const userNotification: Notification = {
-              id: `acct_close_user_${Date.now()}`,
-              type: 'system',
-              title: 'Account Closure Requested',
-              message: 'Your account closure has been requested. Your account and all data will be permanently deleted within 24 hours.',
-              date: new Date().toISOString(),
-              isRead: false
-          };
-
-          await updateDoc(doc(db, 'users', user.id), {
-              notifications: arrayUnion(userNotification)
-          });
-
+        // Notify user
+        const userNotification: Notification = { id: `acct_close_user_${Date.now()}`, type: 'system', title: 'Account Closure Requested', message: 'Your account closure has been requested. Your account and all data will be permanently deleted within 24 hours.', date: new Date().toISOString(), isRead: false };
+        await appendNotificationToUser(user.id, userNotification);
+        await pushToIndividual(user.id, userNotification.title, userNotification.message, '/#/profile');
       } catch (error) {
-          console.error("Error closing account:", error);
-          throw error;
+        console.error('Error closing account:', error);
+        throw error;
       }
   };
 
@@ -1916,12 +2034,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           email: data.email,
           productImages: data.productImages,
           status: 'pending',
-          submittedAt: serverTimestamp(),
+          submittedAt: new Date().toISOString(),
       };
 
-      if (!isDemoMode && db) {
+      if (!isDemoMode) {
           try {
-              await addDoc(collection(db, 'artist_applications'), applicationData);
+              await supabase.from('artist_applications').insert([applicationData]);
           } catch (error) {
               console.error('Error submitting artist application:', error);
               throw error;
@@ -1942,14 +2060,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
       setUser(updatedUser);
       persistUser(updatedUser);
-      if (!isDemoMode && db && user.id !== 'guest') {
-          await updateDoc(doc(db, 'users', user.id), sanitizeFirestoreData(updatedUser));
+      if (!isDemoMode && user.id !== 'guest') {
+          await updateUserFields(user.id, sanitizeFirestoreData(updatedUser));
       }
   };
 
   return (
     <StoreContext.Provider value={{
-      products, categories, cart, user, specials, vouchers, appliedVoucher, affiliateLeaderboard, memberCount, weeklyWinners, isLoading, isDemoMode, dbConnectionError, orders,
+      products, categories, cart, user, currentUser: user, specials, vouchers, appliedVoucher, affiliateLeaderboard, memberCount, weeklyWinners, isDemoMode, isLoading, dbConnectionError, db: supabase, orders,
       isStickyProgressBarVisible, setIsStickyProgressBarVisible,
       currency, setCurrency, toggleCurrency,
       packagingPresets, materialPresets, savePackagingPreset, deletePackagingPreset, saveMaterialPreset, deleteMaterialPreset,
@@ -1959,12 +2077,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addProduct, updateProduct, deleteProduct, addOrder, updateOrder, deleteOrder, addCategory, updateCategory, deleteCategory, replaceCategories,
       addSpecial, resetStore, seedTestUsers, getAllUsers, runDataDiagnostics, adminAdjustPoints,
       getCartTotal, addVoucher, deleteVoucher, applyExternalVoucher, setAppliedVoucher, shareProduct, claimSocialReward, updateUserAddress,
+      updateUser,
 
       // Admin Winner Override
-      manualWinner, setManualWinner, auth,
+      manualWinner, setManualWinner, auth: supabase.auth,
+      authErrorMessage, clearAuthError, signInWithLocalDevAdmin, isSupabaseConfigured: isSupabaseConfigured,
+      dataSource,
 
       // Account Management
-      closeAccount
+      closeAccount,
     }}>
       {children}
     </StoreContext.Provider>

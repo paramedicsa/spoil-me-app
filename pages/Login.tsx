@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { Lock, Mail, ArrowRight } from 'lucide-react';
@@ -7,13 +7,15 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useStore();
+  const [redirectMessage, setRedirectMessage] = useState('');
+  const { login, authErrorMessage, clearAuthError } = useStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+    clearAuthError();
+
     const success = await login(email, password);
     if (success) {
       // Check if user is admin and navigate accordingly
@@ -23,9 +25,20 @@ const Login: React.FC = () => {
         navigate('/');
       }
     } else {
-      setError('Invalid credentials. Please check your email and password.');
+      // Prefer detailed message from Supabase if available
+      setError(authErrorMessage || 'Invalid credentials. Please check your email and password.');
     }
   };
+
+  useEffect(() => {
+    try {
+      const msg = localStorage.getItem('spv_admin_denied');
+      if (msg) {
+        setRedirectMessage(msg);
+        localStorage.removeItem('spv_admin_denied');
+      }
+    } catch (_) {}
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-[80vh]">
@@ -53,7 +66,7 @@ const Login: React.FC = () => {
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); clearAuthError(); setError(''); }}
                   className="w-full pl-10 pr-4 py-3 bg-black border border-gray-700 rounded-lg text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
                   placeholder="name@example.com"
                 />
@@ -72,7 +85,7 @@ const Login: React.FC = () => {
                   autoComplete="current-password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); clearAuthError(); setError(''); }}
                   className="w-full pl-10 pr-4 py-3 bg-black border border-gray-700 rounded-lg text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
                   placeholder="••••••••"
                 />
@@ -83,6 +96,12 @@ const Login: React.FC = () => {
           {error && (
             <div className="p-3 bg-red-900/20 border border-red-900/50 rounded-lg">
               <p className="text-sm text-red-400 text-center">{error}</p>
+            </div>
+          )}
+
+          {redirectMessage && (
+            <div className="p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg mt-2">
+              <p className="text-sm text-yellow-200 text-center">{redirectMessage}</p>
             </div>
           )}
 

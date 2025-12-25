@@ -14,8 +14,11 @@ const PayPalSubscription: React.FC<PayPalSubscriptionProps> = ({
   onApprove,
   onError
 }) => {
-  const initialOptions = {
-    "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID || process.env.REACT_APP_PAYPAL_CLIENT_ID,
+  const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || process.env.REACT_APP_PAYPAL_CLIENT_ID || '';
+
+  const initialOptions: any = {
+    clientId,
+    "client-id": clientId,
     currency: "USD",
     intent: "subscription",
     vault: true,
@@ -58,9 +61,9 @@ const PayPalSubscription: React.FC<PayPalSubscriptionProps> = ({
             'plan_id': planIdToUse
           });
         }}
-        onApprove={(data, actions) => {
+        onApprove={async (data, actions) => {
           console.log('PayPal subscription approved:', data);
-          onApprove(data);
+          await Promise.resolve(onApprove(data));
         }}
         onError={(err) => {
           console.error('PayPal subscription error:', err);

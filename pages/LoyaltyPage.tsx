@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { useAuth } from '../context/AuthContext';
-import { db } from '../firebaseConfig';
-import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { getDocument, updateDocument, createDocument } from '@repo/utils/supabaseClient';
 import { Check, Lock, Star, Share2, ShoppingBag, MessageSquare, CreditCard, Users, Facebook, Twitter, Smartphone, MessageCircle, Gift, Zap, Crown, Award } from 'lucide-react';
 
 interface UserData {
@@ -19,8 +17,7 @@ interface UserData {
 }
 
 const LoyaltyPage: React.FC = () => {
-  const { user } = useAuth();
-  const { products } = useStore();
+  const { user, products } = useStore();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPoints, setSelectedPoints] = useState(0);
@@ -47,9 +44,8 @@ const LoyaltyPage: React.FC = () => {
     if (!user) return;
 
     try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data() as UserData;
+      const data = await getDocument<UserData>('users', user.uid);
+      if (data) {
         setUserData(data);
       } else {
         // Create default user data
@@ -94,9 +90,9 @@ const LoyaltyPage: React.FC = () => {
         [platform]: true
       };
 
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDocument('users', user.uid, {
         socialFollows: updatedFollows,
-        loyaltyPoints: userData.loyaltyPoints + 100
+        loyaltyPoints: userData.loyaltyPoints + 100,
       });
 
       setUserData({
@@ -115,8 +111,8 @@ const LoyaltyPage: React.FC = () => {
     try {
       // Deduct points
       const newPoints = userData.loyaltyPoints - selectedPoints;
-      await updateDoc(doc(db, 'users', user.uid), {
-        loyaltyPoints: newPoints
+      await updateDocument('users', user.uid, {
+        loyaltyPoints: newPoints,
       });
 
       // Generate unique coupon code
@@ -124,15 +120,15 @@ const LoyaltyPage: React.FC = () => {
       const discountValue = selectedPoints * POINT_VALUE_ZAR;
 
       // Create coupon in database
-      await addDoc(collection(db, 'coupons'), {
+      await createDocument('coupons', {
         code: couponCode,
         type: 'fixed',
         value: discountValue,
         currency: 'ZAR',
-        userId: user.uid,
+        user_id: user.uid,
         used: false,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        createdAt: new Date()
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+        created_at: new Date().toISOString(),
       });
 
       setUserData({

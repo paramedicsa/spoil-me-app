@@ -53,7 +53,7 @@ const Vault: React.FC = () => {
     setFilteredItems(filtered);
   }, [vaultItems, selectedType, selectedColor, sortBy, curr]);
 
-  const isDeluxeMember = user.membershipType === 'deluxe' || user.membershipType === 'Deluxe';
+  const isDeluxeMember = user.membershipTier === 'deluxe' || user.membershipTier === 'Deluxe Boss' || user.membershipTier === 'Deluxe Vault';
 
   const handleAddToCart = (item: any) => {
     if (!isDeluxeMember) {
@@ -82,12 +82,21 @@ const Vault: React.FC = () => {
     // Add to cart
     addToCart({
       id: item.id,
+      code: `VAULT-${item.id}`,
       name: item.productName,
+      slug: `vault-${item.id}`,
+      description: item.productName,
       price: curr === 'ZAR' ? item.vaultPriceZAR : item.vaultPriceUSD,
-      image: item.productImage,
-      quantity: 1,
-      vaultItem: true
-    });
+      priceUSD: curr === 'USD' ? item.vaultPriceUSD : item.vaultPriceZAR / 18,
+      costPrice: curr === 'ZAR' ? item.vaultPriceZAR : item.vaultPriceUSD,
+      category: 'Vault',
+      type: 'Other',
+      status: 'published',
+      stock: 1,
+      images: [item.productImage],
+      tags: ['vault'],
+      createdAt: new Date().toISOString()
+    }, { quantity: 1 });
 
     // Track purchase
     monthlyPurchases.push(item.id);

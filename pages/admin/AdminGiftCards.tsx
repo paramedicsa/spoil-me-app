@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Gift, CreditCard, Plus, Trash2, Copy, Check, RefreshCw, PenTool, ShoppingBag, Send, UserCheck, AlertTriangle } from 'lucide-react';
 import { Voucher, Notification } from '../../types';
-import { db } from '../../firebaseConfig';
-import { collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
+import { queryDocuments, createDocument } from '@repo/utils/supabaseClient';
 
 const AdminGiftCards: React.FC = () => {
   const { vouchers, addVoucher, deleteVoucher, cart, currency } = useStore();
@@ -47,15 +46,12 @@ const AdminGiftCards: React.FC = () => {
     };
     addVoucher(newVoucher);
 
-    // 2. If Email is provided, try to send to user
-    if (recipientEmail && db) {
+    // 2. If Email is provided, try to send to user (via Supabase)
+    if (recipientEmail) {
         try {
-            const usersRef = collection(db, "users");
-            const q = query(usersRef, where("email", "==", recipientEmail));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const userDoc = querySnapshot.docs[0];
+            const users = await queryDocuments<any>('users', { filters: { email: recipientEmail }, limit: 1 });
+            if (users && users.length > 0) {
+                const targetUser = users[0];
                 const notification: Notification = {
                     id: `gift_recv_${Date.now()}`,
                     type: 'gift_received',
@@ -67,7 +63,7 @@ const AdminGiftCards: React.FC = () => {
                         code: generatedCode,
                         amount: voucherValue,
                         meta: {
-                            recipientName: recipientName || userDoc.data().name || 'Valued Customer',
+                            recipientName: recipientName || targetUser.name || 'Valued Customer',
                             senderName: 'Spoil Me Vintage Team',
                             message: customMessage || "Enjoy a little something special from us!",
                             deliveryMethod: 'recipient'
@@ -75,9 +71,11 @@ const AdminGiftCards: React.FC = () => {
                     }
                 };
 
-                await updateDoc(userDoc.ref, {
-                    notifications: arrayUnion(notification)
-                });
+                await createDocument('notifications', {
+                    user_id: targetUser.id || (targetUser as any).uid,
+                    ...notification,
+                } as any);
+
                 alert(`Voucher created AND sent to ${recipientEmail}!`);
             } else {
                 alert(`Voucher created, but user with email ${recipientEmail} was not found. Please send the code manually.`);
@@ -86,8 +84,6 @@ const AdminGiftCards: React.FC = () => {
             console.error("Error sending voucher:", error);
             alert("Voucher created, but failed to send to user due to an error.");
         }
-    } else if (recipientEmail && !db) {
-        alert("Voucher created, but cannot send to user (Database not connected / Demo Mode).");
     } else {
         // No email provided, just create
         // alert("Voucher created successfully!");

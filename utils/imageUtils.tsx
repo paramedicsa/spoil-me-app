@@ -1,119 +1,52 @@
-import { FirebaseStorage } from 'firebase/storage';
-import { storage } from '../firebaseConfig';
-import { getDownloadURL, ref as sRef } from 'firebase/storage';
+// Minimal image helpers used across the app. These replace the external
+// `@repo/utils/imageUtils` re-export during migration to Supabase.
 import React, { useEffect, useState } from 'react';
 
-export const isHttpUrl = (s?: string) => !!s && /^https?:\/\//i.test(s);
-export const isDataUrl = (s?: string) => !!s && s.startsWith('data:');
-export const isBlobUrl = (s?: string) => !!s && s.startsWith('blob:');
-export const isGsUrl = (s?: string) => !!s && s.startsWith('gs://');
+export type ResolvedImage = string;
 
-export async function resolveImageSrc(raw: any): Promise<string | null> {
-  if (!raw) return null;
-  if (typeof raw === 'string') {
-    if (isHttpUrl(raw) || isDataUrl(raw) || isBlobUrl(raw) || raw.startsWith('/')) return raw;
-
-    if (isGsUrl(raw)) {
-      const m = raw.match(/^gs:\/\/[^/]+\/(.+)$/);
-      const path = m ? m[1] : raw;
-      try {
-        if (!storage) return null;
-        const url = await getDownloadURL(sRef(storage, decodeURIComponent(path).replace(/^\//, '')));
-        return url;
-      } catch (err) {
-        console.warn('Failed to resolve gs:// URL', raw, err);
-        return null;
-      }
-    }
-
-    try {
-      if (!storage) return raw; // if no storage available, return raw string so UI may attempt to load
-      const url = await getDownloadURL(sRef(storage, raw.replace(/^\//, '')));
-      return url;
-    } catch (err) {
-      // Not resolvable
-    }
-
-    return raw;
-  }
-
-  if (typeof raw === 'object') {
-    const path = raw.fullPath || raw.path || raw.name || null;
-    if (path && storage) {
-      try {
-        const url = await getDownloadURL(sRef(storage, path.replace(/^\//, '')));
-        return url;
-      } catch (err) {
-        console.warn('Failed to resolve storage object image path', raw, err);
-        return null;
-      }
-    }
-  }
-
-  return null;
+export interface ResolvedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+	src?: string | null;
+	fallback?: string;
 }
 
-export function useResolvedImage(src?: any, fallback?: string) {
-  const [resolved, setResolved] = useState<string | undefined>(fallback || undefined);
+export const ResolvedImage: React.FC<ResolvedImageProps> = ({ src, fallback, alt, className, onError, ...rest }) => {
+	const resolved = useResolvedImage(src || undefined, fallback);
+	return (
+		<img
+			src={resolved || fallback || getFallbackImage()}
+			alt={alt}
+			className={className}
+			onError={(e) => {
+				try { handleImageError(e); } catch (_) {}
+				if (onError) onError(e as any);
+			}}
+			{...rest}
+		/>
+	);
+};
 
-  useEffect(() => {
-    let mounted = true;
-    if (!src) {
-      setResolved(fallback);
-      return;
-    }
-
-    // If src is already a direct HTTP URL, use it immediately
-    if (isHttpUrl(src) || isDataUrl(src) || isBlobUrl(src) || src.startsWith('/')) {
-      setResolved(src);
-      return;
-    }
-
-    // Only do async resolution for Firebase paths
-    (async () => {
-      try {
-        const url = await resolveImageSrc(src);
-        if (mounted) setResolved(url || fallback);
-      } catch (e) {
-        console.error('Error resolving image src', e);
-        if (mounted) setResolved(fallback);
-      }
-    })();
-
-    return () => { mounted = false; };
-  }, [src, fallback]);
-
-  return resolved;
+export function handleImageError(e: any) {
+	// Replace broken images with a placeholder
+	const target = e?.target as HTMLImageElement | null;
+	if (target) target.src = getFallbackImage();
 }
 
-export const ResolvedImage: React.FC<{ src?: any; alt?: string; className?: string; fallback?: string; onError?: (e: any) => void }> = ({ src, alt = '', className, fallback, onError }) => {
-  const resolved = useResolvedImage(src, fallback || getFallbackImage(600));
-  return (
-    <img src={resolved} alt={alt} className={className} onError={(e) => {
-      console.warn('❌ Image onError triggered for:', resolved);
-      onError?.(e);
-    }} />
-  );
-};
+export function getFallbackImage(width = 600, height = 600, text?: string) {
+	// Use an embedded SVG data URI as a fallback to avoid external DNS failures
+	const label = text ? text : 'Image';
+	const svg = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}' viewBox='0 0 ${width} ${height}'><rect width='100%' height='100%' fill='%23222' /><text x='50%' y='50%' font-family='Arial, Helvetica, sans-serif' font-size='20' fill='%23ccc' dominant-baseline='middle' text-anchor='middle'>${escapeXml(label)}</text></svg>`;
+	return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 
-export const getFallbackImage = (width: number = 600, height?: number, text: string = 'No Image') => {
-  const size = height ? `${width}x${height}` : width.toString();
-  return `https://placehold.co/${size}/1a1a1a/D4AF37?text=${encodeURIComponent(text)}`;
-};
+function escapeXml(s: string) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+}
 
-export const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-  const target = e.currentTarget;
-
-  // 1. Check if we are already using the fallback to prevent infinite loops
-  if (target.src.includes('placehold.co')) {
-    console.warn("Fallback image also failed. Hiding element.");
-    target.style.display = 'none'; // Give up
-    return;
-  }
-
-  // 2. Log the error for debugging
-  console.warn(`Image failed to load: ${target.src}. Switching to fallback.`);
-
-  // 3. Switch to the working fallback service
-  target.src = getFallbackImage(600, 600, 'Spoil Me Vintage');
-};
+export function useResolvedImage(src?: string, fallback?: string) {
+	const [resolved, setResolved] = useState<string | null>(null);
+	useEffect(() => {
+		if (!src) { setResolved(fallback || getFallbackImage()); return; }
+		setResolved(src);
+	}, [src, fallback]);
+	return resolved;
+}

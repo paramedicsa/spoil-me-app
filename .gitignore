@@ -41,6 +41,9 @@ android/app/src/main/assets/capacitor.config.json
 # Firebase cache
 .firebase/
 
+# NEVER COMMIT SERVICE ACCOUNT KEYS
+spoilme-service-account.json
+
 # Logs
 logs/
 *.log

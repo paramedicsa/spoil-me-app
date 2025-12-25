@@ -1,18 +1,20 @@
 import { Product, Category, User, SpecialOffer } from './types';
 
 export const INITIAL_CATEGORIES: Category[] = [
-  { id: 'c_red', name: 'Red Collection', image: 'https://picsum.photos/400/400?random=1', description: 'Passion & Energy' },
-  { id: 'c_black', name: 'Black Collection', image: 'https://picsum.photos/400/400?random=2', description: 'Bold & Mysterious' },
-  { id: 'c_orange', name: 'Orange Collection', image: 'https://picsum.photos/400/400?random=3', description: 'Warmth & Creativity' },
-  { id: 'c_yellow', name: 'Yellow Collection', image: 'https://picsum.photos/400/400?random=4', description: 'Joy & Sunshine' },
-  { id: 'c_purple', name: 'Purple Collection', image: 'https://picsum.photos/400/400?random=5', description: 'Royalty & Spirit' },
-  { id: 'c_pink', name: 'Pink Collection', image: 'https://picsum.photos/400/400?random=6', description: 'Love & Softness' },
-  { id: 'c_bronze', name: 'Bronze Collection', image: 'https://picsum.photos/400/400?random=7', description: 'Earthy & Ancient' },
-  { id: 'c_white', name: 'White or Pearl Collection', image: 'https://picsum.photos/400/400?random=8', description: 'Elegance & Purity' },
-  { id: 'c_blue', name: 'Blue Collection', image: 'https://picsum.photos/400/400?random=9', description: 'Calm & Ocean' },
-  { id: 'c_green', name: 'Green Collection', image: 'https://picsum.photos/400/400?random=10', description: 'Nature & Harmony' },
-  { id: 'c_gold', name: 'Gold Collection', image: 'https://picsum.photos/400/400?random=11', description: 'Luxury & Wealth' },
-  { id: 'c_silver', name: 'Silver Collection', image: 'https://picsum.photos/400/400?random=12', description: 'Sleek & Modern' },
+  { id: 'bc0ef8b5-e4b9-4bc8-aedd-d677391d74c0', name: 'Red Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763528572144%2F1763528976141_red%20model.png?alt=media&token=1deef60f-3c4f-4e3e-beae-763d1b39621e', description: 'Passion & Energy' },
+  { id: '23bcfca6-5735-4481-ab25-9d61ac83bc3f', name: 'Pink Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763716235698%2F1763716259515_pink%20model.png?alt=media&token=c41510b1-9946-49d0-8b19-f679f24d392b', description: 'Love & Softness' },
+  { id: '3427e08d-f82c-47c7-b5e7-2b8567733f38', name: 'Silver Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732069765%2F1763732089246_silver%20model.png?alt=media&token=eb30db54-99d1-4c3f-ba97-0f2b34934d79', description: 'Sleek & Modern' },
+  { id: '3efca09b-07d8-40f2-8b6e-104049593cb3', name: 'Colorfull', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763849326772%2F1763849625346_colorfull.jpg?alt=media&token=41d78666-4aa1-47a0-935f-c5361b4538ac', description: 'Vibrant & Fun' },
+  { id: '530b80f1-ac27-4ab4-ac10-f093d9d48dde', name: 'Green Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732028982%2F1763732064239_download%20(1).png?alt=media&token=1b184b78-799f-4d79-9e55-8d122c2c07eb', description: 'Nature & Harmony' },
+  { id: '5fa9457f-3d9b-421c-9746-6bffbee4d4da', name: 'Yellow Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732120801%2F1763732142964_download.png?alt=media&token=49c0be99-48b2-47ba-9cb4-38628d2876fe', description: 'Joy & Sunshine' },
+  { id: '6e673b67-9dd3-44b8-8797-51cc7e4ddf07', name: 'Orange Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732327301%2F1763732349258_orange%20model.png?alt=media&token=78d402fc-e0f7-4b73-b0d3-a7502f7bc6d3', description: 'Warmth & Creativity' },
+  { id: '80da52b5-5130-462c-8f27-bdf7ff1c6564', name: 'Black Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732028102%2F1763732058240_1.jpg?alt=media&token=6458bde4-9255-4c11-9015-ec738b79a8cb', description: 'Bold & Mysterious' },
+  { id: '8e8e275a-98fb-42b9-8551-ffeff03fb92a', name: 'Purple Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763529047916%2F1763529076550_purple%20model.png?alt=media&token=10fa0811-7c4c-4c41-9165-262addea89f3', description: 'Royalty & Spirit' },
+  { id: '9667b780-6f85-48ad-a19e-da0951efc590', name: 'Bronze and Brown Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732005647%2F1763732023012_copper%20model.png?alt=media&token=72619e26-b086-4913-a97f-ed8bea238d23', description: 'Earthy & Ancient' },
+  { id: '9d24210c-eb1c-4273-8f6d-beebe2016fc4', name: 'Blue Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763529024900%2F1763529043293_2.jpg?alt=media&token=29dcba53-1264-45a2-9b68-a661a277cc91', description: 'Calm & Ocean' },
+  { id: '9d9fff97-3b25-409e-9e39-4a3b6412bb57', name: 'Girls', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1764232246395%2F1764232265823_girls%20color%20background.jpg?alt=media&token=13860e81-a2e7-48fc-a6b3-42d0763c8d41', description: 'Fun & Playful' },
+  { id: 'b40795f0-5b04-4e95-8e84-40ca3c9561d1', name: 'White & Pearl Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763731966302%2F1763731995895_white%20model.png?alt=media&token=56bdfed9-00c4-4442-ac6a-358d1223e04c', description: 'Elegance & Purity' },
+  { id: '1ef06240-10e5-4bdf-9286-84d355991e95', name: 'Gold Collection', image: 'https://firebasestorage.googleapis.com/v0/b/spoilme-edee0.firebasestorage.app/o/categories%2Fcat_1763732095040%2F1763732116711_gold%20model.png?alt=media&token=25b5331b-6bf1-4ecc-94c8-1ceb31ccdcc7', description: 'Luxury & Wealth' },
 ];
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -24,6 +26,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     description: 'Embrace a touch of whimsy with these adorable sweetheart stud earrings, meticulously crafted from vibrant epoxy resin. Each glossy red heart reflects light beautifully.',
     whenAndHowToWear: 'Perfect for date nights or adding a pop of color to a monochrome outfit.',
     price: 29.00,
+    priceUSD: 2.00,
     compareAtPrice: 45.00,
     memberPrice: 14.50, // 50% off
     costPrice: 5.00,
@@ -155,6 +158,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     slug: 'ethereal-aurora-oval-opal-ring',
     description: 'Experience the captivating play of color in this unique oval opal ring, meticulously set in gleaming sterling silver.',
     price: 129.00,
+    priceUSD: 7.00,
     costPrice: 50.00,
     memberPrice: 60.00,
     backOfficeLink: 'https://www.temu.com/example-ring-link',

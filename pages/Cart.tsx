@@ -185,7 +185,11 @@ const Cart: React.FC = () => {
 
 
   const getCurrencySymbol = () => currency === 'ZAR' ? 'R' : '$';
-  const getPrice = (zarPrice: number, usdPrice?: number) => currency === 'ZAR' ? zarPrice : (usdPrice ?? zarPrice);
+  const getPrice = (zarPrice: number, usdPrice?: number) => {
+    if (currency === 'ZAR') return zarPrice;
+    if (currency === 'USD') return usdPrice !== undefined ? usdPrice : 0; // Don't fallback to ZAR price
+    return zarPrice;
+  };
 
   const pointsPerSpend = currency === 'ZAR' ? 'R10' : '$3';
   const discountRate = currency === 'ZAR' ? 'R1.00' : '$0.50';

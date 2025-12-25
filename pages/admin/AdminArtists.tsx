@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, addDoc, query, where, orderBy, getDocs, deleteDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { queryDocuments, subscribeToTable, createDocument, updateDocument, deleteDocument } from '@repo/utils/supabaseClient';
 import { CheckCircle, XCircle, Eye, Package, DollarSign, Users, TrendingUp, Truck, Warehouse, AlertTriangle, Trash } from 'lucide-react';
 
 interface ArtistApplication {
@@ -55,42 +54,44 @@ const AdminArtists: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubApplications = onSnapshot(
-      query(collection(db, 'artist_applications'), orderBy('submittedAt', 'desc')),
-      (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          submittedAt: doc.data().submittedAt?.toDate() || new Date()
-        })) as ArtistApplication[];
-        setApplications(apps);
-      }
-    );
+    let unsubApps: (() => void) | null = null;
+    let unsubArtists: (() => void) | null = null;
+    let unsubProducts: (() => void) | null = null;
 
-    const unsubArtists = onSnapshot(collection(db, 'artists'), (snapshot) => {
-      const arts = snapshot.docs.map(doc => ({
-        uid: doc.id,
-        ...doc.data()
-      })) as ArtistProfile[];
-      setArtists(arts);
+    const loadInitial = async () => {
+      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
+      setApplications((apps || []).map((a: any) => ({ id: a.id, ...a, submittedAt: a.submitted_at ? new Date(a.submitted_at) : new Date() })));
+
+      const arts = await queryDocuments<any>('artists');
+      setArtists((arts || []) as ArtistProfile[]);
       setLoading(false);
+
+      const prods = await queryDocuments<any>('artist_products');
+      setProducts((prods || []).map((p: any) => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
+    };
+
+    loadInitial();
+
+    // Subscribe to table changes and reload on changes (simple approach)
+    unsubApps = subscribeToTable('artist_applications', async () => {
+      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
+      setApplications((apps || []).map((a: any) => ({ id: a.id, ...a, submittedAt: a.submitted_at ? new Date(a.submitted_at) : new Date() })));
     });
 
-    const unsubProducts = onSnapshot(collection(db, 'artist_products'), (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        receivedAtHub: doc.data().receivedAtHub?.toDate() || null,
-        approvedAt: doc.data().approvedAt?.toDate() || null,
-      })) as ArtistProduct[];
-      setProducts(prods);
+    unsubArtists = subscribeToTable('artists', async () => {
+      const arts = await queryDocuments<any>('artists');
+      setArtists((arts || []) as ArtistProfile[]);
+    });
+
+    unsubProducts = subscribeToTable('artist_products', async () => {
+      const prods = await queryDocuments<any>('artist_products');
+      setProducts((prods || []).map((p: any) => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
     });
 
     return () => {
-      unsubApplications();
-      unsubArtists();
-      unsubProducts();
+      if (unsubApps) unsubApps();
+      if (unsubArtists) unsubArtists();
+      if (unsubProducts) unsubProducts();
     };
   }, []);
 
@@ -111,15 +112,13 @@ const AdminArtists: React.FC = () => {
         isFirstTime: true // Mark as first-time artist
       };
 
-      await addDoc(collection(db, 'artists'), artistData);
+      await createDocument('artists', artistData);
 
       // Update application status
-      await updateDoc(doc(db, 'artist_applications', application.id), {
-        status: 'approved'
-      });
+      await updateDocument('artist_applications', application.id, { status: 'approved' });
 
       // Send notification to user
-      await addDoc(collection(db, 'notifications'), {
+      await createDocument('notifications', {
         userId: application.uid,
         type: 'system',
         title: 'Artist Application Approved!',
@@ -137,12 +136,10 @@ const AdminArtists: React.FC = () => {
 
   const handleRejectApplication = async (application: ArtistApplication) => {
     try {
-      await updateDoc(doc(db, 'artist_applications', application.id), {
-        status: 'rejected'
-      });
+      await updateDocument('artist_applications', application.id, { status: 'rejected' });
 
       // Send notification to user
-      await addDoc(collection(db, 'notifications'), {
+      await createDocument('notifications', {
         userId: application.uid,
         type: 'system',
         title: 'Artist Application Update',
@@ -161,15 +158,12 @@ const AdminArtists: React.FC = () => {
   const handleApproveProduct = async (product: ArtistProduct) => {
     try {
       // Update product status to approved
-      await updateDoc(doc(db, 'artist_products', product.id), {
-        status: 'approved',
-        approvedAt: new Date()
-      });
+      await updateDocument('artist_products', product.id, { status: 'approved', approved_at: new Date().toISOString() });
 
       // Optionally, send notification to artist about product approval
       const artist = artists.find(a => a.uid === product.artistId);
       if (artist) {
-        await addDoc(collection(db, 'notifications'), {
+        await createDocument('notifications', {
           userId: artist.uid,
           type: 'system',
           title: 'Product Approved',
@@ -189,14 +183,12 @@ const AdminArtists: React.FC = () => {
   const handleRejectProduct = async (product: ArtistProduct) => {
     try {
       // Update product status to rejected
-      await updateDoc(doc(db, 'artist_products', product.id), {
-        status: 'rejected'
-      });
+      await updateDocument('artist_products', product.id, { status: 'rejected' });
 
       // Optionally, send notification to artist about product rejection
       const artist = artists.find(a => a.uid === product.artistId);
       if (artist) {
-        await addDoc(collection(db, 'notifications'), {
+        await createDocument('notifications', {
           userId: artist.uid,
           type: 'system',
           title: 'Product Rejected',
@@ -216,11 +208,7 @@ const AdminArtists: React.FC = () => {
   const handleStockReceive = async (product: ArtistProduct) => {
     try {
       // Update product stock level and status
-      await updateDoc(doc(db, 'artist_products', product.id), {
-        stockLevel: product.stockLevel + 1,
-        status: 'live', // or 'pending_approval' based on your flow
-        receivedAtHub: new Date()
-      });
+      await updateDocument('artist_products', product.id, { stock_level: (product.stockLevel || 0) + 1, status: 'live', received_at_hub: new Date().toISOString() });
 
       alert('Stock received and product updated.');
     } catch (error) {
@@ -232,7 +220,7 @@ const AdminArtists: React.FC = () => {
   const handleDeleteProduct = async (productId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await deleteDoc(doc(db, 'artist_products', productId));
+        await deleteDocument('artist_products', productId);
         alert('Product deleted successfully.');
       } catch (error) {
         console.error('Error deleting product:', error);

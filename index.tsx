@@ -3,12 +3,11 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Temporarily unregister old service workers to fix fetch errors
+// Register the Firebase Messaging service worker for background push.
+// (Do not unregister service workers here; it breaks push notifications.)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(let registration of registrations) {
-      registration.unregister();
-    }
+  navigator.serviceWorker.register('/firebase-messaging-sw.js').catch((err) => {
+    console.warn('Service worker registration failed:', err);
   });
 }
 

@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { auth, db } from '../../firebaseConfig';
 import { CustomTemplate } from '../../types';
 import { Plus, Edit2, Trash2, Save, X, Upload, Loader2, ImagePlus, Check } from 'lucide-react';
-import { storage } from '../../firebaseConfig';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { uploadFile, queryDocuments, createDocument, updateDocument, deleteDocument } from '@repo/utils/supabaseClient';
 
 const CustomPendantManager: React.FC = () => {
   const { user } = useStore();
@@ -30,12 +27,8 @@ const CustomPendantManager: React.FC = () => {
 
   const loadTemplates = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'custom_templates'));
-      const loadedTemplates: CustomTemplate[] = [];
-      querySnapshot.forEach((doc) => {
-        loadedTemplates.push({ id: doc.id, ...doc.data() } as CustomTemplate);
-      });
-      setTemplates(loadedTemplates);
+      const loadedTemplates = await queryDocuments<CustomTemplate>('custom_templates', { orderBy: { column: 'created_at', ascending: false } });
+      setTemplates((loadedTemplates || []) as CustomTemplate[]);
     } catch (error) {
       console.error('Error loading templates:', error);
     } finally {
@@ -56,9 +49,9 @@ const CustomPendantManager: React.FC = () => {
       };
 
       if (editingTemplate.id) {
-        await updateDoc(doc(db, 'custom_templates', editingTemplate.id), templateData);
+        await updateDocument('custom_templates', editingTemplate.id!, templateData as any);
       } else {
-        await addDoc(collection(db, 'custom_templates'), templateData);
+        await createDocument('custom_templates', templateData as any);
       }
 
       await loadTemplates();
@@ -84,7 +77,7 @@ const CustomPendantManager: React.FC = () => {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
-      await deleteDoc(doc(db, 'custom_templates', id));
+      await deleteDocument('custom_templates', id);
       await loadTemplates();
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -92,9 +85,8 @@ const CustomPendantManager: React.FC = () => {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const storageRef = ref(storage, `custom-templates/${Date.now()}-${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+    const path = `custom-templates/${Date.now()}-${file.name}`;
+    return await uploadFile('custom-templates', path, file);
   };
 
   const handleMainImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { collection, onSnapshot, doc, updateDoc, addDoc, query, where, orderBy } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { queryDocuments, subscribeToTable, createDocument, updateDocument } from '@repo/utils/supabaseClient';
 import { Package, Truck, DollarSign, AlertCircle, CheckCircle, Upload, Plus } from 'lucide-react';
 
 interface ArtistProduct {
@@ -48,6 +47,7 @@ const ArtistDashboard: React.FC = () => {
     images: [] as string[],
     shippingTracking: ''
   });
+  const [trackingNumbers, setTrackingNumbers] = useState<Record<string, string>>({});
   const [showStockModal, setShowStockModal] = useState(false);
   const [selectedProductsForStock, setSelectedProductsForStock] = useState<{[productId: string]: number}>({});
   const [shippingTracking, setShippingTracking] = useState('');
@@ -55,36 +55,36 @@ const ArtistDashboard: React.FC = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
 
-    // Fetch artist profile
-    const unsubProfile = onSnapshot(doc(db, 'artists', user.uid), (doc) => {
-      if (doc.exists()) {
-        setArtistProfile(doc.data() as ArtistProfile);
-      }
+    const load = async () => {
+      // Load artist profile
+      const profile = await queryDocuments<any>('artists', { filters: { uid: user.id }, limit: 1 });
+      if (profile && profile.length > 0) setArtistProfile(profile[0] as ArtistProfile);
+
+      // Load products
+      const prods = await queryDocuments<any>('artist_products', { filters: { artist_id: user.id } });
+      setProducts((prods || []).map((p: any) => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
+      setLoading(false);
+    };
+
+    load();
+
+    const unsubProfile = subscribeToTable('artists', async () => {
+      const profile = await queryDocuments<any>('artists', { filters: { uid: user.id }, limit: 1 });
+      if (profile && profile.length > 0) setArtistProfile(profile[0] as ArtistProfile);
     });
 
-    // Fetch artist products
-    const unsubProducts = onSnapshot(
-      query(collection(db, 'artist_products'), where('artistId', '==', user.uid)),
-      (snapshot) => {
-        const prods = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          receivedAtHub: doc.data().receivedAtHub?.toDate() || null,
-          approvedAt: doc.data().approvedAt?.toDate() || null,
-        })) as ArtistProduct[];
-        setProducts(prods);
-        setLoading(false);
-      }
-    );
+    const unsubProducts = subscribeToTable('artist_products', async () => {
+      const prods = await queryDocuments<any>('artist_products', { filters: { artist_id: user.id } });
+      setProducts((prods || []).map((p: any) => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
+    });
 
     return () => {
-      unsubProfile();
-      unsubProducts();
+      if (unsubProfile) unsubProfile();
+      if (unsubProducts) unsubProducts();
     };
-  }, [user?.uid]);
+  }, [user?.id]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -118,12 +118,12 @@ const ArtistDashboard: React.FC = () => {
         createdAt: new Date()
       };
 
-      await addDoc(collection(db, 'artist_products'), productData);
+      await createDocument('artist_products', productData as any);
 
       // Update artist's slots used
-      await updateDoc(doc(db, 'artists', user.uid), {
-        slotsUsed: artistProfile.slotsUsed + 1
-      });
+      await updateDocument('artists', user.uid, {
+        slots_used: artistProfile.slotsUsed + 1,
+      } as any);
 
       alert('Product uploaded successfully! Please ship the item to our Worcester Hub with the tracking number.');
       setShowUploadForm(false);
@@ -142,10 +142,10 @@ const ArtistDashboard: React.FC = () => {
 
   const handleAddStock = async (productId: string, trackingNumber: string) => {
     try {
-      await updateDoc(doc(db, 'artist_products', productId), {
-        shippingTracking: trackingNumber,
-        status: 'pending_approval'
-      });
+      await updateDocument('artist_products', productId, {
+        shipping_tracking: trackingNumber,
+        status: 'pending_approval',
+      } as any);
       alert('Shipping information updated. We will notify you when the item arrives.');
     } catch (error) {
       console.error('Error updating shipping:', error);
@@ -164,10 +164,10 @@ const ArtistDashboard: React.FC = () => {
     }
 
     try {
-      await updateDoc(doc(db, 'artist_products', productId), {
-        stockLevel: products.find(p => p.id === productId)?.stockLevel + quantity,
-        additionalStockFee: (products.find(p => p.id === productId)?.additionalStockFee || 0) + totalFee
-      });
+      await updateDocument('artist_products', productId, {
+        stock_level: products.find(p => p.id === productId)?.stockLevel + quantity,
+        additional_stock_fee: (products.find(p => p.id === productId)?.additionalStockFee || 0) + totalFee,
+      } as any);
 
       alert(`Additional stock added successfully! Fee of ${artistProfile.wallet.currency === 'USD' ? '$' : 'R'}${totalFee} has been charged.`);
     } catch (error) {
@@ -211,12 +211,12 @@ const ArtistDashboard: React.FC = () => {
 
         const additionalFee = quantity > 1 ? (quantity - 1) * (artistProfile.wallet.currency === 'USD' ? 0.05 : 0.50) : 0;
 
-        return updateDoc(doc(db, 'artist_products', productId), {
-          stockLevel: currentProduct.stockLevel + quantity,
-          shippingTracking: shippingTracking,
+        return updateDocument('artist_products', productId, {
+          stock_level: currentProduct.stockLevel + quantity,
+          shipping_tracking: shippingTracking,
           status: 'pending_approval',
-          additionalStockFee: (currentProduct.additionalStockFee || 0) + additionalFee
-        });
+          additional_stock_fee: (currentProduct.additionalStockFee || 0) + additionalFee,
+        } as any);
       });
 
       await Promise.all(updatePromises);
@@ -366,11 +366,11 @@ const ArtistDashboard: React.FC = () => {
                       className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded text-white"
                       onChange={(e) => {
                         // Store temporarily for submission
-                        product.tempTracking = e.target.value;
+                        setTrackingNumbers(prev => ({ ...prev, [product.id]: e.target.value }));
                       }}
                     />
                     <button
-                      onClick={() => handleAddStock(product.id, product.tempTracking || '')}
+                      onClick={() => handleAddStock(product.id, trackingNumbers[product.id] || '')}
                       className="w-full mt-2 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
                     >
                       Lock Shipping

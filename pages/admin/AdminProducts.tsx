@@ -1,11 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { auth } from '../../firebaseConfig';
 import { Product, PackagingItem, Review } from '../../types';
 import { Plus, Edit2, Trash2, Sparkles, Save, X, Link as LinkIcon, Tag, MessageSquare, Star, Gift, Clock, Package, ExternalLink, AlertTriangle, Crown, Percent, Truck, RefreshCw, Upload, Loader2, Camera, Check, Info, Bot, DollarSign, BarChart3, Search, Filter, Layers, ImagePlus, Smartphone, FileDown, Bookmark, Gem } from 'lucide-react';
 import { generateProductDescription, generateProductMetadataFromImage, generateSouthAfricanReviews, generateUniquePendantReviews } from '../../services/geminiService';
-import { storage } from '../../firebaseConfig';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '@repo/utils/supabaseClient';
 import { handleImageError } from '../../utils/imageUtils';
 
 // Chain Length Descriptions from Firestore
@@ -24,14 +22,88 @@ const DEFAULT_EARRING_PRESETS = [
   { name: 'Hypo-Allergic Plastic', modifier: 0, description: 'Plastic state bends easily' },
 ];
 
+const DEFAULT_BASE_MATERIALS = [
+   'Epoxy Resin',
+   'Copper',
+   'Aluminium',
+   'Sterling Silver',
+   'Glass Beads',
+   'Beads',
+   'Wood',
+   'Oxidized',
+];
+
+const BASE_MATERIALS_STORAGE_KEY = 'spv_base_materials';
+
 const AdminProducts: React.FC = () => {
-  const { products, addProduct, updateProduct, deleteProduct, categories, packagingPresets, materialPresets, savePackagingPreset, saveMaterialPreset, deleteMaterialPreset, dbConnectionError, login, manualWinner, setManualWinner } = useStore();
+  const { products, addProduct, updateProduct, deleteProduct, categories, packagingPresets, materialPresets, savePackagingPreset, saveMaterialPreset, deleteMaterialPreset, dbConnectionError, login, manualWinner, setManualWinner, isLoading } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isGeneratingReviews, setIsGeneratingReviews] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'pricing' | 'inventory' | 'media' | 'marketing' | 'reviews' | 'promotions' | 'gifts'>('general');
+
+   // Base Material (multi-select) presets
+   const [baseMaterialOptions, setBaseMaterialOptions] = useState<string[]>(() => {
+      try {
+         const raw = localStorage.getItem(BASE_MATERIALS_STORAGE_KEY);
+         const parsed = raw ? JSON.parse(raw) : null;
+         const fromStorage = Array.isArray(parsed) ? parsed.map((s: any) => String(s)).filter(Boolean) : [];
+         return Array.from(new Set([...DEFAULT_BASE_MATERIALS, ...fromStorage]));
+      } catch {
+         return DEFAULT_BASE_MATERIALS;
+      }
+   });
+   const [newBaseMaterial, setNewBaseMaterial] = useState('');
+
+   useEffect(() => {
+      try {
+         localStorage.setItem(BASE_MATERIALS_STORAGE_KEY, JSON.stringify(baseMaterialOptions));
+      } catch {
+         // ignore
+      }
+   }, [baseMaterialOptions]);
+
+   const parseBaseMaterials = (raw?: string) => {
+      if (!raw) return [];
+      return raw
+         .split(/[,|;]/)
+         .map(s => s.trim())
+         .filter(Boolean);
+   };
+
+   const getSelectedBaseMaterials = () => Array.from(new Set(parseBaseMaterials(formData.material)));
+
+   const setSelectedBaseMaterials = (materials: string[]) => {
+      const next = Array.from(new Set(materials.map(s => s.trim()).filter(Boolean)));
+      setFormData(prev => ({ ...prev, material: next.join(', ') }));
+   };
+
+   const toggleBaseMaterial = (materialName: string) => {
+      const normalized = materialName.trim();
+      if (!normalized) return;
+
+      const selected = getSelectedBaseMaterials();
+      const exists = selected.some(m => m.toLowerCase() === normalized.toLowerCase());
+      const next = exists
+         ? selected.filter(m => m.toLowerCase() !== normalized.toLowerCase())
+         : [...selected, normalized];
+
+      setSelectedBaseMaterials(next);
+   };
+
+   const addBaseMaterialPreset = () => {
+      const value = newBaseMaterial.trim();
+      if (!value) return;
+
+      setBaseMaterialOptions(prev => {
+         const exists = prev.some(m => m.toLowerCase() === value.toLowerCase());
+         return exists ? prev : [...prev, value];
+      });
+      setNewBaseMaterial('');
+      toggleBaseMaterial(value);
+   };
   
   // Review Editing State
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
@@ -45,14 +117,72 @@ const AdminProducts: React.FC = () => {
   const [filterPromo, setFilterPromo] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
 
-  // --- BULK EDIT STATE ---
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [isBulkEditing, setIsBulkEditing] = useState(false);
-  const [bulkEditData, setBulkEditData] = useState<{ price?: number; priceUSD?: number; compareAtPrice?: number; compareAtPriceUSD?: number }>({});
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper function for user-friendly type labels
+  const getTypeLabel = (type: string) => {
+    const typeLabels: Record<string, string> = {
+      'Ring': 'Rings',
+      'Rings': 'Rings',
+      'Stud': 'Stud Earrings',
+      'Stud Earrings': 'Stud Earrings',
+      'Dangle': 'Dangle Earrings',
+      'Dangle Earrings': 'Dangle Earrings',
+      'Pendant': 'Pendants',
+      'Pendants': 'Pendants',
+      'Bracelet': 'Bracelets',
+      'Bracelets': 'Bracelets',
+      'Watch': 'Watches',
+      'Watches': 'Watches',
+      'Jewelry Box': 'Jewelry Boxes',
+      'Jewelry Boxes': 'Jewelry Boxes',
+      'Perfume Holder': 'Perfume Holders',
+      'Perfume Holders': 'Perfume Holders',
+      'Other': 'Other'
+    };
+    return typeLabels[type] || type;
+  };
+
+   // Some older product rows may not have `type` populated (or may use `productType`).
+   // Resolve the effective type for filtering and display.
+   const getProductType = (p: any): string => {
+      const direct = (p?.type ?? '').toString().trim();
+      if (direct) return direct;
+
+      const alt = (p?.productType ?? '').toString().trim();
+      if (alt) return alt;
+
+      const name = (p?.name ?? '').toString().toLowerCase();
+      if (!name) return 'Other';
+
+      if (name.includes('perfume')) return 'Perfume Holder';
+      if (name.includes('jewelry box') || name.includes('jewellery box')) return 'Jewelry Box';
+      if (name.includes('watch')) return 'Watch';
+      if (name.includes('bracelet')) return 'Bracelet';
+      if (name.includes('pendant') || name.includes('necklace')) return 'Pendant';
+      if (name.includes('ring')) return 'Ring';
+      if (name.includes('dangle')) return 'Dangle';
+      if (name.includes('stud')) return 'Stud';
+
+      return 'Other';
+   };
+
+  // Helper function for user-friendly tab labels
+  const getTabLabel = (tab: string) => {
+    const tabLabels: Record<string, string> = {
+      'general': 'General',
+      'pricing': 'Pricing',
+      'media': 'Media',
+      'inventory': 'Inventory',
+      'marketing': 'Marketing',
+      'reviews': 'Reviews',
+      'promotions': 'Promotions',
+         'gifts': 'Gifts'
+    };
+    return tabLabels[tab] || tab;
+  };
 
   const initialFormState: Product = {
     id: '',
@@ -201,30 +331,30 @@ const AdminProducts: React.FC = () => {
     try {
         let processedImages: string[] = [];
         
-        if (storage) {
-             const uploadPromises = formData.images.map(async (img, idx) => {
-                if (img.startsWith('data:')) {
-                    try {
-                        const timestamp = Date.now();
-                        const storageRef = ref(storage, `products/${formData.id}/img_${timestamp}_${idx}`);
-                        await uploadString(storageRef, img, 'data_url');
-                        const downloadURL = await getDownloadURL(storageRef);
-                        return downloadURL;
-                    } catch (err) {
-                        console.error("Failed to upload image:", err);
-                        return "";
-                    }
-                }
-                return img;
-             });
-             
-             const results = await Promise.all(uploadPromises);
-             console.log('AdminProducts: upload raw results:', results);
-             processedImages = results.filter(img => img && img.trim() !== '');
-             console.log('AdminProducts: processedImages:', processedImages);
-        } else {
-             processedImages = formData.images.filter(img => img.trim() !== '');
-        }
+      const uploadPromises = formData.images.map(async (img, idx) => {
+         if (typeof img === 'string' && img.startsWith('data:')) {
+            try {
+               // Convert base64 data URL to Blob
+               const blob = await (await fetch(img)).blob();
+               const ext = blob.type.split('/')?.[1] || 'jpg';
+               const path = `products/${formData.id}/img_${Date.now()}_${idx}.${ext}`;
+               try {
+                  const url = await uploadFile('products', path, blob as any);
+                  return url || '';
+               } catch (uplErr) {
+                  console.warn('Supabase upload failed, falling back to base64:', uplErr);
+                  return img; // fallback to base64 so UI still works
+               }
+            } catch (err) {
+               console.error('Failed to process base64 image:', err);
+               return '';
+            }
+         }
+         return img;
+      });
+
+      const results = await Promise.all(uploadPromises);
+      processedImages = results.filter((i: string) => i && i.trim() !== '');
 
         const productToSave: Product = { 
             ...formData,
@@ -497,67 +627,46 @@ const AdminProducts: React.FC = () => {
   
   // Compute unique categories from products
   const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
-  const uniqueTypes = Array.from(new Set(products.map(p => p.type).filter(Boolean)));
+   const uniqueTypes = Array.from(new Set(products.map(p => getProductType(p)).filter(Boolean)));
 
   const filteredProducts = products.filter(p => {
      const searchLower = searchTerm.toLowerCase();
      return (p.name.toLowerCase().includes(searchLower) || p.code.toLowerCase().includes(searchLower)) &&
-            (filterType ? p.type === filterType : true) &&
+            (filterType ? getProductType(p) === filterType : true) &&
             (filterCategory ? p.category === filterCategory : true) &&
             (filterColor ? p.colors?.includes(filterColor) : true) &&
             (filterPromo ? (p.promoPrice && p.promoPrice > 0) : true) &&
             (filterStatus ? p.status === filterStatus : true);
   });
 
+  // Debug logging
+  console.log('AdminProducts Debug:', {
+    isLoading,
+    productsCount: products.length,
+    filteredProductsCount: filteredProducts.length,
+    dbConnectionError,
+    firstProduct: products[0] ? { id: products[0].id, name: products[0].name, images: products[0].images } : null
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white">Product Management</h1>
-        {!isEditing && (
-          <button onClick={handleAddNew} className="bg-pink-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-pink-500 shadow-lg transition-colors text-sm">
-            <Plus size={18} /> Add Product
-          </button>
-        )}
+            {!isEditing && (
+               <div className="flex items-center gap-3">
+                  <button onClick={handleAddNew} className="bg-pink-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-pink-500 shadow-lg transition-colors text-sm">
+                     <Plus size={18} /> Add Product
+                  </button>
+               </div>
+            )}
       </div>
 
       {/* Show DB connection error banner to admins when relevant */}
       {dbConnectionError && (
         <div className="bg-yellow-900/20 border-l-4 border-yellow-500 text-yellow-300 p-3 rounded mb-4">
-           <div className="flex items-start justify-between">
-             <div>
-               <div className="font-bold">Firestore Warning</div>
-               <div className="text-xs mt-1">{dbConnectionError}</div>
-               <div className="text-xs mt-1">Changes may be saved locally only. Fix authentication or Firestore rules to persist remotely.</div>
-             </div>
-             <div className="flex flex-col gap-2 ml-4">
-               <div className="text-xs text-gray-200 mb-1">Auth: {auth?.currentUser?.email || 'not signed in'}</div>
-               <button onClick={async () => {
-                   try {
-                     await login('spoilmevintagediy@gmail.com', 'admin@spoilme');
-                     alert('Attempted admin sign-in — check console for result.');
-                   } catch (err) { console.error('Admin sign-in attempt failed:', err); alert('Sign-in failed — check console.'); }
-                 }} className="px-3 py-1 bg-yellow-600 text-black rounded font-semibold text-sm">Sign in as admin</button>
-               <button onClick={async () => {
-                    try {
-                      // If editing, try to push current formData, otherwise no-op
-                      if (isEditing) {
-                        if (products.some(p => p.id === formData.id)) {
-                          await updateProduct(formData);
-                        } else {
-                          await addProduct(formData);
-                        }
-                        alert('Retry attempted — check console for Firestore response.');
-                      } else {
-                        alert('No active product being edited to retry.');
-                      }
-                    } catch (err) {
-                      console.error('Retry push failed:', err);
-                      alert('Retry failed — check console.');
-                    }
-                  }} className="px-3 py-1 bg-yellow-600 text-black rounded font-semibold text-sm">Retry push</button>
-               <button onClick={() => { navigator.clipboard?.writeText(JSON.stringify(localStorage.getItem('spv_products'))); alert('Local products JSON copied to clipboard'); }} className="px-3 py-1 bg-zinc-800 text-white rounded text-sm">Copy local backup</button>
-             </div>
-           </div>
+          <div className="font-bold">Supabase Warning</div>
+          <div className="text-xs mt-1">{dbConnectionError}</div>
+          <div className="text-xs mt-1">Changes may be saved locally only. Fix Supabase auth/permissions to persist remotely.</div>
         </div>
       )}
 
@@ -573,15 +682,7 @@ const AdminProducts: React.FC = () => {
                 <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
                    value={filterType} onChange={e => setFilterType(e.target.value)}>
                    <option value="">All Types</option>
-                   <option value="Ring">Rings</option>
-                   <option value="Stud">Stud Earrings</option>
-                   <option value="Dangle">Dangle Earrings</option>
-                   <option value="Pendant">Pendants</option>
-                   <option value="Bracelet">Bracelets</option>
-                   <option value="Watch">Watches</option>
-                   <option value="Jewelry Box">Jewelry Boxes</option>
-                   <option value="Perfume Holder">Perfume Holders</option>
-                   <option value="Other">Other</option>
+                   {uniqueTypes.map(type => <option key={type} value={type}>{getTypeLabel(type)}</option>)}
                 </select>
              </div>
              <div className="relative">
@@ -604,7 +705,6 @@ const AdminProducts: React.FC = () => {
                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all flex items-center gap-2 ${filterPromo ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-black border-gray-700 text-gray-400 hover:bg-zinc-800'}`}>
                 <Tag size={16} /> {filterPromo ? 'Promotions Active' : 'Show Promotions'}
              </button>
-             {/* --- STATUS FILTER DROPDOWN --- */}
              <div className="relative">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                 <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
@@ -620,46 +720,12 @@ const AdminProducts: React.FC = () => {
          </div>
       )}
 
-      {/* Bulk Selection by Type */}
-      {!isEditing && uniqueTypes.length > 0 && (
-         <div className="bg-zinc-900 p-4 rounded-xl border border-gray-800">
-             <h3 className="text-white font-bold mb-3 flex items-center gap-2"><Filter size={18} className="text-cyan-400" /> Bulk Select by Type</h3>
-             <div className="flex flex-wrap gap-2">
-                {uniqueTypes.map(type => (
-                   <button key={type} onClick={() => {
-                      const typeProducts = filteredProducts.filter(p => p.type === type).map(p => p.id);
-                      const allSelected = typeProducts.every(id => selectedProducts.includes(id));
-                      if (allSelected) {
-                         setSelectedProducts(selectedProducts.filter(id => !typeProducts.includes(id)));
-                      } else {
-                         setSelectedProducts([...new Set([...selectedProducts, ...typeProducts])]);
-                      }
-                   }} className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all flex items-center gap-2 ${filteredProducts.filter(p => p.type === type).every(p => selectedProducts.includes(p.id)) ? 'bg-cyan-900/30 border-cyan-500 text-cyan-400' : 'bg-black border-gray-700 text-gray-400 hover:bg-zinc-800'}`}>
-                      {type} ({filteredProducts.filter(p => p.type === type).length})
-                   </button>
-                ))}
-                {selectedProducts.length > 0 && (
-                   <button onClick={() => setSelectedProducts([])} className="px-3 py-2 text-xs text-gray-500 hover:text-white underline decoration-dotted">Clear All</button>
-                )}
-             </div>
-         </div>
-      )}
-
-      {!isEditing && selectedProducts.length > 0 && (
-         <div className="bg-zinc-900 p-4 rounded-xl border border-gray-800 flex items-center justify-between">
-             <span className="text-white text-sm">{selectedProducts.length} product(s) selected</span>
-             <button onClick={() => setIsBulkEditing(true)} className="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-500 flex items-center gap-2">
-                <Edit2 size={16} /> Bulk Edit Prices
-             </button>
-         </div>
-      )}
-
       {isEditing ? (
         <div className="bg-zinc-900 rounded-xl border border-gray-800 shadow-sm overflow-hidden">
           <div className="flex border-b border-gray-800 bg-zinc-950/50 overflow-x-auto no-scrollbar">
              {['general', 'pricing', 'media', 'inventory', 'marketing', 'reviews', 'promotions', 'gifts'].map((tab) => (
-               <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-6 py-4 text-sm font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-500/5' : 'text-gray-400 hover:text-white'}`}>
-                 {tab}
+               <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab ? 'text-pink-500 border-b-2 border-pink-500 bg-pink-500/5' : 'text-gray-400 hover:text-white'}`}>
+                 {getTabLabel(tab)}
                </button>
              ))}
           </div>
@@ -735,8 +801,58 @@ const AdminProducts: React.FC = () => {
                    </div>
                    <div>
                       <label className="block text-sm font-medium text-gray-400 mb-1">Base Material</label>
-                      <input type="text" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm" 
-                         value={formData.material} onChange={e => setFormData({...formData, material: e.target.value})} placeholder="e.g. Epoxy Resin, Copper" />
+                                 <div className="bg-black/40 border border-gray-800 rounded-lg p-3">
+                                    <div className="flex flex-wrap gap-2">
+                                       {baseMaterialOptions.map(option => {
+                                          const selected = getSelectedBaseMaterials().some(m => m.toLowerCase() === option.toLowerCase());
+                                          return (
+                                             <button
+                                                key={option}
+                                                type="button"
+                                                onClick={() => toggleBaseMaterial(option)}
+                                                className={
+                                                   selected
+                                                      ? 'px-3 py-1.5 rounded-full text-xs font-bold border bg-cyan-600/20 border-cyan-500 text-cyan-200'
+                                                      : 'px-3 py-1.5 rounded-full text-xs font-medium border bg-zinc-900 border-gray-700 text-gray-300 hover:text-white hover:border-gray-500'
+                                                }
+                                                title={selected ? 'Remove' : 'Add'}
+                                             >
+                                                <span className="inline-flex items-center gap-1">
+                                                   {selected && <Check size={14} />}
+                                                   {option}
+                                                </span>
+                                             </button>
+                                          );
+                                       })}
+                                    </div>
+
+                                    <div className="mt-3 flex gap-2">
+                                       <input
+                                          type="text"
+                                          className="flex-1 p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                                          value={newBaseMaterial}
+                                          onChange={e => setNewBaseMaterial(e.target.value)}
+                                          placeholder="Add new material (saved)"
+                                          onKeyDown={e => {
+                                             if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                addBaseMaterialPreset();
+                                             }
+                                          }}
+                                       />
+                                       <button
+                                          type="button"
+                                          onClick={addBaseMaterialPreset}
+                                          className="px-3 bg-zinc-800 border border-gray-700 rounded-md text-gray-200 hover:text-white hover:bg-zinc-700 transition-colors"
+                                       >
+                                          Save
+                                       </button>
+                                    </div>
+
+                                    <div className="mt-2 text-xs text-gray-500">
+                                       Selected: {getSelectedBaseMaterials().length ? getSelectedBaseMaterials().join(', ') : 'None'}
+                                    </div>
+                                 </div>
                    </div>
                 </div>
               </div>
@@ -1276,19 +1392,42 @@ const AdminProducts: React.FC = () => {
              <button onClick={handleSave} disabled={isSaving} className="px-6 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-500 flex items-center gap-2 shadow transition-colors text-sm font-semibold disabled:opacity-50">{isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} {isSaving ? 'Saving...' : 'Save Product'}</button>
           </div>
         </div>
+      ) : isLoading ? (
+        <div className="bg-zinc-900 rounded-xl border border-gray-800 shadow-sm p-8 text-center">
+          <Loader2 className="animate-spin mx-auto mb-4" size={32} />
+          <p className="text-gray-400">Loading products...</p>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-zinc-900 rounded-xl border border-gray-800 shadow-sm p-8 text-center">
+          <Package className="mx-auto mb-4 text-gray-500" size={48} />
+          <h3 className="text-lg font-medium text-gray-300 mb-2">No products found</h3>
+          <p className="text-gray-500 mb-4">
+            {products.length === 0 
+              ? "No products have been loaded from the database yet." 
+              : "No products match your current filters."
+            }
+          </p>
+          {products.length === 0 && (
+            <p className="text-xs text-gray-600 mb-4">
+              Check the browser console for any Supabase connection errors.
+            </p>
+          )}
+          <button onClick={handleAddNew} className="bg-pink-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-pink-500 shadow-lg transition-colors mx-auto">
+            <Plus size={18} /> Add First Product
+          </button>
+        </div>
       ) : (
         <div className="bg-zinc-900 rounded-xl border border-gray-800 shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-950 border-b border-gray-800 text-gray-400 font-medium">
-              <tr><th className="p-4"><input type="checkbox" checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0} onChange={(e) => { if (e.target.checked) setSelectedProducts(filteredProducts.map(p => p.id)); else setSelectedProducts([]); }} className="rounded bg-black border-gray-600" /></th><th className="p-4">Product</th><th className="p-4">Type</th><th className="p-4">SKU</th><th className="p-4">Price (R)</th><th className="p-4">Price (USD)</th><th className="p-4">Stock</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
+                     <tr><th className="p-4">Product</th><th className="p-4">Type</th><th className="p-4">SKU</th><th className="p-4">Price (R)</th><th className="p-4">Price (USD)</th><th className="p-4">Stock</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {filteredProducts.map(product => (
                 <tr key={product.id} className="hover:bg-zinc-800/50 group transition-colors">
-                  <td className="p-4"><input type="checkbox" checked={selectedProducts.includes(product.id)} onChange={(e) => { if (e.target.checked) setSelectedProducts([...selectedProducts, product.id]); else setSelectedProducts(selectedProducts.filter(id => id !== product.id)); }} className="rounded bg-black border-gray-600" /></td>
                   <td className="p-4 flex items-center gap-3"><img src={product.images[0] || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded bg-black object-cover border border-gray-800" alt="" onError={handleImageError} />
                   <div><span className="font-medium text-gray-200 block">{product.name}</span><span className="text-xs text-gray-500">{product.category}</span></div></td>
-                  <td className="p-4 text-gray-400">{product.type}</td>
+                  <td className="p-4 text-gray-400">{getTypeLabel(getProductType(product))}</td>
                   <td className="p-4 text-gray-500 font-mono text-xs">{product.code}</td>
                   <td className="p-4 font-medium text-green-400">R{(product.price ? product.price.toFixed(2) : '0.00')}</td>
                   <td className="p-4 font-medium text-yellow-400">$ {(product.priceUSD ? product.priceUSD.toFixed(2) : '0.00')}</td>
@@ -1311,69 +1450,6 @@ const AdminProducts: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Edit Modal */}
-      {isBulkEditing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-zinc-900 p-6 rounded-xl border border-gray-800 max-w-md w-full mx-4">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Edit2 size={18} className="text-cyan-400" /> Bulk Edit Prices</h3>
-            <p className="text-gray-400 text-sm mb-4">Update prices for {selectedProducts.length} selected product(s). Leave fields empty to keep current values.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (R)</label>
-                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={bulkEditData.price || ''} onChange={e => setBulkEditData({...bulkEditData, price: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Retail Price (USD)</label>
-                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={bulkEditData.priceUSD || ''} onChange={e => setBulkEditData({...bulkEditData, priceUSD: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">RRP (R)</label>
-                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={bulkEditData.compareAtPrice || ''} onChange={e => setBulkEditData({...bulkEditData, compareAtPrice: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">RRP (USD)</label>
-                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={bulkEditData.compareAtPriceUSD || ''} onChange={e => setBulkEditData({...bulkEditData, compareAtPriceUSD: parseFloat(e.target.value) || undefined})} placeholder="Leave empty to keep current" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => { setIsBulkEditing(false); setBulkEditData({}); }} className="px-4 py-2 text-gray-400 hover:bg-gray-800 rounded-lg transition-colors text-sm">Cancel</button>
-              <button onClick={async () => {
-                try {
-                  for (const productId of selectedProducts) {
-                    const product = products.find(p => p.id === productId);
-                    if (product) {
-                      const updatedProduct = {
-                        ...product,
-                        price: bulkEditData.price !== undefined ? bulkEditData.price : product.price,
-                        priceUSD: bulkEditData.priceUSD !== undefined ? bulkEditData.priceUSD : product.priceUSD,
-                        compareAtPrice: bulkEditData.compareAtPrice !== undefined ? bulkEditData.compareAtPrice : product.compareAtPrice,
-                        compareAtPriceUSD: bulkEditData.compareAtPriceUSD !== undefined ? bulkEditData.compareAtPriceUSD : product.compareAtPriceUSD,
-                        memberPrice: bulkEditData.price !== undefined ? parseFloat((bulkEditData.price * 0.8).toFixed(2)) : product.memberPrice,
-                        memberPriceUSD: bulkEditData.priceUSD !== undefined ? parseFloat((bulkEditData.priceUSD * 0.8).toFixed(2)) : product.memberPriceUSD
-                      };
-                      await updateProduct(updatedProduct);
-                    }
-                  }
-                  setSelectedProducts([]);
-                  setIsBulkEditing(false);
-                  setBulkEditData({});
-                  alert('Bulk update completed successfully!');
-                } catch (error) {
-                  console.error('Bulk update failed:', error);
-                  alert('Bulk update failed. Please check console.');
-                }
-              }} className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 flex items-center gap-2 shadow transition-colors text-sm font-semibold">
-                <Save size={18} /> Update Prices
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* MANUAL WINNER OVERRIDE SECTION */}
       <div className="bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-500/30 p-6 rounded-xl mt-6">
          <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Crown size={18} className="text-yellow-400" /> Manual Winner Override</h3>
@@ -1382,17 +1458,17 @@ const AdminProducts: React.FC = () => {
             <div>
                <label className="block text-sm font-medium text-gray-400 mb-1">Winner Name</label>
                <input type="text" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={manualWinner?.name || ''} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, name: e.target.value } : { name: e.target.value, prize: 500, currency: 'ZAR' as const })} placeholder="e.g. John Doe" />
+                  value={manualWinner?.name || ''} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, name: e.target.value } : { name: e.target.value, prize: 500, currency: 'ZAR' as const, rank: 1 })} placeholder="e.g. John Doe" />
             </div>
             <div>
                <label className="block text-sm font-medium text-gray-400 mb-1">Prize Amount</label>
                <input type="number" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={manualWinner?.prize || ''} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, prize: parseFloat(e.target.value) || 0 } : { name: '', prize: parseFloat(e.target.value) || 0, currency: 'ZAR' as const })} placeholder="500" />
+                  value={manualWinner?.prize || ''} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, prize: parseFloat(e.target.value) || 0 } : { name: '', prize: parseFloat(e.target.value) || 0, currency: 'ZAR' as const, rank: 1 })} placeholder="500" />
             </div>
             <div>
                <label className="block text-sm font-medium text-gray-400 mb-1">Currency</label>
                <select className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                  value={manualWinner?.currency || 'ZAR'} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, currency: e.target.value as 'ZAR' | 'USD' } : { name: '', prize: 500, currency: e.target.value as 'ZAR' | 'USD' })}>
+                  value={manualWinner?.currency || 'ZAR'} onChange={e => setManualWinner(manualWinner ? { ...manualWinner, currency: e.target.value as 'ZAR' | 'USD' } : { name: '', prize: 500, currency: e.target.value as 'ZAR' | 'USD', rank: 1 })}>
                   <option value="ZAR">ZAR (R)</option>
                   <option value="USD">USD ($)</option>
                </select>

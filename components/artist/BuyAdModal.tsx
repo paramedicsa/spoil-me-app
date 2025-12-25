@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useAdConfig } from '../../hooks/useAdConfig';
-import { functions } from '../../firebaseConfig';
-import { httpsCallable } from 'firebase/functions';
+import { supabase } from '../../services/supabaseClient';
 
 interface BuyAdModalProps {
   productId: string;
@@ -29,16 +28,17 @@ const BuyAdModal: React.FC<BuyAdModalProps> = ({ productId, onClose }) => {
 
     setProcessing(true);
     try {
-      const purchaseAd = httpsCallable(functions, 'purchaseAd');
-      // result may be untyped from firebase functions SDK; treat as unknown and guard
-      const result: any = await purchaseAd({
-        productId,
-        packageId: selectedPkg.id,
-        includeSocial,
-        paymentMethod: 'wallet'
+      const { data, error } = await supabase.functions.invoke('purchaseAd', {
+        body: {
+          productId,
+          packageId: selectedPkg.id,
+          includeSocial,
+          paymentMethod: 'wallet'
+        }
       });
-      const success = result?.data?.success;
-      const message = result?.data?.message;
+      if (error) throw error;
+      const success = data?.success;
+      const message = data?.message;
 
       if (success) {
         alert('Ad purchased successfully! Your product is now promoted.');

@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, User, Crown, CreditCard, Clock, CheckCircle, XCircle, Users as UsersIcon, Download, Filter } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { httpsCallable, getFunctions } from 'firebase/functions';
-import { db, app } from '../../firebaseConfig';
-import { collection, query, orderBy, limit, startAfter, getDocs, where } from 'firebase/firestore';
+import { callServerFunction } from '@repo/utils/supabaseClient';
+import { queryDocuments } from '@repo/utils/supabaseClient';
 
-// Initialize Firebase Functions
-const functions = app ? getFunctions(app) : null;
+// Use server-side functions via HTTP proxy
 
 const MemberManagement: React.FC = () => {
   const { user } = useStore();
@@ -54,19 +52,10 @@ const MemberManagement: React.FC = () => {
     try {
       // This would typically call a cloud function to search users
       // For now, we'll simulate with a direct Firestore query
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef,
-        where('email', '>=', searchTerm),
-        where('email', '<=', searchTerm + '\uf8ff'),
-        limit(10)
-      );
-      const querySnapshot = await getDocs(q);
-      const users = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setSearchResults(users);
+      // Supabase search: use exact or prefix matching via a helper or server-side search.
+      // For now, perform an exact email lookup which is strict but reliable.
+      const users = await queryDocuments<any>('users', { filters: { email: searchTerm }, limit: 10 });
+      setSearchResults(users || []);
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
@@ -82,14 +71,12 @@ const MemberManagement: React.FC = () => {
     if (!userId && trialEmail) {
       // Find user by email
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', trialEmail));
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
+        const users = await queryDocuments<any>('users', { filters: { email: trialEmail }, limit: 1 });
+        if (!users || users.length === 0) {
           alert('User not found with that email.');
           return;
         }
-        userId = snapshot.docs[0].id;
+        userId = users[0].id;
       } catch (error) {
         console.error('Error finding user:', error);
         alert('Error finding user.');
@@ -98,8 +85,7 @@ const MemberManagement: React.FC = () => {
     }
 
     try {
-      const grantTrialFunction = httpsCallable(functions, 'grantTrial');
-      await grantTrialFunction({
+      await callServerFunction('grantTrial', {
         userId: userId,
         plan: trialPlan,
         days: trialDays
@@ -122,8 +108,7 @@ const MemberManagement: React.FC = () => {
     if (!selectedUser || !functions) return;
 
     try {
-      const adjustCreditFunction = httpsCallable(functions, 'adjustStoreCredit');
-      await adjustCreditFunction({
+      await callServerFunction('adjustStoreCredit', {
         userId: selectedUser.id,
         amount: creditAmount
       });
@@ -161,18 +146,9 @@ const MemberManagement: React.FC = () => {
   const fetchInitialUsers = async () => {
     setLoading(true);
     try {
-      const usersRef = collection(db, 'users');
-      // Order by 'createdAt' desc to show newest members first
-      const q = query(usersRef, orderBy('createdAt', 'desc'), limit(20));
-
-      const snapshot = await getDocs(q);
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-
-      const newUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      setUsers(newUsers);
-      setLastVisible(lastDoc);
-      setHasMore(snapshot.docs.length === 20); // If less than 20, we hit the end
+      const newUsers = await queryDocuments<any>('users', { orderBy: { column: 'created_at', ascending: false }, limit: 20 });
+      setUsers(newUsers || []);
+      setHasMore((newUsers?.length || 0) === 20);
     } catch (error) {
       console.error("Error loading users:", error);
     } finally {
@@ -184,23 +160,12 @@ const MemberManagement: React.FC = () => {
   const fetchMoreUsers = async () => {
     if (!lastVisible || loading) return;
     setLoading(true);
-
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef,
-        orderBy('createdAt', 'desc'),
-        startAfter(lastVisible), // Start after the previous last one
-        limit(20)
-      );
-
-      const snapshot = await getDocs(q);
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-      const newUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      setUsers(prev => [...prev, ...newUsers]); // Append to existing list
-      setLastVisible(lastDoc);
-      setHasMore(snapshot.docs.length === 20);
+      // Supabase pagination via offset (current length)
+      const offset = users.length;
+      const newUsers = await queryDocuments<any>('users', { orderBy: { column: 'created_at', ascending: false }, limit: 20, offset });
+      setUsers(prev => [...prev, ...(newUsers || [])]);
+      setHasMore((newUsers?.length || 0) === 20);
     } catch (error) {
       console.error("Error loading more:", error);
     } finally {
@@ -215,15 +180,10 @@ const MemberManagement: React.FC = () => {
       fetchInitialUsers(); // Reset if empty
       return;
     }
-
-    // Note: Firebase search is strict. We usually search by exact Email or UID.
-    // Ideally, use a dedicated search field like 'email'
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '>=', term), where('email', '<=', term + '\uf8ff'), limit(20));
-
-    const snapshot = await getDocs(q);
-    setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    setHasMore(false); // Disable pagination during search results
+    // Use an exact email lookup for search for now
+    const results = await queryDocuments<any>('users', { filters: { email: term }, limit: 20 });
+    setUsers(results || []);
+    setHasMore(false);
   };
 
   // Autocomplete handler
@@ -242,19 +202,15 @@ const MemberManagement: React.FC = () => {
 
     // Set new timeout
     searchTimeout.current = setTimeout(() => {
-      // Fetch suggestions from Firestore
       const fetchSuggestions = async () => {
-        const usersRef = collection(db, 'users');
-        const q = query(
-          usersRef,
-          where('email', '>=', term),
-          where('email', '<=', term + '\uf8ff'),
-          limit(10)
-        );
-
-        const querySnapshot = await getDocs(q);
-        const emails = querySnapshot.docs.map(doc => doc.data().email);
-        setSuggestions(emails);
+        try {
+          const users = await queryDocuments<any>('users', { orderBy: { column: 'created_at', ascending: false }, limit: 50 });
+          const emails = (users || []).map(u => u.email).filter((e: string) => e && e.toLowerCase().includes(term.toLowerCase())).slice(0, 10);
+          setSuggestions(emails);
+        } catch (err) {
+          console.error('Failed to fetch suggestions:', err);
+          setSuggestions([]);
+        }
       };
 
       fetchSuggestions();
@@ -266,41 +222,30 @@ const MemberManagement: React.FC = () => {
     setLoading(true);
     setSuggestions([]); // Clear suggestions if any
     try {
-      const usersRef = collection(db, 'users');
-      let q = query(usersRef, orderBy('createdAt', 'desc'));
-
-      // Apply region filter
-      if (filterRegion === 'ZA') {
-        q = query(q, where('country', '==', 'South Africa'));
-      } else if (filterRegion === 'other') {
-        q = query(q, where('country', '!=', 'South Africa'));
-      }
-
-      // Apply type filter (Buyers Only)
-      if (filterType === 'buyers') {
-        q = query(q, where('ordersCount', '>', 0));
-      }
-
-      // Apply search term (Priority Override)
+      // Fetch a page of users from Supabase and apply simple filters client-side
       if (searchTerm) {
-        q = query(collection(db, 'users'), where('email', '==', searchTerm));
+        const results = await queryDocuments<any>('users', { filters: { email: searchTerm }, limit: fetchLimit });
+        const filtered = (results || []).filter((u: any) => {
+          if (filterRegion === 'ZA' && (u.country || '').toLowerCase() !== 'south africa') return false;
+          if (filterRegion === 'other' && (u.country || '').toLowerCase() === 'south africa') return false;
+          if (filterType === 'buyers' && ((u.ordersCount || 0) <= 0)) return false;
+          return true;
+        });
+        setUsers(filtered);
+        setHasMore(false);
+        if (filtered.length === 0) alert('No users found matching these filters.');
       } else {
-        // Only sort by date if NOT searching by exact email (Firestore restriction)
-        q = query(q, orderBy('createdAt', 'desc'));
+        const results = await queryDocuments<any>('users', { orderBy: { column: 'created_at', ascending: false }, limit: fetchLimit });
+        const filtered = (results || []).filter((u: any) => {
+          if (filterRegion === 'ZA' && (u.country || '').toLowerCase() !== 'south africa') return false;
+          if (filterRegion === 'other' && (u.country || '').toLowerCase() === 'south africa') return false;
+          if (filterType === 'buyers' && ((u.ordersCount || 0) <= 0)) return false;
+          return true;
+        });
+        setUsers(filtered);
+        setHasMore((results?.length || 0) === fetchLimit);
+        if (filtered.length === 0) alert('No users found matching these filters.');
       }
-
-      // Apply limit
-      q = query(q, limit(fetchLimit));
-
-      const snapshot = await getDocs(q);
-      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-      const newUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      setUsers(newUsers);
-      setLastVisible(lastDoc);
-      setHasMore(snapshot.docs.length === fetchLimit);
-
-      if (newUsers.length === 0) alert("No users found matching these filters.");
     } catch (error: any) {
       console.error("Error applying filters:", error);
       if (error.message.includes("requires an index")) {

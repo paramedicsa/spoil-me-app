@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { getDocument, updateDocument, createDocument } from '@repo/utils/supabaseClient';
 
 interface AdPackage {
   id: string;
@@ -30,10 +29,8 @@ const AdminAdPricing: React.FC = () => {
 
   const loadConfig = async () => {
     try {
-      const docRef = doc(db, 'settings', 'ad_config');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+      const data = await getDocument<{ packages?: AdPackage[]; socialAddon?: SocialAddon }>('settings', 'ad_config');
+      if (data) {
         setPackages(data.packages || []);
         setSocialAddon(data.socialAddon || socialAddon);
       }
@@ -46,10 +43,19 @@ const AdminAdPricing: React.FC = () => {
 
   const saveConfig = async () => {
     try {
-      await setDoc(doc(db, 'settings', 'ad_config'), {
-        packages,
-        socialAddon
-      });
+      try {
+        await updateDocument('settings', 'ad_config', {
+          packages,
+          socialAddon,
+        });
+      } catch (err) {
+        // If update failed (e.g., record doesn't exist), create it
+        await createDocument('settings', {
+          id: 'ad_config',
+          packages,
+          socialAddon,
+        });
+      }
       alert('Configuration saved successfully!');
     } catch (error) {
       console.error('Error saving ad config:', error);

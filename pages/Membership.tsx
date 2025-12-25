@@ -203,16 +203,7 @@ const Membership: React.FC = () => {
         <SubscriptionTermsModal
           isOpen={termsModalVisible}
           onClose={() => setTermsModalVisible(false)}
-          onAgree={() => {
-            setTermsAgreed(true);
-            setTermsModalVisible(false); // Close the modal after agreeing
-            // Proceed with payment after agreeing to terms
-            if (selectedPlanForSubscription) {
-              proceedToPayment(selectedPlanForSubscription);
-            }
-          }}
           plan={selectedPlanForSubscription}
-          currentUser={user}
           initialView={user ? 'terms' : 'auth'}
         />
       )}

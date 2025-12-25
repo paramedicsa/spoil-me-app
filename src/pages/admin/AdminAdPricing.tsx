@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardBody, Button, Input, Switch } from "@nextui-org/react";
-import { useStore } from '../../context/StoreContext';
+import { useStore } from '../../../context/StoreContext';
 
 const AdminAdPricing: React.FC = () => {
   const { db } = useStore();
@@ -111,19 +111,19 @@ const AdminAdPricing: React.FC = () => {
             <Input
               label="Price ZAR"
               type="number"
-              value={socialAddon.priceZAR}
+              value={socialAddon.priceZAR.toString()}
               onChange={(e) => handleSocialChange('priceZAR', parseFloat(e.target.value))}
             />
             <Input
               label="Price USD"
               type="number"
-              value={socialAddon.priceUSD}
+              value={socialAddon.priceUSD.toString()}
               onChange={(e) => handleSocialChange('priceUSD', parseFloat(e.target.value))}
             />
             <Input
               label="Network Reach"
               type="number"
-              value={socialAddon.reachCount}
+              value={socialAddon.reachCount.toString()}
               onChange={(e) => handleSocialChange('reachCount', parseInt(e.target.value))}
             />
           </div>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+import { queryDocuments } from '@repo/utils/supabaseClient';
 import { CustomTemplate } from '../types';
 import { ArrowLeft, Sparkles, Crown } from 'lucide-react';
 
@@ -16,12 +15,10 @@ const CustomizedWireWrappedPendants: React.FC = () => {
 
   const fetchTemplates = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'custom_templates'));
-      const loadedTemplates: CustomTemplate[] = [];
-      querySnapshot.forEach((doc) => {
-        loadedTemplates.push({ id: doc.id, ...doc.data() } as CustomTemplate);
+      const loadedTemplates = await queryDocuments<CustomTemplate>('custom_templates', {
+        orderBy: { column: 'created_at', ascending: false }
       });
-      setTemplates(loadedTemplates.filter(t => t.isActive !== false));
+      setTemplates((loadedTemplates || []).filter((t: any) => t.isActive !== false));
     } catch (error) {
       console.error('Error fetching templates:', error);
     } finally {

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { auth, db } from '../firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { signUpWithEmail } from '@repo/utils/supabaseClient';
 
 interface RegisterFormProps {
   onSuccess: () => void;
@@ -45,11 +43,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
-
-      // Save extended profile to Firestore
-      await setDoc(doc(db, 'users', user.uid), {
+      await signUpWithEmail(formData.email, formData.password, {
         firstName: formData.firstName,
         lastName: formData.lastName,
         dob: formData.dob,
@@ -57,7 +51,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         favoriteColor: formData.favoriteColor,
         country: formData.country,
         email: formData.email,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         membershipTier: 'none',
         role: 'user',
         wishlist: []
@@ -65,8 +59,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
 
       onSuccess();
     } catch (error: any) {
-      console.error("Registration Error", error);
-      alert(error.message || "Registration failed. Please try again.");
+      console.error('Registration Error', error);
+      alert(error.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

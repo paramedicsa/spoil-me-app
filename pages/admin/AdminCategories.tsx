@@ -3,8 +3,7 @@ import React, { useRef, useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Category } from '../../types';
 import { ArrowUp, ArrowDown, X, Upload, Plus, Loader2 } from 'lucide-react';
-import { storage } from '../../firebaseConfig';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFile } from '@repo/utils/supabaseClient';
 
 const AdminCategories: React.FC = () => {
   const { categories, addCategory, updateCategory, deleteCategory, replaceCategories } = useStore();
@@ -24,27 +23,18 @@ const AdminCategories: React.FC = () => {
   const handleImageUpload = async (id: string, file: File) => {
     if (!file) return;
 
-    // 1. Try Uploading to Firebase Storage
-    if (storage) {
-      try {
-        setUploadingId(id);
-        const timestamp = Date.now();
-        // Create a unique reference: categories/{id}/{timestamp}_{filename}
-        const storageRef = ref(storage, `categories/${id}/${timestamp}_${file.name}`);
-        
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        
-        const category = categories.find(c => c.id === id);
-        if (category) {
-          updateCategory({ ...category, image: downloadURL });
-        }
-        setUploadingId(null);
-        return;
-      } catch (error) {
-        console.error("Firebase Storage Upload failed:", error);
-        // Fallthrough to Base64 if upload fails (e.g. offline)
-      }
+    // Try uploading to Supabase Storage (fallback to Base64 if offline)
+    try {
+      setUploadingId(id);
+      const timestamp = Date.now();
+      const path = `categories/${id}/${timestamp}_${file.name}`;
+      const url = await uploadFile('categories', path, file);
+      const category = categories.find(c => c.id === id);
+      if (category) updateCategory({ ...category, image: url });
+      setUploadingId(null);
+      return;
+    } catch (err) {
+      console.warn('Supabase upload failed, falling back to base64:', err);
     }
 
     // 2. Fallback: Local Base64 (Demo Mode or Offline)

@@ -1,8 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { Request, Response } from 'express';
-import { db } from '../firebaseConfig'; // Assuming Firebase is used for database
-import { doc, updateDoc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { supabase, getDocument, updateDocument, createDocument, queryDocuments } from '@repo/utils/supabaseClient';
 
 const router = express.Router();
 
@@ -55,22 +54,17 @@ function verifyPayPalSignature(req: Request): boolean {
 // Extend user membership by 30 days
 async function extendMembership(userId: string): Promise<void> {
   try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
+    const user = await getDocument<any>('users', userId);
+    if (!user) throw new Error(`User ${userId} not found`);
 
-    if (!userDoc.exists()) {
-      throw new Error(`User ${userId} not found`);
-    }
-
-    const userData = userDoc.data();
-    const currentExpiry = userData.membershipExpiry ? new Date(userData.membershipExpiry) : new Date();
+    const currentExpiry = user.membershipExpiry ? new Date(user.membershipExpiry) : new Date();
     const newExpiry = new Date(currentExpiry);
     newExpiry.setDate(newExpiry.getDate() + 30);
 
-    await updateDoc(userRef, {
+    await updateDocument('users', userId, {
       membershipExpiry: newExpiry.toISOString(),
       membershipStatus: 'active',
-      lastPaymentDate: new Date().toISOString()
+      lastPaymentDate: new Date().toISOString(),
     });
 
     console.log(`Extended membership for user ${userId} until ${newExpiry.toISOString()}`);
@@ -83,48 +77,37 @@ async function extendMembership(userId: string): Promise<void> {
 // Process affiliate commission
 async function processAffiliateCommission(userId: string, planType: string): Promise<void> {
   try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
+    const user = await getDocument<any>('users', userId);
+    if (!user) throw new Error(`User ${userId} not found`);
 
-    if (!userDoc.exists()) {
-      throw new Error(`User ${userId} not found`);
-    }
-
-    const userData = userDoc.data();
-    const referrerId = userData.referrerId || userData.affiliateReferrer;
-
+    const referrerId = user.referrerId || user.affiliateReferrer;
     if (!referrerId) {
       console.log(`No referrer found for user ${userId}`);
       return;
     }
 
     const commissionAmount = COMMISSION_RATES[planType.toLowerCase()] || 0;
-
     if (commissionAmount === 0) {
       console.log(`No commission rate found for plan type: ${planType}`);
       return;
     }
 
-    // Update affiliate's wallet balance
-    const affiliateRef = doc(db, 'users', referrerId);
-    const affiliateDoc = await getDoc(affiliateRef);
-
-    if (!affiliateDoc.exists()) {
+    const affiliate = await getDocument<any>('users', referrerId);
+    if (!affiliate) {
       console.error(`Affiliate ${referrerId} not found`);
       return;
     }
 
-    const affiliateData = affiliateDoc.data();
-    const currentBalance = affiliateData.affiliateBalance || 0;
+    const currentBalance = affiliate.affiliateBalance || 0;
     const newBalance = currentBalance + commissionAmount;
 
-    await updateDoc(affiliateRef, {
+    await updateDocument('users', referrerId, {
       affiliateBalance: newBalance,
-      lastCommissionDate: new Date().toISOString()
+      lastCommissionDate: new Date().toISOString(),
     });
 
     // Log the commission
-    await addDoc(collection(db, 'commissions'), {
+    await createDocument('commissions', {
       affiliateId: referrerId,
       referredUserId: userId,
       amount: commissionAmount,
@@ -132,7 +115,7 @@ async function processAffiliateCommission(userId: string, planType: string): Pro
       type: 'subscription',
       planType: planType,
       date: new Date().toISOString(),
-      status: 'completed'
+      status: 'completed',
     });
 
     console.log(`Processed commission: $${commissionAmount} to affiliate ${referrerId} for referring user ${userId}`);
@@ -145,11 +128,10 @@ async function processAffiliateCommission(userId: string, planType: string): Pro
 // Handle payment failure
 async function handlePaymentFailure(userId: string): Promise<void> {
   try {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
+    await updateDocument('users', userId, {
       membershipStatus: 'grace_period',
       paymentFailedDate: new Date().toISOString(),
-      vaultAccessLocked: true
+      vaultAccessLocked: true,
     });
 
     // TODO: Send email notification
@@ -163,20 +145,15 @@ async function handlePaymentFailure(userId: string): Promise<void> {
 // Handle subscription cancellation
 async function handleSubscriptionCancelled(userId: string, subscriptionId: string): Promise<void> {
   try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
+    const user = await getDocument<any>('users', userId);
+    if (!user) throw new Error(`User ${userId} not found`);
 
-    if (!userDoc.exists()) {
-      throw new Error(`User ${userId} not found`);
-    }
+    const expiryDate = user.membershipExpiry;
 
-    const userData = userDoc.data();
-    const expiryDate = userData.membershipExpiry;
-
-    await updateDoc(userRef, {
+    await updateDocument('users', userId, {
       membershipStatus: 'cancelled_pending',
       subscriptionCancelledDate: new Date().toISOString(),
-      vaultLadderResetScheduled: expiryDate // Reset vault ladder on expiry
+      vaultLadderResetScheduled: expiryDate,
     });
 
     console.log(`Subscription cancelled for user ${userId} - access until ${expiryDate}`);
@@ -190,42 +167,37 @@ async function handleSubscriptionCancelled(userId: string, subscriptionId: strin
 async function handlePayoutFailure(payoutItemId: string): Promise<void> {
   try {
     // Find the payout record
-    const payoutsRef = collection(db, 'payouts');
-    const q = query(payoutsRef, where('paypalPayoutItemId', '==', payoutItemId));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
+    const payouts = await queryDocuments<any>('payouts', { filters: { paypalPayoutItemId: payoutItemId } });
+    if (!payouts || payouts.length === 0) {
       console.error(`Payout record not found for item ID: ${payoutItemId}`);
       return;
     }
 
-    const payoutDoc = querySnapshot.docs[0];
-    const payoutData = payoutDoc.data();
+    const payout = payouts[0];
 
     // Update payout status to failed
-    await updateDoc(payoutDoc.ref, {
+    await updateDocument('payouts', payout.id, {
       status: 'failed',
-      failedDate: new Date().toISOString()
+      failedDate: new Date().toISOString(),
     });
 
     // Refund the amount back to affiliate wallet
-    const affiliateRef = doc(db, 'users', payoutData.affiliateId);
-    const affiliateDoc = await getDoc(affiliateRef);
+    if (payout.affiliateId) {
+      const affiliate = await getDocument<any>('users', payout.affiliateId);
+      if (affiliate) {
+        const currentBalance = affiliate.affiliateBalance || 0;
+        const refundAmount = payout.amount || 0;
 
-    if (affiliateDoc.exists()) {
-      const affiliateData = affiliateDoc.data();
-      const currentBalance = affiliateData.affiliateBalance || 0;
-      const refundAmount = payoutData.amount;
+        await updateDocument('users', payout.affiliateId, {
+          affiliateBalance: currentBalance + refundAmount,
+        });
 
-      await updateDoc(affiliateRef, {
-        affiliateBalance: currentBalance + refundAmount
-      });
-
-      console.log(`Refunded $${refundAmount} to affiliate ${payoutData.affiliateId} due to payout failure`);
+        console.log(`Refunded $${refundAmount} to affiliate ${payout.affiliateId} due to payout failure`);
+      }
     }
 
     // TODO: Send admin notification
-    console.log(`Payout failed for affiliate ${payoutData.affiliateEmail} - funds refunded to wallet`);
+    console.log(`Payout failed for affiliate ${payout.affiliateEmail} - funds refunded to wallet`);
   } catch (error) {
     console.error('Error handling payout failure:', error);
     throw error;

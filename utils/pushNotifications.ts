@@ -1,101 +1,79 @@
-import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
-import { getToken } from 'firebase/messaging';
+import supabase from '../src/supabaseClient';
 import { messaging } from '../firebaseConfig';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { getToken, onMessage } from 'firebase/messaging';
 
-// 1. Prevent multiple initializations in the same session
-let isInitialized = false;
+const TOKEN_CACHE_KEY = 'spv_fcm_token';
 
-export const initializePushNotifications = async (userId: string) => {
-  if (isInitialized) {
-    console.log("Push notifications already initialized. Skipping.");
-    return;
-  }
-  if (userId === "guest") {
-    console.log("Skipping push notifications for guest user.");
-    return;
-  }
-  isInitialized = true;
-
-  try {
-    // === SCENARIO A: NATIVE APP (Android/iOS) ===
-    if (Capacitor.isNativePlatform()) {
-      console.log("Initializing Native Push...");
-
-      // 1. Request Permission
-      let permStatus = await PushNotifications.checkPermissions();
-      if (permStatus.receive === 'prompt') {
-        permStatus = await PushNotifications.requestPermissions();
-      }
-
-      if (permStatus.receive !== 'granted') {
-        console.error("User denied permissions!");
-        return;
-      }
-
-      // 2. Register with Apple/Google
-      await PushNotifications.register();
-
-      // 3. Listen for the Token (This is the device ID)
-      PushNotifications.addListener('registration', (token) => {
-        console.log('Native Token:', token.value);
-        saveTokenToSubCollection(userId, token.value, 'native');
-      });
-
-      // 4. Listen for Notification Click (Deep Linking)
-      PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-        const data = notification.notification.data;
-        if (data.url) {
-          window.location.href = data.url; // Navigate user to specific page
-        }
-      });
-    }
-
-    // === SCENARIO B: WEBSITE (Chrome/Safari) ===
-    else {
-      console.log("Initializing Web Push...");
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          const token = await getToken(messaging, {
-            vapidKey: 'BEZuB_F1gXmTyk47fzfgaEWXKTluRTYdB1MVSyfvQhjkueVbpPywG1vIAUeLVwUsvWcb1a4RE3aver4Ds8wcx8M'
-          });
-          console.log('Web Token:', token);
-          saveTokenToSubCollection(userId, token, 'web');
-        }
-      } catch (error) {
-        console.error("Web Push Error:", error);
-      }
-    }
-  } catch (error) {
-    console.error("Push Init Error:", error);
-  }
+type EnsurePushOpts = {
+  userId: string;
+  userName?: string;
 };
 
-// 2. NEW SAVING LOGIC (Sub-collection)
-const saveTokenToSubCollection = async (userId: string, token: string, platform: string) => {
-  if (!userId || !token) return;
-
+export async function ensureFcmTokenRegistered(opts: EnsurePushOpts): Promise<{ ok: boolean; token?: string; reason?: string }> {
   try {
-    // We use the token itself as the ID to prevent duplicates automatically
-    // Sanitize token for use as ID (remove special chars if any, though usually safe)
-    const deviceId = platform === 'web' ? 'web_device' : 'mobile_device';
+    if (typeof window === 'undefined') return { ok: false, reason: 'not_in_browser' };
+    if (!opts?.userId) return { ok: false, reason: 'missing_userId' };
+    if (!('Notification' in window)) return { ok: false, reason: 'notifications_unsupported' };
+    if (!('serviceWorker' in navigator)) return { ok: false, reason: 'sw_unsupported' };
+    if (!messaging) return { ok: false, reason: 'firebase_messaging_not_configured' };
 
-    // Actually, let's just use a fixed ID for "current web session" to prevent bloat
-    // Or use the token string as a check
-    const tokenRef = doc(db, 'users', userId, 'push_tokens', token.slice(0, 20)); // Use part of token as ID to spread them out
+    const vapidKey =
+      (import.meta as any)?.env?.VITE_FIREBASE_VAPID_KEY ||
+      (import.meta as any)?.env?.VITE_FCM_VAPID_KEY ||
+      (import.meta as any)?.env?.VITE_VAPID_KEY ||
+      '';
 
-    await setDoc(tokenRef, {
-      token: token,
-      platform: platform,
-      lastSeen: serverTimestamp(),
-      userAgent: navigator.userAgent
-    }, { merge: true });
+    if (!vapidKey) return { ok: false, reason: 'missing_vapid_key' };
 
-    console.log("Token saved to sub-collection securely.");
-  } catch (error) {
-    console.error("Error saving token:", error);
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return { ok: false, reason: 'permission_not_granted' };
+
+    const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+    // Keep the SW updated with user name for placeholder personalization
+    try {
+      const name = opts.userName || 'valued customer';
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'USER_DATA', name });
+      } else {
+        const ready = await navigator.serviceWorker.ready;
+        ready.active?.postMessage?.({ type: 'USER_DATA', name });
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swRegistration });
+    if (!token) return { ok: false, reason: 'no_token' };
+
+    const cached = localStorage.getItem(TOKEN_CACHE_KEY);
+    if (cached !== token) {
+      localStorage.setItem(TOKEN_CACHE_KEY, token);
+      await supabase.from('users').update({ fcm_token: token } as any).eq('id', opts.userId);
+    }
+
+    // Foreground messages (when app is open)
+    try {
+      onMessage(messaging, (payload) => {
+        const title = payload?.notification?.title;
+        const body = payload?.notification?.body;
+        if (title && body && Notification.permission === 'granted') {
+          new Notification(title, { body });
+        }
+      });
+    } catch (_) {
+      // ignore
+    }
+
+    return { ok: true, token };
+  } catch (err: any) {
+    console.warn('ensureFcmTokenRegistered failed:', err);
+    return { ok: false, reason: err?.message || String(err) };
   }
+}
+
+// Back-compat entrypoint used by some call sites.
+export const initializePushNotifications = async (userId?: string, userName?: string) => {
+  if (!userId) return;
+  await ensureFcmTokenRegistered({ userId, userName });
 };

@@ -41,8 +41,8 @@ test.describe('Affiliate Partnership Program E2E Flow', () => {
     test.beforeEach(async ({ page }) => {
         // Generate unique data for each test run
         affiliateName = faker.person.fullName();
-        affiliateEmail = faker.internet.email(affiliateName);
-        affiliatePassword = faker.internet.password(10, true, /[A-Z0-9a-z!@#$%^&*()]/); // Ensure strong password for Firebase
+        affiliateEmail = faker.internet.email();
+        affiliatePassword = faker.internet.password({ length: 10, memorable: false, pattern: /[A-Z0-9a-z!@#$%^&*()]/ });
 
         // Set a fixed product price for calculation
         productPrice = 50.00; // Example product price

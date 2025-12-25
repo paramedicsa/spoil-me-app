@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebaseConfig';
-import { Bell, Send, Users, User, Globe } from 'lucide-react';
+import { callServerFunction } from '@repo/utils/supabaseClient';
+import { Bell, Send, User, Globe, Users } from 'lucide-react';
+
+type TargetGroup = 'all' | 'affiliates' | 'artists' | 'non_members' | 'south_africa' | 'international' | 'individual';
 
 const AdminPush = () => {
   const [loading, setLoading] = useState(false);
-  const [targetType, setTargetType] = useState<'individual' | 'tier' | 'all'>('all');
-  const [targetValue, setTargetValue] = useState('');
+  const [targetGroup, setTargetGroup] = useState<TargetGroup>('all');
+  const [targetId, setTargetId] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     body: '',
     imageUrl: '',
-    link: '/vault' // Default to Vault
+    link: '/#/vault' // Default to Vault
   });
 
   const handleSend = async (e: React.FormEvent) => {
@@ -20,18 +21,22 @@ const AdminPush = () => {
 
     setLoading(true);
     try {
-      const sendFn = httpsCallable(functions, 'sendAdminPush');
-      const result: any = await sendFn({
-        targetType,
-        targetValue: targetType === 'tier' ? targetValue : (targetType === 'individual' ? targetValue : null),
-        ...formData
+      const result: any = await callServerFunction('send-push', {
+        title: formData.title,
+        body: formData.body,
+        targetGroup,
+        targetId: targetGroup === 'individual' ? targetId : null,
+        image: formData.imageUrl || null,
+        url: formData.link || '/'
       });
 
-      if (result.data.success) {
-        alert(`✅ Success! Sent to ${result.data.sentCount} devices.`);
+      if (result?.success || result?.data?.success) {
+        const sentCount = result.sentCount || result.data?.sentCount || 0;
+        alert(`✅ Success! Sent to ${sentCount} devices.`);
         setFormData({ ...formData, title: '', body: '' }); // Reset text
       } else {
-        alert(`⚠️ ${result.data.message}`);
+        const msg = result?.message || result?.data?.message || 'Unknown error';
+        alert(`⚠️ ${msg}`);
       }
     } catch (error: any) {
       console.error(error);
@@ -50,51 +55,43 @@ const AdminPush = () => {
 
       <form onSubmit={handleSend} className="space-y-6">
         {/* TARGET SELECTOR */}
-        <div className="grid grid-cols-3 gap-4">
-          <button type="button" onClick={() => setTargetType('all')}
-            className={`p-4 rounded border flex flex-col items-center gap-2 ${targetType === 'all' ? 'border-yellow-500 bg-yellow-900/20 text-white' : 'border-zinc-700 text-gray-400'}`}>
-            <Globe size={20} />
-            <span className="text-sm font-bold">Everyone</span>
-          </button>
-          <button type="button" onClick={() => setTargetType('tier')}
-            className={`p-4 rounded border flex flex-col items-center gap-2 ${targetType === 'tier' ? 'border-yellow-500 bg-yellow-900/20 text-white' : 'border-zinc-700 text-gray-400'}`}>
-            <Users size={20} />
-            <span className="text-sm font-bold">Membership Tier</span>
-          </button>
-          <button type="button" onClick={() => setTargetType('individual')}
-            className={`p-4 rounded border flex flex-col items-center gap-2 ${targetType === 'individual' ? 'border-yellow-500 bg-yellow-900/20 text-white' : 'border-zinc-700 text-gray-400'}`}>
-            <User size={20} />
-            <span className="text-sm font-bold">Individual</span>
-          </button>
+        <div>
+          <label className="text-gray-400 text-sm">Target Group</label>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            {(
+              [
+                { key: 'all', label: 'Everyone', icon: <Globe size={18} /> },
+                { key: 'south_africa', label: 'South Africa', icon: <Users size={18} /> },
+                { key: 'international', label: 'International', icon: <Users size={18} /> },
+                { key: 'non_members', label: 'Non-Members', icon: <Users size={18} /> },
+                { key: 'affiliates', label: 'Affiliates', icon: <Users size={18} /> },
+                { key: 'artists', label: 'Artists', icon: <Users size={18} /> },
+                { key: 'individual', label: 'Individual', icon: <User size={18} /> }
+              ] as Array<{ key: TargetGroup; label: string; icon: React.ReactNode }>
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setTargetGroup(opt.key)}
+                className={`p-3 rounded border flex items-center gap-2 ${targetGroup === opt.key ? 'border-yellow-500 bg-yellow-900/20 text-white' : 'border-zinc-700 text-gray-400'}`}
+              >
+                {opt.icon}
+                <span className="text-sm font-bold">{opt.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* CONDITIONAL INPUTS */}
-        {targetType === 'tier' && (
-          <div>
-            <label className="text-gray-400 text-sm">Select Membership Tier</label>
-            <select
-              className="w-full bg-black border border-zinc-700 text-white p-3 rounded mt-1"
-              onChange={(e) => setTargetValue(e.target.value)}
-              value={targetValue}
-            >
-              <option value="">Select a Tier...</option>
-              <option value="spoil-me">Spoil Me (R19)</option>
-              <option value="basic">Basic</option>
-              <option value="premium">Premium</option>
-              <option value="deluxe">Deluxe (Vault Access)</option>
-            </select>
-          </div>
-        )}
-
-        {targetType === 'individual' && (
+        {targetGroup === 'individual' && (
           <div>
             <label className="text-gray-400 text-sm">User ID (UID)</label>
             <input
               type="text"
               placeholder="Paste User UID here..."
               className="w-full bg-black border border-zinc-700 text-white p-3 rounded mt-1"
-              value={targetValue}
-              onChange={(e) => setTargetValue(e.target.value)}
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
             />
           </div>
         )}
@@ -129,7 +126,7 @@ const AdminPush = () => {
             <label className="text-gray-400 text-sm">Deep Link (Optional)</label>
             <input
               type="text"
-              placeholder="e.g. /vault or /membership"
+              placeholder="e.g. /#/vault or /#/membership"
               className="w-full bg-black border border-zinc-700 text-white p-3 rounded mt-1"
               value={formData.link}
               onChange={(e) => setFormData({...formData, link: e.target.value})}

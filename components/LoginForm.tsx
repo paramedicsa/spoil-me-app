@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { auth } from '../firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmail } from '@repo/utils/supabaseClient';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -33,11 +32,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      await signInWithEmail(formData.email, formData.password);
       onSuccess();
     } catch (error: any) {
-      console.error("Login Error", error);
-      alert(error.message || "Login failed. Please check your credentials.");
+      console.error('Login Error', error);
+      alert(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
