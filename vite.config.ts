@@ -14,7 +14,13 @@ export default defineConfig(({ mode }) => {
       plugins: [
         VitePWA({
           registerType: 'autoUpdate',
+          strategies: 'injectManifest',
+          srcDir: 'src',
+          filename: 'service-worker.js',
           includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+          injectManifest: {
+            globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}']
+          },
           manifest: {
             name: 'Spoil Me Vintage',
             short_name: 'Spoil Me',

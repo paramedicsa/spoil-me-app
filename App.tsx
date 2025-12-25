@@ -35,6 +35,7 @@ import { App as CapApp } from '@capacitor/app';
 import { useAppUpdate } from './src/hooks/useAppUpdate';
 import UpdateNotification from './components/UpdateNotification';
 import UpdatePrompt from './components/UpdatePrompt';
+import IosInstallBanner from './components/IosInstallBanner';
 import AdminVault from './pages/admin/AdminVault';
 import Vault from './pages/Vault';
 import MemberManagement from './pages/admin/MemberManagement';
@@ -143,6 +144,7 @@ const AppContent: React.FC = () => {
     >
       <VoucherHandler />
       <InstallManager />
+      <IosInstallBanner />
       <UpdatePrompt />
       {updateAvailable && (
         <UpdateNotification

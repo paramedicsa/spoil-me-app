@@ -7,6 +7,7 @@ export default function InstallManager() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [dismissed, setDismissed] = useState<boolean>(() => !!localStorage.getItem('spv_install_dismissed'));
 
   useEffect(() => {
     const checkStandalone = () => {
@@ -33,6 +34,7 @@ export default function InstallManager() {
   }, []);
 
   if (isStandalone) return null;
+  if (dismissed) return null; // user dismissed the big install modal
 
   const onInstallClick = async () => {
     if (deferredPrompt) {
@@ -43,6 +45,16 @@ export default function InstallManager() {
       }
     } else {
       setShowGuide(true);
+    }
+  };
+
+  const onDismiss = () => {
+    try {
+      localStorage.setItem('spv_install_dismissed', '1');
+      setDismissed(true);
+      setShowGuide(false);
+    } catch (e) {
+      setDismissed(true);
     }
   };
 
@@ -66,6 +78,7 @@ export default function InstallManager() {
         <div className="flex gap-2">
           <button className="btn btn-primary flex-1" onClick={onInstallClick}>Download App</button>
           <button className="btn" onClick={() => { setShowGuide(true); }}>How to install</button>
+          <button className="btn-ghost" onClick={onDismiss}>Dismiss</button>
         </div>
 
         <div className="mt-4">
