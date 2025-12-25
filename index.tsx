@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import './index.css';
 
 // Register the Firebase Messaging service worker for background push.
@@ -20,5 +21,6 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <App />
+    <SpeedInsights />
   </React.StrictMode>
 );
