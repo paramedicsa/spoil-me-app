@@ -283,12 +283,7 @@ const Layout: React.FC = () => {
                    <li><Link to="/terms" className="hover:text-white">Shipping</Link></li>
                    <li><Link to="/terms" className="hover:text-white">Returns</Link></li>
                    <li><Link to="/artist-partnership" className="hover:text-white">Artist Partnership</Link></li>
-                   <li
-                       className="hover:text-green-400 cursor-pointer flex items-center gap-2 text-gray-300 font-medium"
-                       onClick={() => window.open(latestApkUrl, '_blank')}
-                     >
-                       <Smartphone size={14} /> Download App v{appVersion}
-                     </li>
+                   {/* Download App removed from footer — use Install flow or APK links elsewhere */}
                  </ul>
                </div>
             </div>
