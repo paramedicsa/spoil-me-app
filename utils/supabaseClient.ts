@@ -1,4 +1,5 @@
 import supabase from '../src/supabaseClient';
+export { isSupabaseConfigured } from '../src/supabaseClient';
 
 // Basic helpers used across the app to ease migration from Firestore
 export async function signInWithEmail(email: string, password: string) {

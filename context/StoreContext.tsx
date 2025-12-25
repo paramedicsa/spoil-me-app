@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 // Fix: Added Winner and Order to import
 import { Product, Category, CartItem, User, SpecialOffer, Voucher, Notification, VoucherMeta, AffiliateLeaderboardItem, PackagingItem, EarringMaterial, AffiliateStats, ShippingAddress, Winner, Order, VaultItem, CommissionRecord, AffiliatePayout, AffiliateMilestone } from '../types';
 import { INITIAL_USER, INITIAL_SPECIALS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../constants';
-import supabase, { isSupabaseConfigured } from '../src/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
 import { initializePushNotifications } from '../utils/pushNotifications';
 import { callServerFunction } from '../utils/supabaseClient';
 

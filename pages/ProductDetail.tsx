@@ -6,7 +6,7 @@ import { useResolvedImage, ResolvedImage, handleImageError, getFallbackImage } f
 import { EarringMaterial, Review } from '../types';
 import ProductCard from '../components/ProductCard';
 import { getAnalytics, logEvent } from "firebase/analytics";
-import { queryDocuments } from '@repo/utils/supabaseClient';
+import { queryDocuments } from '../utils/supabaseClient';
 
 // Chain descriptions mapping (Must match Admin)
 const CHAIN_DESCRIPTIONS: Record<string, string> = {
