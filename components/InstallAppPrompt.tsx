@@ -22,6 +22,7 @@ export default function InstallAppPrompt({ apkUrl = '', playStoreUrl }: Props) {
   const [show, setShow] = useState(false);
   const [isUpdate, setIsUpdate] = useState(false);
   const [latestApkUrl, setLatestApkUrl] = useState(apkUrl);
+  const [latestVersion, setLatestVersion] = useState('');
 
   useEffect(() => {
     if (!isMobile()) return;
@@ -37,12 +38,22 @@ export default function InstallAppPrompt({ apkUrl = '', playStoreUrl }: Props) {
         const latestVersion = data.version;
         const storedVersion = localStorage.getItem('appVersion') || '0.1';
         console.log('Latest version:', latestVersion, 'Stored version:', storedVersion);
+
+        // If there's a newer version than the installed version, show the banner
+        // only if the user hasn't dismissed THIS particular version yet.
         if (latestVersion !== storedVersion) {
-          console.log('New version detected, showing update banner');
-          setLatestApkUrl(data.apkUrl);
-          setShow(true);
-          localStorage.setItem('appVersion', latestVersion);
+          const dismissedForVersion = isNative ? localStorage.getItem('updatePromptDismissed') : localStorage.getItem('installPromptDismissed');
+          if (dismissedForVersion !== latestVersion) {
+            console.log('New version detected, showing update banner for this version');
+            setLatestApkUrl(data.apkUrl);
+            setLatestVersion(data.version);
+            setShow(true);
+          } else {
+            console.log('User already dismissed this version, not showing banner');
+            setShow(false);
+          }
         } else {
+          // No new version — respect dismissal flags
           console.log('No new version');
           const dismissed = isNative ? localStorage.getItem('updatePromptDismissed') : localStorage.getItem('installPromptDismissed');
           if (!dismissed) setShow(true);
@@ -61,15 +72,18 @@ export default function InstallAppPrompt({ apkUrl = '', playStoreUrl }: Props) {
   if (!show) return null;
 
   const onDismiss = () => {
+    // Persist dismissal for this version so we don't keep nagging about the same update
     const key = isUpdate ? 'updatePromptDismissed' : 'installPromptDismissed';
-    localStorage.setItem(key, String(Date.now()));
+    try { if (latestVersion) localStorage.setItem(key, latestVersion); else localStorage.setItem(key, String(Date.now())); } catch (e) { /* ignore */ }
     setShow(false);
   };
 
   const onDownload = () => {
     // Open APK URL in browser
     window.location.href = latestApkUrl;
-    if (!isUpdate) onDismiss();
+    // Dismiss prompt for this version (user initiated install/download)
+    try { if (latestVersion) localStorage.setItem('installPromptDismissed', latestVersion); else localStorage.setItem('installPromptDismissed', String(Date.now())); } catch (e) {}
+    setShow(false);
   };
 
   const onInstallInApp = async () => {
@@ -85,7 +99,11 @@ export default function InstallAppPrompt({ apkUrl = '', playStoreUrl }: Props) {
       console.error('Updater error', e);
       window.open(latestApkUrl, '_blank');
     }
-    if (!isUpdate) onDismiss();
+    // Mark this version as handled/dismissed so the banner won't persist
+    try { if (latestVersion) localStorage.setItem(isUpdate ? 'updatePromptDismissed' : 'installPromptDismissed', latestVersion); else localStorage.setItem(isUpdate ? 'updatePromptDismissed' : 'installPromptDismissed', String(Date.now())); } catch (e) {}
+    // Optionally record installed version if we initiated the update
+    try { if (latestVersion) localStorage.setItem('appVersion', latestVersion); } catch (e) {}
+    setShow(false);
   };
 
   return (
