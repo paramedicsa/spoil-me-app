@@ -49,8 +49,10 @@ const Home: React.FC = () => {
   // 3. Dangles: Look for "dangle", "drop", or "hook"
   const dangles = products.filter(p => matches(p, ['dangle', 'drop', 'hook'])).slice(0, 2);
 
-  // 4. Unique Pendants: Look for "pendant", "necklace", or "unique"
-  const uniquePendants = products.filter(p => matches(p, ['pendant', 'necklace', 'unique'])).slice(0, 23);
+  // 4. Unique Pendants: Only show Pendants (exclude Necklaces); look for "pendant" or "unique"
+  const uniquePendants = products
+    .filter(p => (p.type === 'Pendant') && matches(p, ['pendant', 'unique']))
+    .slice(0, 23);
 
   // 5. Bracelets: Look for "bracelet", "bangle", or "wrist"
   const bracelets = products.filter(p => matches(p, ['bracelet', 'bangle'])).slice(0, 6);
