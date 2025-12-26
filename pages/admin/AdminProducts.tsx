@@ -3,7 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { Product, PackagingItem, Review } from '../../types';
 import { Plus, Edit2, Trash2, Sparkles, Save, X, Link as LinkIcon, Tag, MessageSquare, Star, Gift, Clock, Package, ExternalLink, AlertTriangle, Crown, Percent, Truck, RefreshCw, Upload, Loader2, Camera, Check, Info, Bot, DollarSign, BarChart3, Search, Filter, Layers, ImagePlus, Smartphone, FileDown, Bookmark, Gem } from 'lucide-react';
 import { generateProductDescription, generateProductMetadataFromImage, generateSouthAfricanReviews, generateUniquePendantReviews } from '../../services/geminiService';
-import { uploadFile } from '../../utils/supabaseClient';
+import { uploadFile, getDocument, isSupabaseConfigured } from '../../utils/supabaseClient';
 import { handleImageError } from '../../utils/imageUtils';
 
 // Chain Length Descriptions from Firestore
@@ -380,11 +380,24 @@ const AdminProducts: React.FC = () => {
            productToSave.stock = Object.values(productToSave.ringStock).reduce((a: number, b: number) => a + b, 0);
         }
 
-        if (products.some(p => p.id === productToSave.id)) {
-          await updateProduct(productToSave);
-        } else {
-          await addProduct(productToSave);
-        }
+            if (products.some(p => p.id === productToSave.id)) {
+               await updateProduct(productToSave);
+            } else {
+               await addProduct(productToSave);
+            }
+
+            // Verify remote persistence when Supabase is configured
+            try {
+               if (isSupabaseConfigured) {
+                  const remote = await getDocument('products', productToSave.id);
+                  if (!remote) {
+                     // If we couldn't read back the product, warn the admin
+                     alert('Warning: Product saved locally but failed to persist to Supabase. Check DB connection or permissions.');
+                  }
+               }
+            } catch (verifyErr) {
+               console.warn('Post-save verification failed:', verifyErr);
+            }
         
         setIsEditing(false);
     } catch (error: any) {
