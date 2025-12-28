@@ -359,8 +359,8 @@ const ArtistPartnershipPage: React.FC = () => {
         <header className="mb-8">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl sm:text-5xl font-bold text-white font-cherry">Your Art. Global Stage. 1% Fees.</h1>
-              <p className="text-sm sm:text-lg mt-2 text-zinc-300">Join a curated marketplace for elite jewelry artists and reach over 7,000 collectors worldwide.</p>
+              <h1 className="font-cherry text-5xl text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]">Your Art. Global Stage. 1% Fees.</h1>
+              <p className="font-architects text-xl md:text-2xl text-gray-300 max-w-2xl mt-2">Join a curated marketplace for elite jewelry artists and reach over 7,000 collectors worldwide.</p>
             </div>
 
             {/* Currency Toggle */}
@@ -389,7 +389,7 @@ const ArtistPartnershipPage: React.FC = () => {
             </div>
 
             <div>
-              <Link to={`/register?source=artist`} className="inline-block mt-2 sm:mt-0 bg-amber-600 hover:bg-amber-500 text-black font-semibold py-3 px-5 rounded-full shadow-lg">
+              <Link to={`/register?source=artist`} className="inline-block mt-2 sm:mt-0 px-8 py-4 bg-white text-purple-900 font-bold rounded-full hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.3)]">
                 START YOUR SHOP - {isDollar ? '$1.50' : 'R19'} / Month
               </Link>
             </div>
@@ -398,9 +398,9 @@ const ArtistPartnershipPage: React.FC = () => {
 
         {/* Trust Timeline Section */}
         <section className="mb-12">
-          <h3 className="text-xl font-semibold text-amber-400 text-center mb-6">The Trust Timeline</h3>
+          <h3 className="text-xl font-semibold text-purple-400 text-center mb-6">The Trust Timeline</h3>
           <div className="flex flex-col md:flex-row items-stretch gap-4 md:gap-6">
-            <div className="flex-1 bg-zinc-900/40 border border-zinc-800 rounded-lg p-4 text-center relative ring-amber-600/30 shadow-[0_16px_48px_rgba(250,204,21,0.14)]">
+            <div className="flex-1 bg-zinc-900 border-4 border-cyan-500 rounded-2xl p-4 text-center relative shadow-[0_0_25px_rgba(34,211,238,0.14)]">
               <div className="text-3xl mb-2">🛒</div>
               <div className="flex items-center justify-center gap-2">
                 <h4 className="font-bold">Sold</h4>
@@ -519,7 +519,7 @@ const ArtistPartnershipPage: React.FC = () => {
         {showApplicationForm && (
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/80" onClick={() => setShowApplicationForm(false)} />
-            <form onSubmit={handleSubmit} className="relative bg-zinc-900 border border-zinc-800 rounded-t-xl md:rounded-xl p-4 md:p-6 w-full max-w-md z-10">
+            <form onSubmit={handleSubmit} className="relative bg-zinc-900 border-4 border-purple-800 rounded-2xl p-6 w-full max-w-md z-10">
               {/* Drag handle for mobile bottom-sheet */}
               <div className="w-full flex items-center justify-center md:hidden mb-2">
                 <div className="w-14 h-1.5 bg-zinc-800 rounded-full" />
@@ -532,8 +532,8 @@ const ArtistPartnershipPage: React.FC = () => {
                 <div className="mb-3 text-sm text-zinc-400">Applying for: <strong className="text-amber-300">{applicationData.plan}</strong></div>
               )}
 
-              {user && user.id && user.id !== 'guest' && (
-                <div className="mb-3 p-3 bg-zinc-900 border border-zinc-800 rounded text-sm text-zinc-300">
+                {user && user.id && user.id !== 'guest' && (
+                <div className="mb-3 p-3 bg-zinc-900 border-2 border-cyan-500 rounded-xl text-sm text-zinc-300">
                   <div className="font-semibold text-white">Welcome back, {(user.name || '').split(' ')[0] || 'Artist'}!</div>
                   <div className="mt-2 text-sm">Please review your pre-filled details below and complete any missing fields before applying.</div>
                   {missingFields.length > 0 && (
