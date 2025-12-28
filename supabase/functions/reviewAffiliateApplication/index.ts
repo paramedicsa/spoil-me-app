@@ -79,7 +79,7 @@ export async function reviewAffiliateApplicationHandler(req: Request, deps: { su
 (async () => {
   try {
     if (typeof Deno !== 'undefined') {
-      const { serve } = await import('std/server');
+      const { serve } = await import('https://deno.land/std@0.170.0/http/server.ts');
       serve((req: Request) => reviewAffiliateApplicationHandler(req));
     }
   } catch (err) {

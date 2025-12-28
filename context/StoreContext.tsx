@@ -699,24 +699,44 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } as User;
 
       try {
-          if (!isDemoMode) {
-              // If a password is provided, create Supabase Auth user first
-              if ((userData as any).password && userData.email) {
+          // Attempt to create Supabase auth user and users row if credentials provided
+          if ((userData as any).password && userData.email) {
+              try {
                   const { data, error } = await supabase.auth.signUp({ email: userData.email!, password: (userData as any).password });
                   if (error) {
-                      console.warn('Supabase signUp failed:', error.message);
+                      console.warn('Supabase signUp failed (falling back to local user):', error.message);
                   } else if (data?.user) {
                       newUser.id = data.user.id;
+                      // Try to sign in immediately so session exists for subsequent DB actions
+                      try {
+                        const signInRes = await supabase.auth.signInWithPassword({ email: userData.email!, password: (userData as any).password });
+                        if (signInRes.error) {
+                          console.warn('Immediate signIn after signUp failed:', signInRes.error.message);
+                        } else {
+                          console.log('Signed in after registration, session ready');
+                        }
+                      } catch (siErr) {
+                        console.warn('Error signing in after signUp:', siErr);
+                      }
                   }
+              } catch (err) {
+                  console.warn('Supabase signup attempt failed (continuing with local user):', err);
               }
-              // Upsert into users table
-              await supabase.from('users').upsert([sanitizeFirestoreData(newUser)]);
           }
+
+          // Try to upsert into users table (best-effort)
+          try {
+            const { error: upsertErr } = await supabase.from('users').upsert([sanitizeFirestoreData(newUser)]);
+            if (upsertErr) console.warn('Upsert to users table failed (continuing locally):', upsertErr);
+          } catch (err) {
+            console.warn('Upsert to users table threw (continuing locally):', err);
+          }
+
           setUser(newUser);
           persistUser(newUser);
           return true;
       } catch (e) {
-          console.error("Registration Failed", e);
+          console.error("Registration Failed (unexpected)", e);
           setUser(newUser);
           persistUser(newUser);
           return true;
@@ -2020,31 +2040,137 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const applyForArtist = async (data: { name: string; surname: string; artistTradeName?: string; contactNumber: string; email: string; productImages: string[] }) => {
       if (!user.id || user.id === 'guest') {
-          console.error("Cannot apply for artist as guest user.");
-          return;
+          if (!isDemoMode) {
+            console.error("Cannot apply for artist as guest user.");
+            return;
+          }
+          // allow demo-mode submissions without a real user id
+      }
+
+      // Resolve effective user id (prefer Supabase auth uid over local demo 'user_' ids)
+      let effectiveUserId: string | null = user && user.id ? String(user.id) : null;
+      if (effectiveUserId && /^user_/.test(effectiveUserId) && typeof supabase !== 'undefined' && supabase) {
+        try {
+          const sessionRes = await supabase.auth.getUser();
+          const realId = (sessionRes as any)?.data?.user?.id;
+          if (realId) effectiveUserId = realId;
+        } catch (e) {
+          console.warn('applyForArtist: could not resolve real auth user id, proceeding with existing id', e);
+        }
+      }
+
+      // Prevent duplicate/pending applications (use canonical column 'user_id')
+      try {
+        const { data: existing, error: existingErr } = await supabase.from('artist_applications').select('id,status').eq('user_id', effectiveUserId).in('status', ['pending','approved']);
+        if (existingErr) {
+          console.warn('applyForArtist duplicate check could not complete (Supabase error), continuing:', existingErr);
+        } else if (existing && existing.length > 0) {
+          throw new Error('You already have an active application.');
+        }
+      } catch (err) {
+        console.warn('applyForArtist duplicate check encountered an unexpected error, continuing as best-effort:', err);
       }
 
       // Create artist application document
-      const applicationData = {
-          uid: user.id,
+        const applicationData = {
+          uid: effectiveUserId || user.id,
+          user_id: effectiveUserId || user.id,
           name: data.name,
           surname: data.surname,
           artistTradeName: data.artistTradeName,
           contactNumber: data.contactNumber,
           email: data.email,
           productImages: data.productImages,
+          product_images: JSON.stringify(data.productImages || []),
+          plan: (data as any).plan || null,
+          termsAgreed: !!(data as any).termsAgreed,
+          terms_agreed: !!(data as any).termsAgreed,
           status: 'pending',
+          submitted_at: new Date().toISOString(),
           submittedAt: new Date().toISOString(),
       };
 
-      if (!isDemoMode) {
-          try {
-              await supabase.from('artist_applications').insert([applicationData]);
-          } catch (error) {
+          if (!isDemoMode) {
+            try {
+              const res = await supabase.from('artist_applications').insert([applicationData]).select().maybeSingle();
+                // Log full response to help diagnose 400/422 errors coming from Postgres / Supabase
+                console.log('artist_applications.insert response', res);
+                const inserted = (res as any)?.data || (res as any);
+                if ((res as any)?.error) {
+                  console.error('Insert into artist_applications returned error object:', (res as any));
+                  throw (res as any).error || (res as any);
+                }
+              // Update user's local state to block re-apply and show In Review
+              const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as User;
+              setUser(updatedUser);
+              persistUser(updatedUser);
+              await updateUserFields(user.id, { artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as any);
+
+              // Send a professional acknowledgement notification to the user
+              const notification: Notification = {
+                id: `artist_app_sub_${Date.now()}`,
+                type: 'system',
+                title: 'Artist Application Received',
+                message: 'Thank you for applying to the Spoil Me Vintage Artist Program. We will review your application and respond within 72 hours. If approved, you will receive instructions on next steps.',
+                date: new Date().toISOString(),
+                isRead: false
+              };
+              await appendNotificationToUser(user.id, notification);
+              await pushToIndividual(user.id, notification.title, notification.message);
+            } catch (error) {
               console.error('Error submitting artist application:', error);
               throw error;
+            }
+          } else {
+            // Demo mode: persist the application locally so it can be reviewed in the admin view
+              // Try to insert into Supabase even in demo mode (best-effort). If it fails, fall back to local persistence.
+              try {
+                const res = await supabase.from('artist_applications').insert([applicationData]).select().maybeSingle();
+                if ((res as any)?.error) throw (res as any).error;
+                const inserted = (res as any)?.data || (res as any);
+                // update user's local state to block re-apply and show In Review
+                const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as User;
+                setUser(updatedUser);
+                persistUser(updatedUser);
+                try { await updateUserFields(user.id, { artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as any); } catch (_) {}
+
+                const notification: Notification = {
+                  id: `artist_app_sub_${Date.now()}`,
+                  type: 'system',
+                  title: 'Artist Application Received',
+                  message: 'Thank you for applying to the Spoil Me Vintage Artist Program. We will review your application and respond within 72 hours.',
+                  date: new Date().toISOString(),
+                  isRead: false
+                };
+                try { await appendNotificationToUser(user.id, notification); await pushToIndividual(user.id, notification.title, notification.message); } catch (_) { }
+              } catch (err) {
+                console.warn('Supabase insert failed in demo mode; falling back to local persistence', err);
+                try {
+                  const localAppsRaw = localStorage.getItem('spv_artist_applications');
+                  const localApps = localAppsRaw ? JSON.parse(localAppsRaw) : [];
+                  const id = `demo_${Date.now()}`;
+                  const demoApp = { ...applicationData, id, uid: user?.id || 'demo_user' };
+                  localApps.unshift(demoApp);
+                  localStorage.setItem('spv_artist_applications', JSON.stringify(localApps));
+                  // update local user state if present
+                  const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: id } as User;
+                  setUser(updatedUser);
+                  persistUser(updatedUser);
+                  const notification: Notification = {
+                    id: `artist_app_sub_${Date.now()}`,
+                    type: 'system',
+                    title: 'Artist Application Received',
+                    message: 'Thank you for applying to the Spoil Me Vintage Artist Program (demo). We will review your application and respond within 72 hours.',
+                    date: new Date().toISOString(),
+                    isRead: false
+                  };
+                  await appendNotificationToUser(user?.id || 'demo_user', notification);
+                } catch (err2) {
+                  console.error('Failed to persist demo application locally', err2);
+                  throw err2;
+                }
+              }
           }
-      }
 
       const notification: Notification = {
           id: `artist_app_${Date.now()}`,

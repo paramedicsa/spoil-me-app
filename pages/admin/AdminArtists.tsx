@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { queryDocuments, subscribeToTable, createDocument, updateDocument, deleteDocument } from '../../utils/supabaseClient';
+import { queryDocuments, subscribeToTable, createDocument, updateDocument, deleteDocument, supabase } from '../../utils/supabaseClient';
 import { CheckCircle, XCircle, Eye, Package, DollarSign, Users, TrendingUp, Truck, Warehouse, AlertTriangle, Trash } from 'lucide-react';
 
 interface ArtistApplication {
@@ -11,6 +11,11 @@ interface ArtistApplication {
   contactNumber: string;
   email: string;
   productImages: string[];
+  // legacy / snake_case compatibility
+  product_images?: string[];
+  id_document_url?: string;
+  country?: string;
+  website?: string;
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: Date;
 }
@@ -49,33 +54,111 @@ interface ArtistProduct {
 const AdminArtists: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'applications' | 'stock' | 'pricing' | 'quality'>('applications');
   const [applications, setApplications] = useState<ArtistApplication[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [products, setProducts] = useState<ArtistProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const loadInitial = async () => {
+    try {
+      setLoading(true);
+      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'created_at', ascending: false } });
+        if (!apps) {
+        setSupabaseError('Could not load artist applications from Supabase (table missing or schema mismatch). Falling back to local demo applications.');
+        const raw = localStorage.getItem('spv_artist_applications');
+        const demo = raw ? JSON.parse(raw) : [];
+        setApplications(demo.map((a: any) => ({ id: a.id, ...a, submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(a.submitted_at || a.submitted || a.createdAt || a.created_at) })));
+        } else {
+          // normalize created_at/submitted_at
+          const norm = apps.map((a: any) => {
+            const status = (a.status as any) === 'approved' || (a.status as any) === 'rejected' ? a.status as 'approved' | 'rejected' : 'pending';
+            const submittedAt = a.created_at ? new Date(a.created_at) : (a.submitted_at ? new Date(a.submitted_at) : new Date());
+            return {
+              id: a.id,
+              uid: a.uid,
+              name: a.name || a.first_name || '',
+              surname: a.surname || a.last_name || '',
+              artistTradeName: a.artistTradeName || a.shop_name || a.artist_trade_name || null,
+              contactNumber: a.contactNumber || a.contact_number || '',
+              email: a.email || '',
+              productImages: a.productImages || a.product_images || [],
+              product_images: a.product_images || undefined,
+              id_document_url: a.id_document_url || null,
+              country: a.country || null,
+              website: a.website || null,
+              status,
+              submittedAt,
+            } as ArtistApplication;
+          });
+          setApplications(norm);
+        setSupabaseError(null);
+      }
+
+      const arts = await queryDocuments<any>('artists');
+      if (!arts) setSupabaseError(prev => prev ? prev : 'Could not load `artists` table from Supabase.');
+      else setArtists((arts || []) as ArtistProfile[]);
+
+      const prods = await queryDocuments<any>('artist_products');
+      if (!prods) setSupabaseError(prev => prev ? prev : 'Could not load `artist_products` table from Supabase.');
+      else setProducts((prods || []).map((p: any) => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
+    } catch (err: any) {
+      console.error('loadInitial failed', err);
+      setSupabaseError(err?.message || String(err));
+      const raw = localStorage.getItem('spv_artist_applications');
+      const demo = raw ? JSON.parse(raw) : [];
+      const normDemo = demo.map((a: any) => ({
+        id: a.id,
+        uid: a.uid || null,
+        name: a.name || a.first_name || '',
+        surname: a.surname || a.last_name || '',
+        artistTradeName: a.artistTradeName || a.shop_name || null,
+        contactNumber: a.contactNumber || a.contact_number || '',
+        email: a.email || '',
+        productImages: a.productImages || a.product_images || [],
+        product_images: a.product_images || undefined,
+        id_document_url: a.id_document_url || null,
+        country: a.country || null,
+        website: a.website || null,
+        status: (a.status === 'approved' || a.status === 'rejected') ? a.status : 'pending',
+        submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(a.submitted_at || a.submitted || a.createdAt || a.created_at)
+      } as ArtistApplication));
+      setApplications(normDemo);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let unsubApps: (() => void) | null = null;
     let unsubArtists: (() => void) | null = null;
     let unsubProducts: (() => void) | null = null;
 
-    const loadInitial = async () => {
-      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
-      setApplications((apps || []).map((a: any) => ({ id: a.id, ...a, submittedAt: a.submitted_at ? new Date(a.submitted_at) : new Date() })));
-
-      const arts = await queryDocuments<any>('artists');
-      setArtists((arts || []) as ArtistProfile[]);
-      setLoading(false);
-
-      const prods = await queryDocuments<any>('artist_products');
-      setProducts((prods || []).map((p: any) => ({ id: p.id, ...p, createdAt: p.created_at ? new Date(p.created_at) : new Date(), receivedAtHub: p.received_at_hub ? new Date(p.received_at_hub) : null, approvedAt: p.approved_at ? new Date(p.approved_at) : null })));
-    };
-
     loadInitial();
 
     // Subscribe to table changes and reload on changes (simple approach)
     unsubApps = subscribeToTable('artist_applications', async () => {
-      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
-      setApplications((apps || []).map((a: any) => ({ id: a.id, ...a, submittedAt: a.submitted_at ? new Date(a.submitted_at) : new Date() })));
+      const apps = await queryDocuments<any>('artist_applications', { orderBy: { column: 'created_at', ascending: false } });
+      const norm = (apps || []).map((a: any) => {
+        const status = (a.status === 'approved' || a.status === 'rejected') ? a.status : 'pending';
+        const submittedAt = a.created_at ? new Date(a.created_at) : (a.submitted_at ? new Date(a.submitted_at) : new Date());
+        return {
+          id: a.id,
+          uid: a.uid,
+          name: a.name || '',
+          surname: a.surname || '',
+          artistTradeName: a.artistTradeName || a.shop_name || null,
+          contactNumber: a.contactNumber || '',
+          email: a.email || '',
+          productImages: a.productImages || a.product_images || [],
+          product_images: a.product_images || undefined,
+          id_document_url: a.id_document_url || null,
+          country: a.country || null,
+          website: a.website || null,
+          status,
+          submittedAt,
+        } as ArtistApplication;
+      });
+      setApplications(norm);
     });
 
     unsubArtists = subscribeToTable('artists', async () => {
@@ -95,42 +178,83 @@ const AdminArtists: React.FC = () => {
     };
   }, []);
 
+  // Fetch signed URLs for private bucket previews (600s expiry)
+  useEffect(() => {
+    let mounted = true;
+    const fetchSigned = async () => {
+      try {
+        const map: Record<string, string> = {};
+        const appsWithPath = applications.filter(a => a.id_document_url);
+        await Promise.all(appsWithPath.map(async (app) => {
+          try {
+            const path = app.id_document_url;
+            const { data, error } = await supabase.storage.from('artist-applications').createSignedUrl(path, 600);
+            if (!error && data?.signedUrl) map[app.id] = data.signedUrl;
+          } catch (e) {
+            console.warn('Signed URL fetch failed for', app.id, e);
+          }
+        }));
+        if (mounted) setSignedUrls(map);
+      } catch (err) {
+        console.warn('Failed to fetch signed URLs', err);
+      }
+    };
+    if (applications.length > 0) fetchSigned();
+    return () => { mounted = false; };
+  }, [applications]);
+
   const handleApproveApplication = async (application: ArtistApplication) => {
+    // Approve: create artist row, update application status, notify admins
+    // Make the operations tolerant: try Supabase first, fallback to local demo data
     try {
-      // Create artist profile
-      const artistData: ArtistProfile = {
-        uid: application.uid,
-        shopName: application.artistTradeName || `${application.name} ${application.surname}`,
-        slotLimit: 5, // Start with tester tier
-        slotsUsed: 0,
-        wallet: {
-          pending: 0,
-          available: 0,
-          currency: 'ZAR'
-        },
-        status: 'active',
-        isFirstTime: true // Mark as first-time artist
+      // create artist record (best-effort)
+      const artistPayload: any = {
+        name: application.name || null,
+        surname: application.surname || null,
+        shop_name: application.artistTradeName || null,
+        user_id: application.uid || null,
+        country: application.country || null,
+        website: application.website || null,
       };
 
-      await createDocument('artists', artistData);
+      const { data: artistData, error: artistError } = await supabase
+        .from('artists')
+        .insert([artistPayload])
+        .select('*')
+        .single();
 
-      // Update application status
-      await updateDocument('artist_applications', application.id, { status: 'approved' });
+      if (artistError) console.warn('Artist insert warning', artistError.message || artistError);
 
-      // Send notification to user
-      await createDocument('notifications', {
-        userId: application.uid,
-        type: 'system',
-        title: 'Artist Application Approved!',
-        message: 'Welcome to Spoil Me Vintage Artist Program! As a first-time artist, you can upload 1 product initially. Please ship it to our Worcester Hub for approval.',
-        date: new Date().toISOString(),
-        isRead: false
-      });
+      // update application status
+      const { error: updateError } = await supabase
+        .from('artist_applications')
+        .update({ status: 'approved' })
+        .eq('id', application.id);
 
-      alert('Application approved successfully!');
-    } catch (error) {
-      console.error('Error approving application:', error);
-      alert('Failed to approve application.');
+      if (updateError) console.warn('Application status update warning', updateError.message || updateError);
+
+      // send notification (Edge Function path)
+      try {
+        await fetch('/.netlify/functions/send-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Artist Approved', body: `${application.name || ''} ${application.surname || ''} was approved.` }),
+        });
+      } catch (notifyErr) {
+        console.warn('Notification send failed', notifyErr);
+      }
+
+      // remove from local state
+      setApplications(prev => prev.filter(a => a.id !== application.id));
+
+      // If we created an artist locally and we have an id, show a small success toast (console for now)
+      console.log('Application approved', artistData || null);
+    } catch (err) {
+      console.error('Approve failed, falling back to local update', err);
+      // Fallback to localStorage demo update
+      const updated: ArtistApplication[] = applications.map(a => a.id === application.id ? { ...a, status: 'approved' } : a);
+      setApplications(updated);
+      localStorage.setItem('demo_artist_applications', JSON.stringify(updated));
     }
   };
 
@@ -151,6 +275,18 @@ const AdminArtists: React.FC = () => {
       alert('Application rejected.');
     } catch (error) {
       console.error('Error rejecting application:', error);
+      try {
+        const raw = localStorage.getItem('spv_artist_applications');
+        if (raw) {
+          const arr = JSON.parse(raw).map((a: any) => a.id === application.id ? { ...a, status: 'rejected', rejectedAt: new Date().toISOString() } : a);
+          localStorage.setItem('spv_artist_applications', JSON.stringify(arr));
+          setApplications(arr.map((a: any) => ({ ...a, submittedAt: a.submittedAt ? new Date(a.submittedAt) : new Date(a.submitted_at || a.submitted || a.createdAt || a.created_at) })));
+          alert('Application rejected in local/demo storage (Supabase unavailable).');
+          return;
+        }
+      } catch (e) {
+        console.warn('Local fallback failed', e);
+      }
       alert('Failed to reject application.');
     }
   };
@@ -239,7 +375,7 @@ const AdminArtists: React.FC = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold text-white mb-8">Artist Hub</h1>
+      <h1 className="text-3xl font-bold text-white mb-6">Artist Hub</h1>
 
       {/* Tabs */}
       <div className="flex space-x-1 mb-6 bg-zinc-900 p-1 rounded-lg">
@@ -295,48 +431,71 @@ const AdminArtists: React.FC = () => {
               Reviews take up to 72 hours. Artists will be notified via email and in-app notification once their application is processed.
             </p>
           </div>
-          {applications.filter(app => app.status === 'pending').length === 0 ? (
-            <div className="text-gray-400">No pending applications.</div>
-          ) : (
-            applications.filter(app => app.status === 'pending').map((app) => (
-              <div key={app.id} className="bg-zinc-900 rounded-lg p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-white">
-                      {app.name} {app.surname}
-                      {app.artistTradeName && <span className="text-yellow-400"> ({app.artistTradeName})</span>}
-                    </h3>
-                    <p className="text-gray-300">{app.email} | {app.contactNumber}</p>
-                    <p className="text-sm text-gray-400">Applied: {app.submittedAt.toLocaleDateString()}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApproveApplication(app)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                    >
-                      <CheckCircle size={16} /> Approve
-                    </button>
-                    <button
-                      onClick={() => handleRejectApplication(app)}
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                    >
-                      <XCircle size={16} /> Reject
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {app.productImages.slice(0, 5).map((image, index) => (
-                    <img
-                      key={index}
-                      src={image}
-                      alt={`Product ${index + 1}`}
-                      className="w-full h-20 object-cover rounded border border-zinc-700"
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
+                {applications.filter(app => app.status === 'pending').length === 0 ? (
+                  <div className="text-gray-400">No pending applications.</div>
+                ) : (
+                  applications.filter(app => app.status === 'pending').map((app) => (
+                    <div key={app.id} className="bg-zinc-900 rounded-lg p-6">
+                      <div className="flex justify-between items-start mb-4 gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-white">
+                            {app.artistTradeName || `${app.name || ''} ${app.surname || ''}`}
+                          </h3>
+                          <p className="text-gray-300">{app.email} {app.contactNumber ? `| ${app.contactNumber}` : ''}</p>
+                          <p className="text-sm text-gray-400">Applied: {app.submittedAt ? app.submittedAt.toLocaleString() : '—'}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Approve this application? This will create an artist record.')) return;
+                              try {
+                                await handleApproveApplication(app);
+                              } catch (e) {
+                                console.error('Approve action failed', e);
+                                alert('Failed to approve application.');
+                              }
+                            }}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-500 transition-colors flex items-center gap-2"
+                          >
+                            <CheckCircle size={16} /> Approve
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Reject this application?')) return;
+                              try {
+                                await handleRejectApplication(app);
+                              } catch (e) {
+                                console.error('Reject action failed', e);
+                                alert('Failed to reject application.');
+                              }
+                            }}
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-500 transition-colors flex items-center gap-2"
+                          >
+                            <XCircle size={16} /> Reject
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        {/* ID document preview (signed URL) */}
+                        {app.id_document_url ? (
+                          <div className="col-span-1">
+                            {signedUrls[app.id] ? (
+                              <img src={signedUrls[app.id]} alt="ID document" className="w-full h-40 object-contain rounded border border-zinc-700" />
+                            ) : (
+                              <div className="w-full h-40 flex items-center justify-center bg-zinc-800 rounded border border-zinc-700 text-sm text-zinc-400">No preview available</div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* Product images or other uploaded previews (if present) */}
+                        {Array.isArray(app.product_images || app.productImages) && (app.product_images || app.productImages).slice(0, 4).map((image: string, index: number) => (
+                          <img key={index} src={image} alt={`Product ${index + 1}`} className="w-full h-40 object-cover rounded border border-zinc-700" />
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
 
           <h2 className="text-xl font-bold text-yellow-400 mt-8">All Applications</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

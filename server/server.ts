@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendAdminPushHandler } from '../supabase/functions/sendAdminPush/index';
 import { sendPushHandler } from '../supabase/functions/send-push/index';
 import { reviewAffiliateApplicationHandler } from '../supabase/functions/reviewAffiliateApplication/index';
+import { grantTrialHandler } from '../supabase/functions/grantTrial/index';
 
 const app = express();
 const PORT = process.env.PORT || 3001;

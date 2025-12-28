@@ -100,6 +100,8 @@ export interface Product {
   
   // Media
   images: string[];
+  imageUrl?: string;
+  image_url?: string;
   
   // Inventory & Variants
   stock: number; // General stock
@@ -197,6 +199,8 @@ export interface AffiliateStats {
   bankDetails?: string;
   // Extended Profile
   gender?: 'Male' | 'Female' | 'Other';
+  country?: string;
+  favoriteColor?: string;
   joinReason?: string;
   isElite?: boolean; // Paid tier
   hasContentAccess?: boolean; // Paid or unlocked via 100 sales
@@ -237,6 +241,9 @@ export interface User {
   id: string;
   uid?: string; // Firebase UID
   name: string;
+  surname?: string;
+  artistTradeName?: string;
+  gender?: 'Male' | 'Female' | 'Other';
   firstName?: string;
   lastName?: string;
   email: string;

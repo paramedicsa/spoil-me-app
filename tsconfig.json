@@ -35,6 +35,7 @@
     "tmp_service_worker.js",
     "tmp_deployed_index_js.js",
     "tmp_deployed_index.html",
-    "tmp_*"
+    "tmp_*",
+    "supabase/functions/**"
   ]
 }

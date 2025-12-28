@@ -65,7 +65,7 @@ const MemberManagement: React.FC = () => {
 
   // Grant trial
   const grantTrial = async () => {
-    if ((!selectedUser && !trialEmail) || !trialPlan || !trialDays || !functions) return;
+    if ((!selectedUser && !trialEmail) || !trialPlan || !trialDays) return;
 
     let userId = selectedUser?.id;
     if (!userId && trialEmail) {
@@ -105,7 +105,7 @@ const MemberManagement: React.FC = () => {
 
   // Adjust store credit
   const adjustCredit = async () => {
-    if (!selectedUser || !functions) return;
+    if (!selectedUser) return;
 
     try {
       await callServerFunction('adjustStoreCredit', {
