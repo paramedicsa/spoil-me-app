@@ -16,15 +16,23 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { action, image, category } = await req.json();
+    console.log('📥 Received request:', { action, category, imageLength: image?.length || 0 });
+    
     const apiKey = Deno.env.get("GEMINI_API_KEY");
 
-    if (!apiKey) throw new Error("GEMINI_API_KEY not found in secrets.");
+    if (!apiKey) {
+      console.error('❌ GEMINI_API_KEY not found in environment');
+      throw new Error("GEMINI_API_KEY not found in secrets.");
+    }
 
     // --- ACTION: ANALYZE IMAGE ---
     if (action === 'analyze-image') {
+      console.log('🔍 Processing analyze-image action');
+      
       // Clean the Base64 string (Remove prefix if it exists)
       const base64Data = image.includes(',') ? image.split(',')[1] : image;
       const mimeType = image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
+      console.log('📸 Image details:', { mimeType, base64Length: base64Data.length });
 
       const prompt = `You are a high-end jewelry specialist for 'Spoil Me Vintage'. 
       Analyze this ${category || 'jewelry'} image. 
@@ -51,6 +59,7 @@ Deno.serve(async (req: Request) => {
       // THE CORRECT ENDPOINT AND PAYLOAD FOR GEMINI 1.5 FLASH
       const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
+      console.log('🚀 Calling Gemini API...');
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,16 +73,22 @@ Deno.serve(async (req: Request) => {
         })
       });
 
+      console.log('📡 Gemini API response status:', response.status);
+      
       if (!response.ok) {
         const errorDetail = await response.text();
+        console.error('❌ Gemini API error:', errorDetail);
         throw new Error(`Google API Failure: ${response.status} - ${errorDetail}`);
       }
 
       const result = await response.json();
+      console.log('✅ Gemini API success, parsing response...');
       const aiText = result.candidates[0].content.parts[0].text;
+      console.log('📝 AI generated text:', aiText.substring(0, 200));
       
       // Clean Markdown from AI response
       const cleanJson = aiText.replace(/```json|```/g, "").trim();
+      console.log('✨ Returning cleaned JSON, length:', cleanJson.length);
 
       return new Response(cleanJson, {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
