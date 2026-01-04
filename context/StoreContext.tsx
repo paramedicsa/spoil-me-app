@@ -1852,38 +1852,50 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           // >>> DEBUG LOG <<<
           console.log("DEBUG: Final Product Data to Supabase (Add) - cleanData:", JSON.stringify(cleanData, null, 2));
 
+          // Check authentication status
+          const { data: sessionData } = await supabase.auth.getSession();
+          console.log('🔐 Current auth session:', sessionData?.session?.user?.email || 'NOT LOGGED IN');
+          if (!sessionData?.session) {
+            const authError = '❌ NOT AUTHENTICATED - You must be logged in to save products to Supabase';
+            console.error(authError);
+            alert(authError + '\n\nPlease log in and try again.');
+            throw new Error(authError);
+          }
+
           try {
             const res = await supabase.from('products').upsert([cleanData]).select();
-            console.log('Supabase addProduct response:', res);
+            console.log('✅ Supabase addProduct response:', res);
             if (res.error) {
-              console.error('Supabase addProduct ERROR:', res.error);
+              console.error('❌ Supabase addProduct ERROR:', res.error);
+              console.error('Error details:', {
+                message: res.error.message,
+                code: (res.error as any).code,
+                status: (res.error as any).status,
+                hint: (res.error as any).hint,
+                details: (res.error as any).details
+              });
               // Suggest RLS/permission issue if status indicates forbidden
               if ((res.error as any).status === 403 || (res.error as any).code === '42501') {
-                console.error('Permission / RLS error detected when inserting product. Check RLS policies and grants.');
+                console.error('❌ Permission / RLS error detected when inserting product. Check RLS policies and grants.');
+                alert('Permission denied: Unable to save product to Supabase.\n\nError: ' + res.error.message + '\n\nPlease check RLS policies in Supabase dashboard.');
               }
               throw res.error;
             }
+            console.log('✅ Product successfully saved to Supabase:', res.data);
             setDbConnectionError(null);
-          } catch (err) {
+          } catch (err: any) {
+            console.error('❌ Supabase addProduct CATCH block error:', err);
+            alert('Failed to save product to Supabase:\n\n' + (err.message || err));
             console.warn('Supabase addProduct failed, saving to local storage instead:', err);
             try {
               const existing = JSON.parse(localStorage.getItem('spv_products') || '[]');
               localStorage.setItem('spv_products', JSON.stringify([safeProduct, ...existing]));
             } catch (_) {}
+            throw err; // Re-throw so the UI knows it failed
           }
-          setDbConnectionError(null); // Clear any old error
-        } catch (err: any) {
-          console.error('CRITICAL FIRESTORE ERROR (addProduct):', err, 'Product:', dbPayload);
-          try {
-            localStorage.setItem('spv_products', JSON.stringify(newProducts));
-            setDbConnectionError(`Failed to add product: ${err.code || 'Unknown Error'}. Changes saved locally.`);
-            console.warn('Firestore write failed — product saved to localStorage instead.');
-          } catch (le) {
-            console.error('Fallback localStorage save also failed:', le);
-            throw new Error(`Critical Save Failure. Firestore and LocalStorage failed. (Details: ${le.message})`);
-          }
-          // Throw so calling UI can show a proper failure message
-          throw new Error(err.message || "Failed to add product.");
+        } catch (outerErr: any) {
+          console.error('❌ Outer try/catch error in addProduct:', outerErr);
+          throw outerErr;
         }
       } else {
          // Demo Mode - just local storage update
