@@ -31,7 +31,7 @@ serve(async (req) => {
       // CLEAN THE BASE64 STRING
       const base64Data = image.split(',')[1] || image;
 
-      const prompt = `You are an expert jewelry cataloger for "Spoil Me Vintage". 
+        const prompt = `You are an expert jewelry cataloger for "Spoil Me Vintage". 
       ANALYZE THIS IMAGE CAREFULLY. 
       Identify the exact color (e.g. Amber, Sunset Orange, Tangerine), the shape (e.g. Square, Geometric), the material (e.g. Resin, Glass, Acrylic), and the type (e.g. Stud Earring, Dangle).
       
@@ -39,7 +39,7 @@ serve(async (req) => {
       {
         "name": "A creative, high-end name for this specific piece",
         "description": "A 3-sentence luxury description focusing on the visual details seen in the photo",
-        "whenAndHowToWear": "Styling advice for this specific color and shape",
+          "whenAndHowToWear": "short guidance on when and how to wear",
         "tags": ["5 specific tags"],
         "seoKeywords": ["5 high-ranking keywords"],
         "colors": ["The dominant color name"]
