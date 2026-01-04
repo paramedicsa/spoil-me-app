@@ -559,16 +559,30 @@ const AdminProducts: React.FC = () => {
           console.log('AdminProducts: Added base64 image for analysis (preview length):', (base64String as string).slice(0, 80));
                let metadata: any = null;
                try {
+                  console.log('🔍 Calling gemini-analyze with action: analyze-image, category:', formData.category);
                   const { data, error } = await supabase.functions.invoke('gemini-analyze', {
                     body: { action: 'analyze-image', image: base64String, category: formData.category }
                   });
+                  console.log('📦 Supabase function response - error:', error, 'data:', data);
                   if (error) {
-                    console.warn('gemini-analyze returned error:', error);
+                    console.error('❌ gemini-analyze returned error:', error);
                   } else {
-                    metadata = data;
+                    // The function returns JSON as a string, so we need to parse it
+                    if (typeof data === 'string') {
+                      try {
+                        metadata = JSON.parse(data);
+                        console.log('✅ Parsed metadata from string:', metadata);
+                      } catch (parseErr) {
+                        console.error('❌ Failed to parse response string:', parseErr, 'raw data:', data);
+                        metadata = null;
+                      }
+                    } else {
+                      metadata = data;
+                      console.log('✅ Metadata (already object):', metadata);
+                    }
                   }
                } catch (err) {
-                  console.warn('Failed to call supabase function gemini-analyze:', err);
+                  console.error('❌ Failed to call supabase function gemini-analyze:', err);
                }
 
                if (!metadata) {
