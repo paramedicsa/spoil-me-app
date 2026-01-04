@@ -1,88 +1,92 @@
-// Deno-based Supabase Edge Function for image analysis
-// Uses: GEMINI_API_KEY from Supabase Secrets
-
-// @ts-ignore
-import { serve } from 'https://deno.land/std@0.170.0/http/server.ts';
-
+// 1. Deno-native imports for Supabase Edge Functions
+// Declare Deno for the TypeScript language server in the editor
 declare const Deno: any;
 
-const GEMINI_KEY = (typeof Deno !== 'undefined') ? Deno.env.get('GEMINI_API_KEY') || '' : '';
-
-const forwardToGoogle = async (body: any) => {
-  if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY not configured');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '<no body>');
-    console.error('Google API Error Body:', text);
-    throw new Error(`Google API Error: ${res.status} ${text}`);
+Deno.serve(async (req: Request) => {
+  // 2. Handle CORS (So your browser doesn't block the call)
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST'
+      }
+    });
   }
-  return await res.json();
-};
 
-const extractText = (r: any): string | null => {
-  if (!r) return null;
-  if (typeof r === 'string') return r;
-  if (typeof r.text === 'string') return r.text;
-  try { if (r.candidates && r.candidates[0] && r.candidates[0].content) {
-    const c = r.candidates[0].content.find((it: any) => typeof it.text === 'string'); if (c && c.text) return c.text; }
-  } catch (_) {}
-  try { if (r.outputs && r.outputs[0] && r.outputs[0].content) {
-    const c = r.outputs[0].content.find((it: any) => typeof it.text === 'string'); if (c && c.text) return c.text; }
-  } catch (_) {}
-  return null;
-};
-
-serve(async (req: Request) => {
   try {
-    if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST' } });
-    if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+    const { action, image, category } = await req.json();
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
 
-    const json = await req.json().catch(() => ({} as any));
-    const action = (json && json.action) || undefined;
+    if (!apiKey) throw new Error("GEMINI_API_KEY not found in secrets.");
 
+    // --- ACTION: ANALYZE IMAGE ---
     if (action === 'analyze-image') {
-      const { image, category } = json || {};
-      if (!image) return new Response(JSON.stringify({ error: 'image required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      // Clean the Base64 string (Remove prefix if it exists)
+      const base64Data = image.includes(',') ? image.split(',')[1] : image;
+      const mimeType = image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
 
-      const m = (image || '').match(/^data:(image\/[A-Za-z0-9.+-]+);base64,(.*)$/s);
-      const mimeType = m ? m[1] : 'image/jpeg';
-      const base64Data = m ? (m[2] || '') : (image || '').replace(/^data:image\/[A-Za-z0-9.+-]+;base64,/, '').replace(/\s+/g, '');
+      const prompt = `You are a high-end jewelry specialist for 'Spoil Me Vintage'. 
+      Analyze this image. Identify the PRIMARY COLOR, SHAPE, and PIECE TYPE. 
+      Return ONLY a JSON object:
+      {
+        "name": "Creative luxury name",
+        "description": "3-sentence visual description",
+        "whenAndHowToWear": "Specific styling advice",
+        "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+        "seoKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
+        "colors": ["Primary Color Name"]
+      }`;
 
-      const prompt = `Analyze this jewelry image. Identify the PRIMARY COLOR, SHAPE, MATERIAL (e.g., resin, copper, beads), and TYPE (e.g., stud, dangle, ring). Return a JSON object with keys: name, description (exactly 3 sentences), whenAndHowToWear, tags (5), seoKeywords (5), colors (array). Ensure colors describe only the product and ignore background or skin. Return ONLY the raw JSON object.`;
+      // THE CORRECT ENDPOINT AND PAYLOAD FOR GEMINI 1.5 FLASH
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-      const payload = { parts: [ { text: prompt }, { inline_data: { mime_type: mimeType, data: base64Data } } ] };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Data } }
+            ]
+          }]
+        })
+      });
 
-      console.log('Gemini Request Body:', payload);
-
-      const resp = await forwardToGoogle({ instances: [ payload ] });
-
-      const text = extractText(resp);
-      if (!text) return new Response(JSON.stringify({ raw: resp || {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-
-      // Try direct parse, then substring parse
-      try { const parsed = JSON.parse(text); return new Response(JSON.stringify(parsed), { headers: { 'Content-Type': 'application/json' } }); }
-      catch (e) {
-        const mm = text.match(/(\{[\s\S]*\})/);
-        if (mm && mm[1]) {
-          try { const parsed = JSON.parse(mm[1]); return new Response(JSON.stringify(parsed), { headers: { 'Content-Type': 'application/json' } }); } catch (pe) { console.warn('parse substring failed', pe); }
-        }
+      if (!response.ok) {
+        const errorDetail = await response.text();
+        throw new Error(`Google API Failure: ${response.status} - ${errorDetail}`);
       }
 
-      return new Response(JSON.stringify({ raw: resp || {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      const result = await response.json();
+      const aiText = result.candidates[0].content.parts[0].text;
+      
+      // Clean Markdown from AI response
+      const cleanJson = aiText.replace(/```json|```/g, "").trim();
+
+      return new Response(cleanJson, {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
     }
 
-    return new Response(JSON.stringify({ error: 'Action not supported' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: "Unsupported action" }), { status: 400 });
+
   } catch (err: any) {
-    console.error('gemini-analyze error:', err);
-    return new Response(JSON.stringify({ error: String(err?.message || err) }), { status: 502, headers: { 'Content-Type': 'application/json' } });
+    console.error("FUNCTION ERROR:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
   }
 });
-// Initialize Supabase client directly if the module does not exist
+// Initialize Supabase client directly (Deno runtime). The editor may not be able to
+// resolve the remote module; ignore TS errors for this import in the editor.
+// @ts-ignore: Remote Deno import
 import { createClient } from 'https://deno.land/x/supabase_js@2.39.7/mod.ts';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
