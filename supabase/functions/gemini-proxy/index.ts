@@ -1,8 +1,18 @@
-import { serve } from 'https://deno.land/std@0.170.0/http/server.ts';
+// If running in Deno, ensure your editor supports Deno imports and enable Deno extension.
+// If running in Node.js, use a Node.js HTTP server instead:
+import { createServer } from 'http';
+
+// Declare Deno global to silence TypeScript language server in editors (runtime is Deno in Supabase).
+declare const Deno: any;
+
+// Replace all usage of 'serve' with Node.js equivalent below.
 
 // A lightweight Gemini proxy for server-side AI calls. Keep the GEMINI_API_KEY as a Supabase Secret.
 
-const GEMINI_KEY = (typeof Deno !== 'undefined') ? Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GEMINI_API_KEY') : (process.env.GEMINI_API_KEY || '');
+const GEMINI_KEY =
+  (typeof globalThis !== 'undefined' && typeof (globalThis as any).Deno !== 'undefined' && typeof (globalThis as any).Deno.env !== 'undefined' && typeof (globalThis as any).Deno.env.get === 'function')
+    ? (globalThis as any).Deno.env.get('GEMINI_API_KEY')
+    : (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY : '');
 
 const forwardToGoogle = async (model: string, body: any) => {
   if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY not configured');
@@ -17,7 +27,7 @@ const forwardToGoogle = async (model: string, body: any) => {
   return json;
 };
 
-serve(async (req: Request) => {
+const handler = async (req: Request) => {
   try {
     if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
     const url = new URL(req.url);
@@ -148,4 +158,45 @@ serve(async (req: Request) => {
     console.error('gemini-proxy top-level error:', err);
     return new Response(JSON.stringify({ error: String(err?.message || err) }), { status: 500 });
   }
-});
+};
+
+// Start the server: prefer Deno runtime (Supabase functions), fallback to Node.js HTTP server for local testing.
+(async () => {
+  // Use typeof to check for Deno existence to avoid TS errors in Node
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).Deno !== 'undefined') {
+    try {
+      // Dynamic import to avoid build-time TypeScript errors in the project editor
+        // @ts-ignore: dynamic Deno std import
+        const mod = await import('https://deno.land/std@0.170.0/http/server.ts');
+      const serve = (mod as any).serve;
+      serve(handler);
+      return;
+    } catch (err) {
+      console.warn('Failed to use Deno serve, falling back to Node server:', err);
+    }
+  }
+
+  // Node.js fallback for local testing
+  const server = createServer(async (req, res) => {
+    try {
+      const chunks: Uint8Array[] = [];
+      req.on('data', (c) => chunks.push(c));
+      req.on('end', async () => {
+        const raw = Buffer.concat(chunks as any).toString() || '{}';
+        let parsed = {};
+        try { parsed = raw ? JSON.parse(raw) : {}; } catch (_) { parsed = {}; }
+        const url = new URL(req.url || '/', `http://${req.headers.host}`);
+        const fakeReq = new Request(url.toString(), { method: req.method, headers: req.headers as any, body: JSON.stringify(parsed) });
+        const resp = await handler(fakeReq);
+        const text = await resp.text();
+        res.writeHead(resp.status, Object.fromEntries(resp.headers.entries()));
+        res.end(text);
+      });
+    } catch (err) {
+      res.writeHead(500);
+      res.end(String(err));
+    }
+  });
+  const port = Number(process.env.PORT) || 8787;
+  server.listen(port, () => console.log(`Gemini proxy (Node fallback) listening on ${port}`));
+})();
