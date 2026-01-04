@@ -48,6 +48,7 @@ import AdminPush from './pages/admin/AdminPush';
 import CustomizedWireWrappedPendants from './pages/CustomizedWireWrappedPendants';
 import CustomPendantManager from './pages/admin/CustomPendantManager';
 import CustomPendantBuilder from './pages/CustomPendantBuilder';
+import MakerProfile from './pages/MakerProfile';
 import AdminArtists from './pages/admin/AdminArtists'; // NEW
 import ArtistPartnershipPage from './pages/ArtistPartnership'; // NEW
 import AdminAdPricing from './pages/admin/AdminAdPricing'; // NEW
@@ -175,6 +176,7 @@ const AppContent: React.FC = () => {
           <Route path="notifications" element={<Notifications />} /> {/* NEW */}
           <Route path="customized-wire-wrapped-pendants" element={<CustomizedWireWrappedPendants />} />
           <Route path="customized-wire-wrapped-pendants/:id" element={<CustomPendantBuilder />} /> {/* NEW */}
+          <Route path="maker/:makerName" element={<MakerProfile />} /> {/* NEW */}
           <Route path="artist-partnership" element={<ArtistPartnershipPage />} /> {/* NEW */}
         </Route>
 

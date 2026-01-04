@@ -41,9 +41,10 @@ export default defineConfig(({ mode }) => {
           }
         })
       ],
+      // Do NOT expose GEMINI API keys to the client bundle. Use a server-side proxy (Edge Function) and set
+      // VITE_GEMINI_PROXY_URL to point to your deployed proxy, e.g. https://<project>.functions.supabase.co/gemini-proxy
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_PROXY_URL': JSON.stringify(env.VITE_GEMINI_PROXY_URL || '')
       },
       resolve: {
         alias: {

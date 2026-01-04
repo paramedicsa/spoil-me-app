@@ -76,20 +76,21 @@ const ProductDetail: React.FC = () => {
   // Analytics logging instead of view count
   useEffect(() => {
     if (product) {
-      // Calculate Price in selected Currency
-      const displayPrice = getPrice(currentPrice);
-
       // Log Event to Firebase Analytics (Free) instead of Firestore (Paid)
-      const analytics = getAnalytics();
-      logEvent(analytics, 'view_item', {
-        currency: currency,
-        value: displayPrice,
-        items: [{
-          item_id: product.id,
-          item_name: product.name,
-          price: displayPrice
-        }]
-      });
+      try {
+        const analytics = getAnalytics();
+        logEvent(analytics, 'view_item', {
+          currency: currency,
+          value: product.price,
+          items: [{
+            item_id: product.id,
+            item_name: product.name,
+            price: product.price
+          }]
+        });
+      } catch (err) {
+        console.log('Analytics error:', err);
+      }
     }
   }, [product, currency]);
 
@@ -284,6 +285,12 @@ const ProductDetail: React.FC = () => {
   // Fixed Member Price: Use stored member prices with NO CONVERSION fallback
   const basePrice = currency === 'ZAR' ? product.price : (product.priceUSD !== undefined ? product.priceUSD : 0);
   const standardMemberPrice = currency === 'ZAR' ? (product.memberPrice || basePrice * 0.8) : (product.memberPriceUSD !== undefined ? product.memberPriceUSD : basePrice * 0.8);
+  
+  // For promo prices, use the same currency-aware approach
+  const promoPrice = currency === 'ZAR' ? (product.promoPrice || 0) : ((product.promoPrice || 0) / 29);
+  const promoBasicPrice = currency === 'ZAR' ? (product.promoBasicMemberPrice || 0) : ((product.promoBasicMemberPrice || 0) / 29);
+  const promoPremiumPrice = currency === 'ZAR' ? (product.promoPremiumMemberPrice || 0) : ((product.promoPremiumMemberPrice || 0) / 29);
+  const promoDeluxePrice = currency === 'ZAR' ? (product.promoDeluxeMemberPrice || 0) : ((product.promoDeluxeMemberPrice || 0) / 29);
 
   // Effective Base Price Logic
   let currentBasePrice = basePrice;
@@ -295,50 +302,49 @@ const ProductDetail: React.FC = () => {
      currentBasePrice = standardMemberPrice;
 
      if (isPromoActive) {
-         if (user.membershipTier === 'deluxe' && product.promoDeluxeMemberPrice && product.promoDeluxeMemberPrice > 0) {
-             currentBasePrice = product.promoDeluxeMemberPrice;
+         if (user.membershipTier === 'deluxe' && promoDeluxePrice > 0) {
+             currentBasePrice = promoDeluxePrice;
              appliedTier = 'deluxe';
-         } else if (user.membershipTier === 'premium' && product.promoPremiumMemberPrice && product.promoPremiumMemberPrice > 0) {
-             currentBasePrice = product.promoPremiumMemberPrice;
+         } else if (user.membershipTier === 'premium' && promoPremiumPrice > 0) {
+             currentBasePrice = promoPremiumPrice;
              appliedTier = 'premium';
-         } else if (user.membershipTier === 'basic' && product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0) {
-             currentBasePrice = product.promoBasicMemberPrice;
+         } else if (user.membershipTier === 'basic' && promoBasicPrice > 0) {
+             currentBasePrice = promoBasicPrice;
              appliedTier = 'basic';
          } else {
             // If no specific tier price, check if general promo is better than member 20% off
-            if ((product.promoPrice || Infinity) < standardMemberPrice) {
-                currentBasePrice = product.promoPrice!;
+            if (promoPrice > 0 && promoPrice < standardMemberPrice) {
+                currentBasePrice = promoPrice;
             }
          }
      }
   } else if (isPromoActive) {
      // Non-members get the general promo price if active
-     currentBasePrice = product.promoPrice!;
+     currentBasePrice = promoPrice;
   }
   
   // Calculate Member Price for Upsell Display (Non-Members)
-  const memberUpsellPrice = isPromoActive && product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0
-      ? product.promoBasicMemberPrice
+  const memberUpsellPrice = isPromoActive && promoBasicPrice > 0
+      ? promoBasicPrice
       : standardMemberPrice;
 
   // Final Price Calculation with Modifiers
   let currentPrice = currentBasePrice;
   if (selectedMaterial) {
-    currentPrice += selectedMaterial.modifier;
+    const materialModifier = currency === 'ZAR' ? selectedMaterial.modifier : (selectedMaterial.modifier / 29);
+    currentPrice += materialModifier;
   }
 
   // Original Price (Base + Mods) for strikethrough comparison
-  const standardPrice = basePrice + (selectedMaterial?.modifier || 0);
+  const materialModifier = selectedMaterial ? (currency === 'ZAR' ? selectedMaterial.modifier : (selectedMaterial.modifier / 29)) : 0;
+  const standardPrice = basePrice + materialModifier;
 
   // Calculate Savings for Display based on current view (Upsell)
   const upsellSavingsAmount = standardPrice - memberUpsellPrice;
   const upsellSavingsPercent = Math.round((upsellSavingsAmount / standardPrice) * 100);
   
   // Determine if we have tiered promo pricing to show detailed breakdown
-  const hasTieredPromo = isPromoActive && (
-    (product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0) ||
-    (product.promoDeluxeMemberPrice && product.promoDeluxeMemberPrice > 0)
-  );
+  const hasTieredPromo = isPromoActive && (promoBasicPrice > 0 || promoDeluxePrice > 0);
 
   // Helper for Tier Breakdown Percentage
   const getPercentOff = (price: number) => Math.round(((standardPrice - price) / standardPrice) * 100);
@@ -441,14 +447,9 @@ const ProductDetail: React.FC = () => {
 
   const resolvedPrimary = useResolvedImage(product.images[activeImage] || product.images[0] || '', getFallbackImage(800, 800, 'Spoil Me Vintage'));
 
-  // Helper functions for currency display - NO CONVERSION, show exactly what was inserted
+  // Helper functions for currency display
   const getCurrencySymbol = () => currency === 'ZAR' ? 'R' : '$';
-  const getPrice = (zarPrice: number, usdPrice?: number) => {
-    if (currency === 'ZAR') return zarPrice;
-    if (currency === 'USD') return usdPrice !== undefined ? usdPrice : 0; // Don't fallback to ZAR price
-    return zarPrice;
-  };
-  const convertPrice = (zarPrice: number) => currency === 'ZAR' ? zarPrice : zarPrice / 29; // Keep for backwards compatibility
+  const formatPrice = (price: number) => price.toFixed(2);
 
   return (
     <div className="space-y-16 pt-4 pb-16 relative">
@@ -691,7 +692,7 @@ const ProductDetail: React.FC = () => {
             <div className="flex flex-col gap-1">
                {product.compareAtPrice && product.compareAtPrice > currentPrice && (
                   <div className="flex items-center gap-2 relative">
-                    <span className="text-sm text-gray-500 line-through">RRP {getCurrencySymbol()}{getPrice(product.compareAtPrice, product.compareAtPriceUSD).toFixed(2)}</span>
+                    <span className="text-sm text-gray-500 line-through">RRP {getCurrencySymbol()}{formatPrice(currency === 'ZAR' ? product.compareAtPrice : (product.compareAtPriceUSD || product.compareAtPrice / 29))}</span>
                     <button onClick={() => setShowRRPInfo(!showRRPInfo)} className="text-gray-500 hover:text-cyan-400">
                        <HelpCircle size={14} />
                     </button>
@@ -705,11 +706,11 @@ const ProductDetail: React.FC = () => {
                
                <div className="flex items-baseline gap-3">
                   <span className={`text-[32px] font-bold drop-shadow-sm ${user.isMember ? 'text-purple-400' : 'text-green-400'}`}>
-                     {getCurrencySymbol()}{getPrice(currentPrice).toFixed(2)}
+                     {getCurrencySymbol()}{formatPrice(currentPrice)}
                   </span>
                   {/* Ensure that if Promo is active (or member price is lower), we show the struck through original price */}
                   {standardPrice > currentPrice + 0.01 && (
-                     <span className="text-lg text-gray-600 line-through">{getCurrencySymbol()}{getPrice(standardPrice).toFixed(2)}</span>
+                     <span className="text-lg text-gray-600 line-through">{getCurrencySymbol()}{formatPrice(standardPrice)}</span>
                   )}
                </div>
                
@@ -737,7 +738,7 @@ const ProductDetail: React.FC = () => {
                         <>
                             <div className={`w-2 h-2 rounded-full ${availableStock > 0 ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.8)]' : 'bg-red-500'}`}></div>
                             <span className={`${availableStock > 0 ? (availableStock <= 5 ? 'text-orange-400' : 'text-green-400') : 'text-red-400'} font-bold`}>
-                               {availableStock > 0 ? (availableStock <= 5 ? `Only ${availableStock} left!` : 'In Stock') : 'Out of Stock'}
+                               {availableStock > 0 ? (availableStock === 1 ? '1 item left!' : availableStock <= 5 ? `Only ${availableStock} left!` : 'In Stock') : 'Out of Stock'}
                             </span>
                         </>
                     )}
@@ -759,7 +760,7 @@ const ProductDetail: React.FC = () => {
                 <div className="space-y-3">
                    <div className="flex justify-between items-center text-sm p-2 rounded bg-zinc-800/50 border border-zinc-700/50">
                       <span className="text-gray-400">Retail Price</span>
-                      <span className="text-gray-300 font-medium">{getCurrencySymbol()}{getPrice(standardPrice).toFixed(2)}</span>
+                      <span className="text-gray-300 font-medium">{getCurrencySymbol()}{formatPrice(standardPrice)}</span>
                    </div>
                    
                    {/* DYNAMIC MEMBERSHIP PRICING DISPLAY */}
@@ -773,7 +774,7 @@ const ProductDetail: React.FC = () => {
                                   <span className="text-xs text-purple-300 uppercase font-bold">{getPercentOff(product.promoBasicMemberPrice)}% Off</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(product.promoBasicMemberPrice).toFixed(0)}</span>
+                                    <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{formatPrice(promoBasicPrice)}</span>
                                 </div>
                               </div>
                           )}
@@ -785,7 +786,7 @@ const ProductDetail: React.FC = () => {
                                    <span className="text-xs text-purple-300 uppercase font-bold">{getPercentOff(product.promoPremiumMemberPrice)}% Off</span>
                                  </div>
                                  <div className="text-right">
-                                     <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(product.promoPremiumMemberPrice).toFixed(0)}</span>
+                                     <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{formatPrice(promoPremiumPrice)}</span>
                                  </div>
                                </div>
                           )}
@@ -798,7 +799,7 @@ const ProductDetail: React.FC = () => {
                                   <span className="text-xs text-lime-300 uppercase font-bold">{getPercentOff(product.promoDeluxeMemberPrice)}% Off</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block text-lime-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(product.promoDeluxeMemberPrice).toFixed(0)}</span>
+                                    <span className="block text-lime-400 font-bold text-lg">{getCurrencySymbol()}{formatPrice(promoDeluxePrice)}</span>
                                 </div>
                               </div>
                           )}
@@ -808,7 +809,7 @@ const ProductDetail: React.FC = () => {
                       <div className="flex justify-between items-center text-sm p-2 rounded bg-purple-900/20 border border-purple-500/40">
                          <span className="text-purple-200 font-bold">Member Price</span>
                          <div className="text-right">
-                            <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{getPrice(memberUpsellPrice).toFixed(2)}</span>
+                            <span className="block text-purple-400 font-bold text-lg">{getCurrencySymbol()}{formatPrice(memberUpsellPrice)}</span>
                             <span className="text-xs text-purple-300 uppercase font-bold">Save {upsellSavingsPercent}%</span>
                          </div>
                        </div>
@@ -849,6 +850,16 @@ const ProductDetail: React.FC = () => {
                         <p className="text-gray-300 text-sm leading-relaxed font-light">{product.material}</p>
                     </div>
                 )}
+
+                <div>
+                    <h3 className="font-cherry text-2xl text-amber-400 mb-2 tracking-wide">Made By</h3>
+                    <Link 
+                        to={`/maker/${encodeURIComponent(product.madeBy || 'Spoil Me Vintage')}`}
+                        className="text-gray-300 text-sm leading-relaxed font-light hover:text-cyan-400 transition-colors inline-block"
+                    >
+                        {product.madeBy || 'Spoil Me Vintage'}
+                    </Link>
+                </div>
 
                 {/* NEW TIP SECTION: Oxidized Jewelry Care */}
                 {product.isUniquePendant && (
@@ -921,7 +932,9 @@ const ProductDetail: React.FC = () => {
                 {selectedSize && product.ringStock[selectedSize] > 0 && (
                   <p className={`text-xs mt-2 flex items-center gap-1 ${product.ringStock[selectedSize] <= 5 ? 'text-orange-400 font-bold' : 'text-green-400'}`}>
                     <Check size={12} /> 
-                    {product.ringStock[selectedSize] <= 5 
+                    {product.ringStock[selectedSize] === 1
+                        ? '1 item left in stock!' 
+                        : product.ringStock[selectedSize] <= 5 
                         ? `Only ${product.ringStock[selectedSize]} left in stock!` 
                         : 'In Stock'}
                   </p>
@@ -949,7 +962,7 @@ const ProductDetail: React.FC = () => {
                         <div className="flex justify-between items-center">
                            <span className={`font-medium text-sm ${selectedMaterial?.name === mat.name ? 'text-white' : 'text-gray-300'}`}>{mat.name}</span>
                            <span className="text-xs font-bold text-pink-400">
-                             {mat.modifier > 0 ? `+${getCurrencySymbol()}${getPrice(mat.modifier).toFixed(0)}` : ''}
+                             {mat.modifier > 0 ? `+${getCurrencySymbol()}${formatPrice(currency === 'ZAR' ? mat.modifier : mat.modifier / 29)}` : ''}
                            </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{mat.description}</p>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { signUpWithEmail } from '../utils/supabaseClient';
+import { useStore } from '../context/StoreContext';
 
 interface RegisterFormProps {
   onSuccess: () => void;
@@ -27,6 +27,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     }));
   };
 
+  const { register, authErrorMessage, resendVerificationEmail } = useStore();
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -43,27 +45,41 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
 
     try {
-      await signUpWithEmail(formData.email, formData.password, {
+      const success = await register({
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
         dob: formData.dob,
         gender: formData.gender,
         favoriteColor: formData.favoriteColor,
         country: formData.country,
-        email: formData.email,
-        createdAt: new Date().toISOString(),
-        membershipTier: 'none',
-        role: 'user',
-        wishlist: []
-      });
+      } as any);
+      if (success) {
+        onSuccess();
+        return;
+      }
 
-      onSuccess();
+      // Registration returned false - surface store error message if present
+      if (authErrorMessage) {
+        alert(authErrorMessage);
+      } else {
+        alert('Registration failed. Please try again.');
+      }
     } catch (error: any) {
       console.error('Registration Error', error);
       alert(error.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResend = async () => {
+    if (!formData.email) return alert('Please enter the email to resend verification to.');
+    const ok = await resendVerificationEmail(formData.email);
+    if (ok) alert('Verification email resent — check your inbox.');
+    else alert('Failed to resend verification email. Check the email address and try again.');
   };
 
   return (
@@ -193,6 +209,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
       >
         {isLoading ? 'Creating Account...' : 'Create Account'}
       </button>
+      {authErrorMessage && authErrorMessage.toLowerCase().includes('confirm') && (
+        <div className="mt-2 text-sm text-yellow-300">
+          <div>{authErrorMessage}</div>
+          <button onClick={handleResend} className="mt-2 text-sm text-amber-400 underline">Resend verification email</button>
+        </div>
+      )}
     </form>
   );
 };

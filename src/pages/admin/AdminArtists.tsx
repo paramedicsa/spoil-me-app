@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs, Tab, Card, CardBody } from "@nextui-org/react";
-import { queryDocuments, updateDocument, createDocument } from '../../../utils/supabaseClient';
+import { queryDocuments, updateDocument, createDocument, subscribeToTable } from '../../../utils/supabaseClient';
 import supabase from '../../supabaseClient';
 
 type AppRow = any;
@@ -8,37 +8,31 @@ type AppRow = any;
 const AdminArtistsPage: React.FC = () => {
   const [applications, setApplications] = useState<AppRow[]>([]);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [viewingImage, setViewingImage] = useState<{ id: string; url: string } | null>(null);
   // Load applications with robust fallbacks
   const loadApplications = async () => {
     try {
-      // Prefer demo/demo-local apps if present
-      const raw = localStorage.getItem('spv_artist_applications');
-      if (raw && raw.length > 0) {
-        const apps = JSON.parse(raw);
-        setApplications(apps || []);
+      // Fetch pending artist applications from Supabase using standard columns
+      const { data, error } = await supabase
+        .from('artist_applications')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        setApplications([]);
+        setSupabaseError(null);
         return;
       }
 
-      // Try a few common column names for ordering, and fall back to unordered query
-      let apps = await queryDocuments('artist_applications', { orderBy: { column: 'submitted_at', ascending: false } });
-      if (!apps) apps = await queryDocuments('artist_applications', { orderBy: { column: 'submittedAt', ascending: false } });
-      if (!apps) apps = await queryDocuments('artist_applications');
-
-      if (!apps || apps.length === 0) {
-        // Nothing from Supabase — fallback to localStorage (demo) and set error flag
-        setSupabaseError('Could not load applications from Supabase; showing demo/local applications instead.');
-        const raw2 = localStorage.getItem('spv_artist_applications');
-        const apps2 = raw2 ? JSON.parse(raw2) : [];
-        setApplications(apps2 || []);
-        return;
-      }
-
-      setApplications(apps || []);
+      setApplications(data || []);
       setSupabaseError(null);
     } catch (err: any) {
       console.error('Failed to load artist applications', err);
       setSupabaseError(err?.message || String(err));
-      // fallback to localStorage apps
+      // fallback to localStorage apps for admins when Supabase is unavailable
       const raw = localStorage.getItem('spv_artist_applications');
       const apps = raw ? JSON.parse(raw) : [];
       setApplications(apps || []);
@@ -46,11 +40,24 @@ const AdminArtistsPage: React.FC = () => {
   };
 
   useEffect(() => { loadApplications(); }, []);
+  useEffect(() => {
+    // Subscribe to changes on artist_applications so admin view updates in real-time
+    let unsub: (() => void) | null = null;
+    try {
+      unsub = subscribeToTable('artist_applications', async () => {
+        await loadApplications();
+      });
+    } catch (err) {
+      console.warn('Failed to subscribe to artist_applications realtime events:', err);
+    }
+    return () => { try { if (unsub) unsub(); } catch (_) {} };
+  }, []);
 
   // Dummy data for products needing pricing - replace with real data
+  // Prefer modern `images` array when available; fallback to legacy `imageUrl` or placeholder
   const productsToPrice = [
-    { id: 101, artist: 'Jane Doe', requestedCost: 150, imageUrl: 'https://via.placeholder.com/150' },
-    { id: 102, artist: 'John Smith', requestedCost: 200, imageUrl: 'https://via.placeholder.com/150' },
+    { id: 101, artist: 'Jane Doe', requestedCost: 150, images: ['https://via.placeholder.com/150'] },
+    { id: 102, artist: 'John Smith', requestedCost: 200, images: ['https://via.placeholder.com/150'] },
   ];
 
     // Dummy data for QC
@@ -61,6 +68,18 @@ const AdminArtistsPage: React.FC = () => {
 
   return (
     <div className="p-8">
+      {viewingImage && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg overflow-hidden max-w-3xl w-full">
+            <div className="p-2 flex justify-end">
+              <button onClick={() => setViewingImage(null)} className="px-3 py-1 bg-zinc-800 text-white rounded">Close</button>
+            </div>
+            <div className="p-4 bg-black flex items-center justify-center">
+              <img src={viewingImage.url} alt="ID Document" className="max-h-[70vh] object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
       {supabaseError && (
         <div className="mb-4 p-3 rounded bg-amber-600 text-black">
           <strong>Supabase notice:</strong> {supabaseError}
@@ -93,54 +112,58 @@ const AdminArtistsPage: React.FC = () => {
                   <div key={app.id} className="flex flex-col md:flex-row md:justify-between items-start md:items-center p-4 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                     <div className="flex gap-4 w-full md:w-auto">
                       <div className="flex flex-col">
-                        <p className="font-bold">{app.name} {app.surname}</p>
-                        <p className="text-sm text-zinc-500">Applying for: <strong>{app.plan || '—'}</strong></p>
-                        <p className="text-sm text-zinc-500">Contact: {app.contactNumber} • {app.email}</p>
+                        <p className="font-bold">{app.shop_name || `Applicant ${app.user_id?.slice(0, 8) || '—'}`}</p>
+                        <p className="text-sm text-zinc-500">User ID: <strong>{app.user_id || '—'}</strong></p>
+                        <p className="text-sm text-zinc-500">Status: {app.status || 'pending'}</p>
                         <p className="text-sm text-zinc-500 mt-1">Submitted: {(() => {
-                          const dateVal = app.submittedAt || app.submitted_at || app.submitted || app.createdAt || app.created_at;
+                          const dateVal = app.created_at || app.submitted_at || app.submittedAt || app.submitted || app.createdAt;
                           try { return dateVal ? new Date(dateVal).toLocaleString() : '—'; } catch (_) { return '—'; }
                         })()}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="text-sm text-zinc-500">Images: {app.productImages?.length || 0}</div>
+                        <div className="text-sm text-zinc-500">Images: {(app.product_images || app.productImages || []).length}</div>
                       </div>
                     </div>
 
                     <div className="mt-3 md:mt-0 flex gap-3 items-center">
                       <button onClick={async () => {
-                        // Approve: try to create artist entry, update application status, notify user.
+                        // Load signed URL for ID document and display
                         try {
-                          await createDocument('artists', {
-                            uid: app.uid,
-                            shopName: app.artistTradeName || `${app.name} ${app.surname}`,
-                            slotLimit: 5,
-                            slotsUsed: 0,
-                            wallet: { pending: 0, available: 0, currency: 'ZAR' },
-                            status: 'active',
-                            isFirstTime: true
-                          });
-                          await updateDocument('artist_applications', app.id, { status: 'approved', approvedAt: new Date().toISOString() });
-                          await supabase.from('users').update({ artistApplicationStatus: 'approved' }).eq('id', app.uid);
-                          await supabase.from('notifications').insert([{ userId: app.uid, type: 'system', title: 'Artist Application Approved!', message: 'Congratulations! Your artist application has been approved. You can now access your artist dashboard and start listing products.', date: new Date().toISOString(), isRead: false }]);
+                          if (!app.id_document_url) {
+                            alert('No ID document uploaded for this application.');
+                            return;
+                          }
+                          // If already cached, use it
+                          if (signedUrls[app.id]) {
+                            setViewingImage({ id: app.id, url: signedUrls[app.id] });
+                            return;
+                          }
+                          const { data: signedData, error: signedErr } = await supabase.storage.from('artist-applications').createSignedUrl(app.id_document_url, 3600);
+                          if (signedErr || !signedData?.signedUrl) {
+                            throw signedErr || new Error('Failed to create signed URL');
+                          }
+                          setSignedUrls(prev => ({ ...prev, [app.id]: signedData.signedUrl }));
+                          setViewingImage({ id: app.id, url: signedData.signedUrl });
+                        } catch (err) {
+                          console.error('Failed to fetch signed URL for ID document', err);
+                          alert('Failed to load ID document. See console for details.');
+                        }
+                      }} className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-500">View ID</button>
+
+                      <button onClick={async () => {
+                        // Approve: update application status to 'approved'
+                        try {
+                          await supabase.from('artist_applications').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', app.id);
+                          // update user's application status and notify
+                          if (app.user_id) {
+                            await supabase.from('users').update({ artistApplicationStatus: 'approved' }).eq('id', app.user_id);
+                            await supabase.from('notifications').insert([{ user_id: app.user_id, type: 'system', title: 'Artist Application Approved!', message: 'Congratulations! Your artist application has been approved. You can now access your artist dashboard and start listing products.', created_at: new Date().toISOString(), read: false }]);
+                          }
                           // refresh list
-                          const apps = await queryDocuments('artist_applications', { orderBy: { column: 'submittedAt', ascending: false } });
-                          setApplications(apps || []);
+                          await loadApplications();
                           alert('Application approved successfully!');
                         } catch (err) {
                           console.error('Error approving application', err);
-                          // fallback: update localStorage if present
-                          try {
-                            const raw = localStorage.getItem('spv_artist_applications');
-                            if (raw) {
-                              const arr = JSON.parse(raw).map((a: any) => a.id === app.id ? { ...a, status: 'approved', approvedAt: new Date().toISOString() } : a);
-                              localStorage.setItem('spv_artist_applications', JSON.stringify(arr));
-                              setApplications(arr);
-                              alert('Application approved in local/demo storage (Supabase unavailable).');
-                              return;
-                            }
-                          } catch (e) {
-                            console.warn('Local fallback failed', e);
-                          }
                           alert('Failed to approve application. See console for details.');
                         }
                       }} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-500">Approve</button>
@@ -148,26 +171,15 @@ const AdminArtistsPage: React.FC = () => {
                       <button onClick={async () => {
                         const reason = prompt('Optional note for rejection (will be sent to the artist):') || '';
                         try {
-                          await updateDocument('artist_applications', app.id, { status: 'rejected', rejectedAt: new Date().toISOString() });
-                          await supabase.from('users').update({ artistApplicationStatus: 'rejected' }).eq('id', app.uid);
-                          await supabase.from('notifications').insert([{ userId: app.uid, type: 'system', title: 'Artist Application Update', message: `We regret to inform you that your application has been declined. ${reason}`, date: new Date().toISOString(), isRead: false }]);
-                          const apps = await queryDocuments('artist_applications', { orderBy: { column: 'submittedAt', ascending: false } });
-                          setApplications(apps || []);
+                          await supabase.from('artist_applications').update({ status: 'rejected', rejected_at: new Date().toISOString() }).eq('id', app.id);
+                          if (app.user_id) {
+                            await supabase.from('users').update({ artistApplicationStatus: 'rejected' }).eq('id', app.user_id);
+                            await supabase.from('notifications').insert([{ user_id: app.user_id, type: 'system', title: 'Artist Application Update', message: `We regret to inform you that your application has been declined. ${reason}`, created_at: new Date().toISOString(), read: false }]);
+                          }
+                          await loadApplications();
                           alert('Application rejected.');
                         } catch (err) {
                           console.error('Error rejecting application', err);
-                          try {
-                            const raw = localStorage.getItem('spv_artist_applications');
-                            if (raw) {
-                              const arr = JSON.parse(raw).map((a: any) => a.id === app.id ? { ...a, status: 'rejected', rejectedAt: new Date().toISOString(), adminNote: reason } : a);
-                              localStorage.setItem('spv_artist_applications', JSON.stringify(arr));
-                              setApplications(arr);
-                              alert('Application rejected in local/demo storage (Supabase unavailable).');
-                              return;
-                            }
-                          } catch (e) {
-                            console.warn('Local fallback failed', e);
-                          }
                           alert('Failed to reject application. See console for details.');
                         }
                       }} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-500">Reject</button>
@@ -183,9 +195,9 @@ const AdminArtistsPage: React.FC = () => {
             <CardBody>
               <h2 className="text-2xl font-bold mb-4">Price New Products</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {productsToPrice.map((product) => (
+                {productsToPrice.map((product: any) => (
                   <div key={product.id} className="bg-zinc-100 dark:bg-zinc-800 rounded-lg p-4">
-                    <img src={product.imageUrl} alt="Product" className="w-full h-48 object-cover rounded-md mb-4" />
+                    <img src={(product.images && product.images[0]) || product.imageUrl || 'https://via.placeholder.com/150'} alt="Product" className="w-full h-48 object-cover rounded-md mb-4" />
                     <p className="font-bold mb-2">Artist: {product.artist}</p>
                     <p className="mb-4">Requested Cost: <span className="font-semibold">R{product.requestedCost}</span></p>
                     <div className="space-y-2">

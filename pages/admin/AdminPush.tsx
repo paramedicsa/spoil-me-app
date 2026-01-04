@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { callServerFunction } from '../../utils/supabaseClient';
+import { callServerFunction, supabase } from '../../utils/supabaseClient';
 import { Bell, Send, User, Globe, Users } from 'lucide-react';
 
 type TargetGroup = 'all' | 'affiliates' | 'artists' | 'non_members' | 'south_africa' | 'international' | 'individual';
@@ -14,6 +14,7 @@ const AdminPush = () => {
     imageUrl: '',
     link: '/#/vault' // Default to Vault
   });
+  const [testUserId, setTestUserId] = useState('');
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +52,27 @@ const AdminPush = () => {
       <div className="flex items-center gap-3 mb-6 border-b border-zinc-800 pb-4">
         <Bell className="text-yellow-500" size={24} />
         <h2 className="text-xl font-bold text-white">Push Notification Center</h2>
+      </div>
+
+      {/* SEND TEST NOTIFICATION TO SPECIFIC USER */}
+      <div className="mt-6 p-4 border-t border-zinc-800">
+        <label className="text-gray-400 text-sm">Test Notification (send to specific User ID)</label>
+        <div className="mt-2 flex gap-2">
+          <input type="text" placeholder="Paste User UID here..." className="flex-1 bg-black border border-zinc-700 text-white p-3 rounded" value={testUserId} onChange={(e) => setTestUserId(e.target.value)} />
+          <button onClick={async () => {
+            if (!testUserId) { alert('Please enter a User ID'); return; }
+            if (!confirm(`Send test notification to ${testUserId}?`)) return;
+            try {
+              const payload = { user_id: testUserId, type: 'general', title: formData.title || 'Test Notification', message: formData.body || 'This is a test notification sent from Admin panel', link: formData.link || '/' };
+              const { error } = await supabase.from('notifications').insert([payload]);
+              if (error) { console.error('Insert notification failed:', error); alert('Failed to enqueue notification. See console.'); return; }
+              alert('Test notification enqueued (server webhook will send it)');
+            } catch (err: any) {
+              console.error('Send test notification error:', err);
+              alert('Failed to send test notification. See console for details.');
+            }
+          }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded">Send Test Notification</button>
+        </div>
       </div>
 
       <form onSubmit={handleSend} className="space-y-6">

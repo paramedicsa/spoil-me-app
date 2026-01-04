@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Facebook, Instagram, Twitter, Share2, Check, RefreshCw, AlertCircle, Image as ImageIcon, Loader2, Smartphone, Settings, X, Save, Link as LinkIcon, Sparkles, Zap, Play, Pause, Server, Activity, Terminal } from 'lucide-react';
-import { generateSocialPost } from '../../services/geminiService';
+// Do not import server-side Gemini service in client code. Use the Edge Function proxy instead.
 import { SocialPlatform, Product } from '../../types';
 
 const INITIAL_PLATFORMS: SocialPlatform[] = [
@@ -165,7 +165,11 @@ const AdminSocial: React.FC = () => {
         for (const platform of activePlatforms) {
             // Pass the account name to the AI so it knows the context
             const contextName = platform.accountName ? `(Account: @${platform.accountName})` : '';
-            captions[platform.id] = await generateSocialPost(randomProduct.name, `${platform.name} ${contextName}`, randomProduct.price);
+            // Call server-side proxy to generate social caption
+            const proxyUrl = (import.meta as any).env?.VITE_GEMINI_PROXY_URL || '/api/gemini-proxy';
+            const resp = await fetch(`${proxyUrl}/generate-social`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productName: randomProduct.name, platform: `${platform.name} ${contextName}`, price: randomProduct.price }) });
+            const json = await resp.json().catch(() => ({}));
+            captions[platform.id] = json?.text || `Check out this amazing product: ${randomProduct.name} for R${randomProduct.price}!`;
         }
 
         setGeneratedCaptions(captions);

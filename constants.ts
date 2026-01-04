@@ -30,6 +30,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     compareAtPrice: 45.00,
     memberPrice: 14.50, // 50% off
     costPrice: 5.00,
+    madeBy: 'Spoil Me Vintage',
     category: 'Red Collection',
     type: 'Stud',
     status: 'published',

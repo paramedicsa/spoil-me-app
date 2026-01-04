@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, X, Mail, Lock, ArrowRight } from 'lucide-react';
-import { signInWithEmail } from '../utils/supabaseClient';
+import { useStore } from '../context/StoreContext';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -17,6 +17,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
   onSwitchToSignup,
   planName
 }) => {
+  const { login, authErrorMessage } = useStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -42,8 +43,12 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setIsLoading(true);
 
     try {
-      await signInWithEmail(formData.email, formData.password);
-      onLoginSuccess();
+      const success = await login(formData.email, formData.password);
+      if (success) {
+        onLoginSuccess();
+      } else {
+        alert(authErrorMessage || 'Login failed. Please check your credentials.');
+      }
     } catch (error: any) {
       console.error('Login Error', error);
       alert(error.message || 'Login failed. Please check your credentials.');
@@ -75,6 +80,12 @@ const LoginModal: React.FC<LoginModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleLogin} className="p-6 space-y-4">
+          {authErrorMessage && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded-md p-3 text-red-400 text-sm">
+              {authErrorMessage}
+            </div>
+          )}
+          
           {/* Email */}
           <div>
             <label className="block text-white text-sm font-medium mb-2">

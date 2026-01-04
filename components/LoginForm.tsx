@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { signInWithEmail } from '../utils/supabaseClient';
+import { useStore } from '../context/StoreContext';
 
 interface LoginFormProps {
   onSuccess: () => void;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
+  const { login, authErrorMessage } = useStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -32,8 +33,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
 
     try {
-      await signInWithEmail(formData.email, formData.password);
-      onSuccess();
+      const success = await login(formData.email, formData.password);
+      if (success) {
+        onSuccess();
+      } else {
+        alert(authErrorMessage || 'Login failed. Please check your credentials.');
+      }
     } catch (error: any) {
       console.error('Login Error', error);
       alert(error.message || 'Login failed. Please check your credentials.');
@@ -44,6 +49,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
   return (
     <form onSubmit={handleLogin} className="space-y-4">
+      {authErrorMessage && (
+        <div className="bg-red-500/10 border border-red-500/50 rounded-md p-3 text-red-400 text-sm">
+          {authErrorMessage}
+        </div>
+      )}
+      
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
         <input

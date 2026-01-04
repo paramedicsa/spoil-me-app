@@ -9,7 +9,16 @@ alter table public.artist_applications
 update public.artist_applications set uid = user_id where uid is null and user_id is not null;
 
 alter table public.artist_applications
-  add constraint if not exists artist_applications_uid_fkey foreign key (uid) references auth.users(id) on delete set null;
+  drop constraint if exists artist_applications_uid_fkey;
+
+-- Add FK constraint conditionally (avoid unsupported 'ADD CONSTRAINT IF NOT EXISTS')
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'artist_applications_uid_fkey') THEN
+    ALTER TABLE public.artist_applications
+      ADD CONSTRAINT artist_applications_uid_fkey FOREIGN KEY (uid) REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+END$$;
 
 alter table public.artist_applications
   add column if not exists product_images jsonb default '[]'::jsonb;

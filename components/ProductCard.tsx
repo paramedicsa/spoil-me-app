@@ -32,6 +32,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   // Standard Member Price (Use stored member prices with fallback)
   const basePrice = curr === 'ZAR' ? product.price : (product.priceUSD || product.price);
   const standardMemberPrice = curr === 'ZAR' ? (product.memberPrice || basePrice * 0.8) : (product.memberPriceUSD || basePrice * 0.8);
+  
+  // For promo prices, use the same currency-aware approach
+  const promoPrice = curr === 'ZAR' ? (product.promoPrice || 0) : ((product.promoPrice || 0) / 29);
+  const promoBasicPrice = curr === 'ZAR' ? (product.promoBasicMemberPrice || 0) : ((product.promoBasicMemberPrice || 0) / 29);
+  const promoPremiumPrice = curr === 'ZAR' ? (product.promoPremiumMemberPrice || 0) : ((product.promoPremiumMemberPrice || 0) / 29);
+  const promoDeluxePrice = curr === 'ZAR' ? (product.promoDeluxeMemberPrice || 0) : ((product.promoDeluxeMemberPrice || 0) / 29);
 
   // Determine effective price for the user based on Tier + Promo
   let currentPrice = basePrice;
@@ -42,19 +48,19 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       isMemberPricingEffective = true;
       // If Promo is active, check for Tier-Specific Pricing
       if (isPromoActive) {
-          if (user.membershipTier === 'deluxe' && product.promoDeluxeMemberPrice && product.promoDeluxeMemberPrice > 0) {
-              currentPrice = product.promoDeluxeMemberPrice;
+          if (user.membershipTier === 'deluxe' && promoDeluxePrice > 0) {
+              currentPrice = promoDeluxePrice;
               appliedTier = 'deluxe';
-          } else if (user.membershipTier === 'premium' && product.promoPremiumMemberPrice && product.promoPremiumMemberPrice > 0) {
-              currentPrice = product.promoPremiumMemberPrice;
+          } else if (user.membershipTier === 'premium' && promoPremiumPrice > 0) {
+              currentPrice = promoPremiumPrice;
               appliedTier = 'premium';
-          } else if (user.membershipTier === 'basic' && product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0) {
-              currentPrice = product.promoBasicMemberPrice;
+          } else if (user.membershipTier === 'basic' && promoBasicPrice > 0) {
+              currentPrice = promoBasicPrice;
               appliedTier = 'basic';
           } else {
               // Fallback: If specific tier has no promo price set, use standard member price (20% off)
               // UNLESS the general promo price is better.
-              currentPrice = Math.min(standardMemberPrice, product.promoPrice || Infinity);
+              currentPrice = Math.min(standardMemberPrice, promoPrice || Infinity);
           }
       } else {
           // No Promo active -> Standard 20% off
@@ -62,12 +68,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       }
   } else if (isPromoActive) {
       // Non-member gets Promo Price if active
-      currentPrice = product.promoPrice!;
+      currentPrice = promoPrice;
   }
 
   // Determine price to show as "Member Price" upsell for non-members
-  const displayMemberUpsellPrice = isPromoActive && product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0
-      ? product.promoBasicMemberPrice
+  const displayMemberUpsellPrice = isPromoActive && promoBasicPrice > 0
+      ? promoBasicPrice
       : standardMemberPrice;
 
   // Stats
@@ -122,18 +128,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   };
 
   // Check if tiered pricing exists for display
-  const hasTieredPromo = isPromoActive && (
-    (product.promoBasicMemberPrice && product.promoBasicMemberPrice > 0) ||
-    (product.promoDeluxeMemberPrice && product.promoDeluxeMemberPrice > 0)
-  );
+  const hasTieredPromo = isPromoActive && (promoBasicPrice > 0 || promoDeluxePrice > 0);
 
   // Helper function for currency display
   const getCurrencySymbol = () => curr === 'ZAR' ? 'R' : '$';
-  const getPrice = (zarPrice: number, usdPrice?: number) => {
-    if (curr === 'ZAR') return zarPrice;
-    if (curr === 'USD') return usdPrice !== undefined ? usdPrice : 0; // Don't fallback to ZAR price
-    return zarPrice;
-  };
+  const formatPrice = (price: number) => `${getCurrencySymbol()}${price.toFixed(2)}`;
 
   // Get the base price for calculations
   const baseCompareAtPrice = curr === 'ZAR' ? product.compareAtPrice : (product.compareAtPriceUSD || product.compareAtPrice);
@@ -233,7 +232,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 )}
                 {product.stock > 0 && product.stock <= 5 && (
                     <div className="text-orange-400 font-medium flex items-center gap-1">
-                        Low Stock
+                        {product.stock === 1 ? '1 item left' : 'Low Stock'}
                     </div>
                 )}
              </div>
@@ -273,10 +272,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                         </span>
                         <div className="flex items-baseline gap-2">
                             <span className="text-2xl font-bold text-white drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]">
-                                {getCurrencySymbol()}{getPrice(currentPrice).toFixed(2)}
+                                {formatPrice(currentPrice)}
                             </span>
-                            {currentPrice < product.price && (
-                                <span className="text-xs text-gray-500 line-through">{getCurrencySymbol()}{getPrice(product.price).toFixed(2)}</span>
+                            {currentPrice < basePrice && (
+                                <span className="text-xs text-gray-500 line-through">{formatPrice(basePrice)}</span>
                             )}
                         </div>
                     </div>
@@ -289,9 +288,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                          {isPromoActive ? (
                             <div className="flex items-baseline gap-2">
                                 <span className="text-2xl font-bold text-green-400">
-                                    {getCurrencySymbol()}{getPrice(currentPrice).toFixed(2)}
+                                    {formatPrice(currentPrice)}
                                 </span>
-                                <span className="text-xs text-gray-400 line-through">{getCurrencySymbol()}{getPrice(product.price).toFixed(2)}</span>
+                                <span className="text-xs text-gray-400 line-through">{formatPrice(basePrice)}</span>
                             </div>
                          ) : null}
                          
@@ -300,18 +299,25 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                             <div className="flex flex-col gap-0.5 mt-1">
                                 <div className="flex justify-between text-[9px] text-gray-400">
                                     <span>Basic & Premium:</span>
-                                    <span className="text-purple-400 font-bold">{getCurrencySymbol()}{getPrice(product.promoBasicMemberPrice || 0).toFixed(2)}</span>
+                                    <span className="text-purple-400 font-bold">{formatPrice(promoBasicPrice)}</span>
                                 </div>
                                 <div className="flex justify-between text-[9px] text-gray-400">
                                     <span>Deluxe:</span>
-                                    <span className="text-purple-400 font-bold">{getCurrencySymbol()}{getPrice(product.promoDeluxeMemberPrice || 0).toFixed(2)}</span>
+                                    <span className="text-purple-400 font-bold">{formatPrice(promoDeluxePrice)}</span>
                                 </div>
                             </div>
                          ) : (
                              <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                Members: <span className="text-purple-400 font-bold">{getCurrencySymbol()}{getPrice(displayMemberUpsellPrice).toFixed(2)}</span>
+                                Members: <span className="text-purple-400 font-bold">{formatPrice(displayMemberUpsellPrice)}</span>
                              </div>
                          )}
+                         <Link 
+                            to={`/maker/${encodeURIComponent(product.madeBy || 'Spoil Me Vintage')}`} 
+                            className="text-[9px] text-gray-500 hover:text-cyan-400 transition-colors mt-1 inline-block"
+                            onClick={(e) => e.stopPropagation()}
+                         >
+                            Made by: <span className="text-gray-400 hover:text-cyan-300">{product.madeBy || 'Spoil Me Vintage'}</span>
+                         </Link>
                      </div>
                 </div>
             )}

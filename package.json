@@ -36,7 +36,6 @@
     "@capacitor/push-notifications": "^7.0.4",
     "@capgo/capacitor-updater": "^7.30.0",
     "@faker-js/faker": "^10.1.0",
-    
     "@nextui-org/react": "^2.6.11",
     "@paypal/react-paypal-js": "^8.9.2",
     "@playwright/test": "^1.57.0",

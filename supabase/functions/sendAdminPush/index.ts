@@ -60,19 +60,26 @@ export async function sendAdminPushHandler(req: Request, deps: { supabase?: any;
     // Gather tokens
     let tokens: string[] = [];
     if (targetType === 'individual') {
-      const { data } = await sb.from('push_tokens').select('token').eq('user_id', targetValue);
+      const { data } = await sb.from('public.push_tokens').select('token').eq('user_id', targetValue).eq('is_active', true);
       tokens = (data || []).map((r: any) => r.token).filter(Boolean);
     } else if (targetType === 'tier') {
       // join users -> push_tokens
       const { data } = await sb.rpc('get_tokens_for_tier', { tier: targetValue });
       tokens = (data || []).flat().filter(Boolean);
     } else if (targetType === 'all') {
-      const { data } = await sb.from('push_tokens').select('token').limit(1000);
+      const { data } = await sb.from('public.push_tokens').select('token').eq('is_active', true).limit(1000);
       tokens = (data || []).map((r: any) => r.token).filter(Boolean);
     }
 
     const uniqueTokens = [...new Set(tokens)].slice(0, 1000);
-    if (uniqueTokens.length === 0) return new Response(JSON.stringify({ success: false, message: 'No active devices found' }));
+    if (uniqueTokens.length === 0) {
+      // If admin user (spoilmevintagediy@gmail.com) has no active devices, don't treat this as a hard failure
+      if (u && ((u as any).email || '').toLowerCase() === 'spoilmevintagediy@gmail.com') {
+        console.warn('Admin user has no active devices; returning success but noting zero recipients');
+        return new Response(JSON.stringify({ success: true, sentCount: 0, failureCount: 0, message: 'Admin has no active devices' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: false, message: 'No active devices found' }));
+    }
 
     // Dry-run if no FCM key provided
     const fcmKey = deps.fcmKey ?? FCM_SERVER_KEY;
@@ -97,19 +104,26 @@ export async function sendAdminPushHandler(req: Request, deps: { supabase?: any;
         data: { url: link || '/' }
       };
 
-      const res = await fetch('https://fcm.googleapis.com/fcm/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `key=${fcmKey}` },
-        body: JSON.stringify(payloadBody)
-      });
+      try {
+        const res = await fetch('https://fcm.googleapis.com/fcm/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `key=${fcmKey}` },
+          body: JSON.stringify(payloadBody)
+        });
 
-      if (!res.ok) {
-        console.warn('FCM batch send failed', await res.text());
+        if (!res.ok) {
+          console.warn('FCM batch send failed', await res.text());
+          failureCount += slice.length;
+        } else {
+          const json = await res.json();
+          successCount += json.success || 0;
+          failureCount += json.failure || 0;
+        }
+      } catch (e) {
+        // Log and continue to next batch - do not let a batch failure crash the whole send
+        console.error('FCM batch send exception (continuing):', e);
         failureCount += slice.length;
-      } else {
-        const json = await res.json();
-        successCount += json.success || 0;
-        failureCount += json.failure || 0;
+        continue;
       }
     }
 

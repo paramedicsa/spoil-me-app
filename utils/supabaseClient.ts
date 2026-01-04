@@ -11,11 +11,24 @@ export async function signUpWithEmail(email: string, password: string, metadata?
   const res = await supabase.auth.signUp({ email, password });
   if (res.error) throw res.error;
   // If metadata provided and a user id exists, ensure a users row exists
-  try {
-    const userId = (res?.data as any)?.user?.id || (res as any)?.user?.id;
+    try {
+      const userId = (res?.data as any)?.user?.id || (res as any)?.user?.id;
     if (userId && metadata) {
+      // Convert metadata keys to snake_case and filter to safe keys
+      const toSnake = (obj: any): any => {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(toSnake);
+        const out: any = {};
+        for (const k of Object.keys(obj)) {
+          const snake = k.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+          if (/^[a-z0-9_]+$/.test(snake)) out[snake] = toSnake(obj[k]);
+        }
+        return out;
+      };
+      const payload = { id: userId, email, ...(toSnake(metadata) || {}) };
       // Upsert a users row so profile data exists immediately
-      await supabase.from('users').upsert([{ id: userId, email, ...metadata }]);
+      await supabase.from('users').upsert([payload]);
     }
   } catch (err) {
     // Non-fatal: log but don't block signup flow

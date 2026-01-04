@@ -507,6 +507,16 @@ export interface ArtistApplication {
   reviewerNotes?: string;
 }
 
+export interface ArtistApplicationLog {
+  id: string;
+  applicationId: string;
+  userId: string;
+  action: 'create' | 'update' | 'status_change' | string;
+  payload: any;
+  adminId?: string;
+  createdAt: Date;
+}
+
 export interface ArtistProduct {
   id: string;
   artistId: string;

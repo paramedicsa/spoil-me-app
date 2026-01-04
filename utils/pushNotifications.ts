@@ -49,7 +49,31 @@ export async function ensureFcmTokenRegistered(opts: EnsurePushOpts): Promise<{ 
     const cached = localStorage.getItem(TOKEN_CACHE_KEY);
     if (cached !== token) {
       localStorage.setItem(TOKEN_CACHE_KEY, token);
-      await supabase.from('users').update({ fcm_token: token } as any).eq('id', opts.userId);
+      // Back-compat: keep single token on users table
+      try {
+        // Explicitly target public.users (not auth.users)
+        await supabase.from('public.users').update({ fcm_token: token } as any).eq('id', opts.userId);
+      } catch (e) {
+        console.warn('Failed to update public.users.fcm_token (non-fatal):', e);
+      }
+
+      // Upsert into push_tokens table for multi-device support
+      try {
+        const platform = ('serviceWorker' in navigator) ? 'web' : 'native';
+        const deviceInfo = { userAgent: navigator.userAgent } as any;
+        // Explicitly upsert into public.push_tokens (avoid auth schema)
+        await supabase.from('public.push_tokens').upsert([
+          {
+            user_id: opts.userId,
+            token,
+            platform,
+            device_info: deviceInfo,
+            is_active: true
+          }
+        ], { onConflict: 'token', returning: 'minimal' });
+      } catch (e) {
+        console.warn('Failed to upsert push token to public.push_tokens table:', e);
+      }
     }
 
     // Foreground messages (when app is open)
