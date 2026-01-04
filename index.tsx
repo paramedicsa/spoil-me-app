@@ -1,7 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { SpeedInsights } from '@vercel/speed-insights/react';
+// SpeedInsights import removed to avoid bundling errors during Vercel build.
+// If you want to re-enable Vercel Speed Insights, load it client-side only via a dynamic import in a
+// useEffect or render it behind an environment flag to prevent build-time bundling.
 import './index.css';
 
 // Register the Firebase Messaging service worker for background push.
@@ -21,6 +23,6 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <App />
-    <SpeedInsights />
+    {/* SpeedInsights intentionally not rendered here to avoid build-time bundling issues. */}
   </React.StrictMode>
 );
