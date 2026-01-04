@@ -1,27 +1,6 @@
 import { Review } from "../types";
 import { supabase } from "./supabaseClient";
 
-// Proxy URL for server-side Gemini calls (Edge Function). Configure VITE_GEMINI_PROXY_URL in your environment.
-const GEMINI_PROXY_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_GEMINI_PROXY_URL) ? (import.meta as any).env.VITE_GEMINI_PROXY_URL : '/api/gemini-proxy';
-
-const callProxy = async (path: string, body: any) => {
-  try {
-    const res = await fetch(`${GEMINI_PROXY_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`Gemini proxy error: ${res.status} ${txt}`);
-    }
-    return await res.json();
-  } catch (err) {
-    console.warn('Gemini proxy call failed:', err);
-    throw err;
-  }
-};
-
 // --- Local fallback generators to keep the admin UX working when AI is unavailable ---
 const adjectives = ["Timeless", "Elegant", "Vintage", "Handmade", "Artisan", "Luxe", "Delicate", "Statement", "Classic", "Boho"];
 const materials = ["Gold", "Silver", "Sterling Silver", "Resin", "Bronze", "Copper", "Glass", "Crystal", "Gemstone"];
@@ -63,21 +42,29 @@ const localGenerateSeoKeywords = (name: string, tags: string[]) => {
 
 // --- End local fallbacks ---
 
-export const generateProductDescription = async (productName, category, keywords) => {
+export const generateProductDescription = async (productName: string, category: string, keywords?: string): Promise<string> => {
   try {
-    const json = await callProxy('/generate-description', { productName, category, keywords });
-    return json?.text || localGenerateDescription(productName || localGenerateProductName(category || ''), category || 'Jewelry', keywords);
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { action: 'generate-description', productName, category, keywords }
+    });
+    if (error) throw error;
+    const text = (data && ((data as any).text || (data as any).description)) || null;
+    return text || localGenerateDescription(productName || localGenerateProductName(category || ''), category || 'Jewelry', keywords);
   } catch (err) {
+    console.warn('generateProductDescription invoke failed:', err);
     return localGenerateDescription(productName || localGenerateProductName(category || ''), category || 'Jewelry', keywords);
   }
 };
 
-export const suggestMarketingCopy = async (specialTitle, discount) => {
+export const suggestMarketingCopy = async (specialTitle: string, discount: number): Promise<string> => {
   try {
-    const json = await callProxy('/generate-description', { specialTitle, discount });
-    return json?.text || "AI Generation unavailable.";
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { action: 'generate-description', specialTitle, discount }
+    });
+    if (error) throw error;
+    return (data && ((data as any).text || '')) || "AI Generation unavailable.";
   } catch (err) {
-    console.warn('Marketing copy proxy failed:', err);
+    console.warn('suggestMarketingCopy invoke failed:', err);
     return "AI Generation unavailable.";
   }
 };
@@ -91,7 +78,7 @@ export interface AIProductMetadata {
   colors: string[];
 }
 
-export const generateProductMetadataFromImage = async (base64Image, categoryContext) => {
+export const generateProductMetadataFromImage = async (base64Image: string, categoryContext: string): Promise<AIProductMetadata | null> => {
   try {
     // Use Supabase Edge Function instead of calling Google directly
     try {
@@ -99,7 +86,12 @@ export const generateProductMetadataFromImage = async (base64Image, categoryCont
         body: { image: base64Image, category: categoryContext }
       });
       if (error) throw error;
-      return data || null;
+      // Ensure the returned object conforms to AIProductMetadata shape
+      const parsed = data as AIProductMetadata | null;
+      if (parsed && parsed.name && parsed.description && Array.isArray(parsed.tags) && Array.isArray(parsed.seoKeywords) && Array.isArray(parsed.colors)) {
+        return parsed;
+      }
+      return null;
     } catch (invokeErr) {
       console.warn('supabase.functions.invoke(gemini-analyze) failed:', invokeErr);
       throw invokeErr;
@@ -125,34 +117,43 @@ export const generateProductMetadataFromImage = async (base64Image, categoryCont
     }
 };
 
-export const generateSouthAfricanReviews = async (productName, count) => {
+export const generateSouthAfricanReviews = async (productName: string, count = 5): Promise<Review[]> => {
   try {
-    const json = await callProxy('/generate-reviews', { productName, count, type: 'south_african' });
-    const rawReviews = json || [];
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { action: 'generate-reviews', productName, count, type: 'south_african' }
+    });
+    if (error) throw error;
+    const rawReviews = (data as any) || [];
     return rawReviews.map((r: any) => ({ ...r, id: `rev_ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }));
   } catch (err) {
-    console.warn('Review proxy failed:', err);
+    console.warn('generateSouthAfricanReviews invoke failed:', err);
     return [];
   }
 };
 
-export const generateUniquePendantReviews = async (count) => {
+export const generateUniquePendantReviews = async (count = 25): Promise<Review[]> => {
   try {
-    const json = await callProxy('/generate-reviews', { count, type: 'unique_pendant' });
-    const rawReviews = json || [];
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { action: 'generate-reviews', count, type: 'unique_pendant' }
+    });
+    if (error) throw error;
+    const rawReviews = (data as any) || [];
     return rawReviews.map((r: any) => ({ ...r, id: `rev_unique_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }));
   } catch (err) {
-    console.warn('Unique reviews proxy failed:', err);
+    console.warn('generateUniquePendantReviews invoke failed:', err);
     return [];
   }
 };
 
-export const generateSocialPost = async (productName, platform, price) => {
+export const generateSocialPost = async (productName: string, platform: string, price: number): Promise<string> => {
   try {
-    const json = await callProxy('/generate-social', { productName, platform, price });
-    return json?.text || `Check out this amazing product: ${productName} for R${price}! #SpoilMeVintage #vintage #jewelry`;
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { action: 'generate-social', productName, platform, price }
+    });
+    if (error) throw error;
+    return (data && (data as any).text) || `Check out this amazing product: ${productName} for R${price}! #SpoilMeVintage #vintage #jewelry`;
   } catch (err) {
-    console.warn('Social post proxy failed:', err);
+    console.warn('generateSocialPost invoke failed:', err);
     return `Check out this amazing product: ${productName} for R${price}! #SpoilMeVintage #vintage #jewelry`;
   }
 };
