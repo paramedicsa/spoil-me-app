@@ -101,13 +101,19 @@ export function subscribeToTable(table: string, callback: (payload: any) => void
 }
 
 export async function uploadFile(bucket: string, path: string, file: File | Blob) {
+  console.log(`📤 uploadFile called:`, { bucket, path, fileSize: file.size, fileType: file.type });
   try {
-    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-    if (error) throw error;
+    const { data, error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+    if (error) {
+      console.error(`❌ Storage upload error:`, error);
+      throw error;
+    }
+    console.log(`✅ File uploaded successfully:`, data);
     const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(path);
+    console.log(`🔗 Public URL generated:`, publicUrlData?.publicUrl);
     return publicUrlData?.publicUrl || null;
   } catch (err) {
-    console.error('uploadFile failed:', err);
+    console.error('❌ uploadFile failed:', err);
     throw err;
   }
 }

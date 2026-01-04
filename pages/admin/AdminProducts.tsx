@@ -374,30 +374,57 @@ const AdminProducts: React.FC = () => {
     try {
         let processedImages: string[] = [];
         
+      console.log('🖼️ Processing images for upload:', {
+         imageCount: formData.images.length,
+         images: formData.images.map((img, i) => ({
+            index: i,
+            type: typeof img,
+            isBase64: typeof img === 'string' && img.startsWith('data:'),
+            isUrl: typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://')),
+            length: typeof img === 'string' ? img.length : 0
+         }))
+      });
+
       const uploadPromises = formData.images.map(async (img, idx) => {
          if (typeof img === 'string' && img.startsWith('data:')) {
+            console.log(`🔄 Uploading image ${idx + 1}/${formData.images.length} to Supabase Storage...`);
             try {
                // Convert base64 data URL to Blob
                const blob = await (await fetch(img)).blob();
                const ext = blob.type.split('/')?.[1] || 'jpg';
                const path = `products/${formData.id}/img_${Date.now()}_${idx}.${ext}`;
+               console.log(`📤 Uploading to path: ${path}, size: ${blob.size} bytes`);
                try {
                   const url = await uploadFile('products', path, blob as any);
+                  console.log(`✅ Image ${idx + 1} uploaded successfully:`, url);
                   return url || '';
                } catch (uplErr) {
-                  console.warn('Supabase upload failed, falling back to base64:', uplErr);
+                  console.error(`❌ Supabase upload failed for image ${idx + 1}:`, uplErr);
+                  console.warn('Falling back to base64 for image ${idx + 1}');
                   return img; // fallback to base64 so UI still works
                }
             } catch (err) {
-               console.error('Failed to process base64 image:', err);
+               console.error(`❌ Failed to process base64 image ${idx + 1}:`, err);
                return '';
             }
+         } else if (typeof img === 'string') {
+            console.log(`ℹ️ Image ${idx + 1} is already a URL, keeping as-is:`, img.substring(0, 100));
          }
          return img;
       });
 
       const results = await Promise.all(uploadPromises);
       processedImages = results.filter((i: string) => i && i.trim() !== '');
+      
+      console.log('✅ All images processed:', {
+         original: formData.images.length,
+         processed: processedImages.length,
+         images: processedImages.map(url => ({
+            isBase64: url.startsWith('data:'),
+            isSupabaseUrl: url.includes('supabase'),
+            preview: url.substring(0, 100)
+         }))
+      });
 
       const EXCHANGE_RATE = 29; // ZAR per USD - used to ensure currency fields are consistent
 
