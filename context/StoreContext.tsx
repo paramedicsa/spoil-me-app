@@ -325,7 +325,19 @@ const sanitizePayload = (data: any, isUpdate: boolean = false): any => {
 
 // Strict list of allowed top-level columns for the `products` table.
 // Any other keys will be moved into the `options` JSONB column to avoid schema errors (400s).
-const ALLOWED_COLUMNS = ['id','name','slug','description','price','price_usd','stock','status','category','images','options','code'];
+const ALLOWED_COLUMNS = [
+  'id','name','slug','description','price','price_usd','stock','status','category','images','options','code',
+  'when_and_how_to_wear','type','tags','colors','seo_keywords','material','compare_at_price','compare_at_price_usd',
+  'member_price','member_price_usd','cost_price','shipping_cost','made_by','back_office_link',
+  'is_sold_out','sold_count','ring_stock','earring_materials','show_earring_options',
+  'pendant_chain_lengths','pendant_wire_wrapped','chain_styles',
+  'is_new_arrival','is_best_seller','is_featured_ring','is_featured_bracelet','is_featured_watch',
+  'is_unique_pendant','is_featured_stud','is_featured_dangle','is_featured_jewelry_box',
+  'is_featured_perfume_holder','is_jewelry_set','reviews','packaging','ads',
+  'gift_product_id','gift_value','promo_price','promo_starts_at','promo_expires_at',
+  'promo_basic_member_price','promo_premium_member_price','promo_deluxe_member_price',
+  'image_url','created_at','updated_at'
+];
 
 // Normalize DB user rows to the app User shape (map snake_case, ensure booleans)
 const normalizeUserRow = (row: any): User => {
