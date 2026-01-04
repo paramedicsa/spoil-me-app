@@ -44,7 +44,7 @@ const localGenerateSeoKeywords = (name: string, tags: string[]) => {
 
 export const generateProductDescription = async (productName: string, category: string, keywords?: string): Promise<string> => {
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    const { data, error } = await supabase.functions.invoke('gemini-analyze', {
       body: { action: 'generate-description', productName, category, keywords }
     });
     if (error) throw error;
@@ -58,7 +58,7 @@ export const generateProductDescription = async (productName: string, category: 
 
 export const suggestMarketingCopy = async (specialTitle: string, discount: number): Promise<string> => {
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    const { data, error } = await supabase.functions.invoke('gemini-analyze', {
       body: { action: 'generate-description', specialTitle, discount }
     });
     if (error) throw error;
@@ -83,7 +83,7 @@ export const generateProductMetadataFromImage = async (base64Image: string, cate
     // Use Supabase Edge Function instead of calling Google directly
     try {
       const { data, error } = await supabase.functions.invoke('gemini-analyze', {
-        body: { image: base64Image, category: categoryContext }
+        body: { action: 'analyze-image', image: base64Image, category: categoryContext }
       });
       if (error) throw error;
       // Ensure the returned object conforms to AIProductMetadata shape
@@ -119,7 +119,7 @@ export const generateProductMetadataFromImage = async (base64Image: string, cate
 
 export const generateSouthAfricanReviews = async (productName: string, count = 5): Promise<Review[]> => {
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    const { data, error } = await supabase.functions.invoke('gemini-analyze', {
       body: { action: 'generate-reviews', productName, count, type: 'south_african' }
     });
     if (error) throw error;
@@ -133,7 +133,7 @@ export const generateSouthAfricanReviews = async (productName: string, count = 5
 
 export const generateUniquePendantReviews = async (count = 25): Promise<Review[]> => {
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    const { data, error } = await supabase.functions.invoke('gemini-analyze', {
       body: { action: 'generate-reviews', count, type: 'unique_pendant' }
     });
     if (error) throw error;
@@ -147,7 +147,7 @@ export const generateUniquePendantReviews = async (count = 25): Promise<Review[]
 
 export const generateSocialPost = async (productName: string, platform: string, price: number): Promise<string> => {
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    const { data, error } = await supabase.functions.invoke('gemini-analyze', {
       body: { action: 'generate-social', productName, platform, price }
     });
     if (error) throw error;

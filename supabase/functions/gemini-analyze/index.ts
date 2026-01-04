@@ -20,15 +20,19 @@ serve(async (req: Request) => {
   try {
     if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
     const json = await req.json().catch(() => ({} as any));
-    const { image, category } = json || {};
-    if (!image) return new Response(JSON.stringify({ error: 'image required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const action = (json && (json.action as string)) || (path.endsWith('/analyze-image') ? 'analyze-image' : undefined);
 
-    const base64Data = (image || '').replace(/^data:image\/\w+;base64,/, '');
+    // Route by action (support analyze-image, generate-description, generate-reviews, generate-social)
+    if (action === 'analyze-image') {
+      const { image, category } = json || {};
+      if (!image) return new Response(JSON.stringify({ error: 'image required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 
-    const body = {
-      contents: [
-        { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-        { text: `You are a fashion merchandising expert for a specialized jewelry store. Analyze this image of a ${category || 'jewelry product'}.
+      const base64Data = (image || '').replace(/^data:image\/\w+;base64,/, '');
+
+      const body = {
+        contents: [
+          { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
+          { text: `You are a fashion merchandising expert for a specialized jewelry store. Analyze this image of a ${category || 'jewelry product'}.
 
 Generate the following JSON object:
 {
@@ -45,11 +49,90 @@ CRITICAL:
 2. Colors must describe product-only colors (ignore background/skin).
 
 Return ONLY the raw JSON object and nothing else.` }
-      ],
-      config: { responseMimeType: 'application/json' }
-    };
+        ]
+      };
 
-    const resp = await forwardToGoogle('gemini-3-pro-preview', body);
+      const resp = await forwardToGoogle('gemini-3-pro-preview', { ...body, config: { responseMimeType: 'application/json' } });
+
+      const text = extractText(resp);
+      if (text) {
+        try {
+          const parsed = JSON.parse(text);
+          return new Response(JSON.stringify(parsed || {}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          const m = text.match(/(\{[\s\S]*\})/);
+          if (m && m[1]) {
+            try {
+              const parsed = JSON.parse(m[1]);
+              return new Response(JSON.stringify(parsed || {}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            } catch (pe) {
+              console.warn('gemini-analyze: failed to parse JSON substring:', (pe && (pe as any).message) || pe);
+            }
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ raw: resp || {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (action === 'generate-description') {
+      const { productName, category, keywords, specialTitle, discount } = json || {};
+      try {
+        let prompt = '';
+        if (productName) {
+          prompt = `Write a compelling, SEO-friendly product description for an e-commerce product.\n\nProduct Name: ${productName}\nCategory: ${category}\nKeywords/Features: ${keywords}\n\nTone: Professional, persuasive, and enthusiastic. Keep it under 150 words.`;
+        } else if (specialTitle) {
+          prompt = `Write a catchy, short headline and a subheader for a website banner promoting a sale.\n\nSale Title: ${specialTitle}\nDiscount: ${discount}% Off\n\nFormat:\nHeadline: [Text]\nSubheader: [Text]`;
+        } else {
+          return new Response(JSON.stringify({ error: 'productName or specialTitle required' }), { status: 400 });
+        }
+
+        const g = await forwardToGoogle('gemini-2.5-flash', { prompt: { text: prompt } });
+        return new Response(JSON.stringify(g || {}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      } catch (err: any) {
+        console.warn('gemini-analyze generate-description failed:', err.message || err);
+        return new Response(JSON.stringify({ error: String(err?.message || err) }), { status: 502 });
+      }
+    }
+
+    if (action === 'generate-reviews') {
+      const { productName, count = 5, type = 'south_african' } = json || {};
+      try {
+        let contents = '';
+        if (type === 'south_african') {
+          contents = `Generate ${count} unique South African product reviews for a jewelry item named "${productName}". Output strictly as JSON array of objects with keys: userName, location, content, rating, date.`;
+        } else if (type === 'unique_pendant') {
+          contents = `Generate ${count} unique South African reviews specifically for one-of-a-kind handmade wire-wrapped pendants. Output strictly as JSON array.`;
+        }
+        const g = await forwardToGoogle('gemini-2.5-flash', { prompt: { text: contents }, config: { responseMimeType: 'application/json' } });
+        return new Response(JSON.stringify(g || {}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      } catch (err: any) {
+        console.warn('gemini-analyze generate-reviews failed:', err.message || err);
+        return new Response(JSON.stringify({ error: String(err?.message || err) }), { status: 502 });
+      }
+    }
+
+    if (action === 'generate-social') {
+      const { productName, platform, price } = json || {};
+      try {
+        let prompt = `Write a single social media post for a jewelry product named "${productName}". Price: R${price}.`;
+        if (platform === 'Instagram' || platform === 'TikTok') {
+          prompt += ` Style: High energy, visually descriptive, lots of emojis, include 10 relevant hashtags. Focus on \"Unique\", \"Handmade\", \"South Africa\". Keep it under 200 characters + hashtags.`;
+        } else if (platform === 'Facebook') {
+          prompt += ` Style: Friendly, community-focused, engaging question at the end. Mention \"Spoil Me Vintage\". Include link placeholder [Link].`;
+        } else if (platform === 'Twitter' || platform === 'X') {
+          prompt += ` Style: Short, punchy, urgent. Max 280 characters. Include 3 hashtags.`;
+        } else {
+          prompt += ` Style: Professional yet inviting.`;
+        }
+
+        const g = await forwardToGoogle('gemini-2.5-flash', { prompt: { text: prompt } });
+        return new Response(JSON.stringify(g || {}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      } catch (err: any) {
+        console.warn('gemini-analyze generate-social failed:', err.message || err);
+        return new Response(JSON.stringify({ error: String(err?.message || err) }), { status: 502 });
+      }
+    }
 
     // Helper to extract text that may contain JSON
     const extractText = (r: any): string | null => {
