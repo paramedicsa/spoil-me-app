@@ -124,34 +124,24 @@ export interface AIProductMetadata {
   tags: string[];
   seoKeywords: string[];
   colors: string[];
+  analyzedImage?: {
+    mimeType: string;
+    base64: string;
+  };
 }
 
 export const generateProductMetadataFromImage = async (base64Image: string, categoryContext: string): Promise<AIProductMetadata | null> => {
   const ai = getAI();
-  // If AI is not configured, return a local generated metadata object so the admin can continue
   if (!ai) {
-    try {
-      const name = localGenerateProductName(categoryContext);
-      const tags = localExtractTags(categoryContext);
-      const description = localGenerateDescription(name, categoryContext || 'Jewelry', 'Handmade, Unique');
-      const seoKeywords = localGenerateSeoKeywords(name, tags);
-      const colors: string[] = [];
-      return {
-        name,
-        description,
-        whenAndHowToWear: 'Perfect for both everyday wear and special occasions. Layer with other pieces for a curated look.',
-        tags,
-        seoKeywords,
-        colors
-      } as AIProductMetadata;
-    } catch (fallbackError) {
-      console.error('Local fallback for product metadata failed:', fallbackError);
-      return null;
-    }
+    // Explicitly fail when Gemini/AI is not configured
+    console.error('Gemini API not configured (API key missing).');
+    return null;
   }
 
-  // Strip data URL prefix if present to get raw base64
-  const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+  // Extract mime type and base64 data from data URL if present
+  const m = (base64Image || '').match(/^data:(image\/[^;]+);base64,(.*)$/s);
+  const mimeType = m ? m[1] : 'image/jpeg';
+  const base64Data = m ? (m[2] || '') : base64Image.replace(/^data:image\/\w+;base64,/, "");
 
   try {
     const response = await ai.models.generateContent({
@@ -194,30 +184,19 @@ export const generateProductMetadataFromImage = async (base64Image: string, cate
 
     const text = response.text;
     if (!text) return null;
-    
-    return JSON.parse(text) as AIProductMetadata;
+    const parsed = JSON.parse(text) as AIProductMetadata;
+
+    // Attach analyzed image metadata so callers have access to the original image payload
+    parsed.analyzedImage = {
+      mimeType,
+      base64: base64Data
+    };
+
+    return parsed;
   } catch (error) {
     console.error("Gemini Image Analysis Error:", error);
-    // If AI fails or key missing, use local deterministic fallback so admin can still generate metadata
-    try {
-      const name = localGenerateProductName(categoryContext);
-      const tags = localExtractTags(categoryContext);
-      const description = localGenerateDescription(name, categoryContext || 'Jewelry', 'Handmade, Unique');
-      const seoKeywords = localGenerateSeoKeywords(name, tags);
-      const colors: string[] = []; // cannot reliably detect colors locally
-
-      return {
-        name,
-        description,
-        whenAndHowToWear: 'Perfect for both everyday wear and special occasions. Layer with other pieces for a curated look.',
-        tags,
-        seoKeywords,
-        colors
-      } as AIProductMetadata;
-    } catch (fallbackError) {
-      console.error('Local fallback for product metadata failed:', fallbackError);
-      return null;
-    }
+    // On any AI failure, return null so caller can handle the error explicitly
+    return null;
   }
 };
 
