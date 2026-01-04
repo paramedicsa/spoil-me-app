@@ -560,7 +560,7 @@ const AdminProducts: React.FC = () => {
                let metadata: any = null;
                try {
                   const { data, error } = await supabase.functions.invoke('gemini-analyze', {
-                    body: { image: base64String, category: formData.category }
+                    body: { action: 'analyze-image', image: base64String, category: formData.category }
                   });
                   if (error) {
                     console.warn('gemini-analyze returned error:', error);

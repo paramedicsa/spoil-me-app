@@ -27,15 +27,25 @@ Deno.serve(async (req: Request) => {
       const mimeType = image.match(/data:([^;]+);/)?.[1] || 'image/jpeg';
 
       const prompt = `You are a high-end jewelry specialist for 'Spoil Me Vintage'. 
-      Analyze this image. Identify the PRIMARY COLOR, SHAPE, and PIECE TYPE. 
+      Analyze this ${category || 'jewelry'} image. 
+      
+      CRITICAL: Describe EXACTLY what you see in the image:
+      - If it's earrings, say "earrings" or "studs" or "dangles"
+      - If it's a ring, say "ring"
+      - If it's a pendant/necklace, say "pendant" or "necklace"
+      - If the primary color is orange, say "Orange"
+      - If it's silver metal, say "Silver"
+      - If it's a stud style, include "Stud" in tags
+      - If it's a dangle style, include "Dangle" in tags
+      
       Return ONLY a JSON object:
       {
-        "name": "Creative luxury name",
-        "description": "3-sentence visual description",
-        "whenAndHowToWear": "Specific styling advice",
-        "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+        "name": "Creative luxury name that reflects what's in the image",
+        "description": "3-sentence visual description of what you actually see",
+        "whenAndHowToWear": "Specific styling advice based on the piece type",
+        "tags": ["Piece Type (Ring/Stud/Dangle/Pendant)", "Primary Color", "Material", "Style", "tag5"],
         "seoKeywords": ["kw1", "kw2", "kw3", "kw4", "kw5"],
-        "colors": ["Primary Color Name"]
+        "colors": ["Primary Color Name from the product itself"]
       }`;
 
       // THE CORRECT ENDPOINT AND PAYLOAD FOR GEMINI 1.5 FLASH
@@ -80,52 +90,3 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
-// Initialize Supabase client directly (Deno runtime). The editor may not be able to
-// resolve the remote module; ignore TS errors for this import in the editor.
-// @ts-ignore: Remote Deno import
-import { createClient } from 'https://deno.land/x/supabase_js@2.39.7/mod.ts';
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-/**
- * GEMINI PROXY SERVICE
- * Verified Syntax & Type Safety
- */
-
-const invokeGemini = async (action: string, payload: any) => {
-  try {
-    const { data, error } = await supabase.functions.invoke('gemini-analyze', {
-      body: { action, ...payload }
-    });
-    if (error) throw error;
-    return data;
-  } catch (err) {
-    console.error(`Gemini Error [${action}]:`, err);
-    return null;
-  }
-};
-
-export const generateProductMetadataFromImage = async (base64Image: string, category: string) => {
-  return await invokeGemini('analyze-image', { image: base64Image, category });
-};
-
-export const generateSouthAfricanReviews = async (productName: string, count: number = 5) => {
-  const data = await invokeGemini('generate-reviews', { productName, count });
-  return data?.reviews || [];
-};
-
-export const generateProductDescription = async (productName: string, category: string, keywords: string) => {
-  const data = await invokeGemini('generate-description', { productName, category, keywords });
-  return data?.description || "";
-};
-
-export const generateUniquePendantReviews = async (count: number) => {
-  return await generateSouthAfricanReviews("Unique Handcrafted Pendant", count);
-};
-
-export const generateSocialPost = async (productName: string, platform: string, price: number) => {
-  const data = await invokeGemini('generate-social', { productName, platform, price });
-  return data?.text || `Check out ${productName} for R${price}! #SpoilMeVintage`;
-};
