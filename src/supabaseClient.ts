@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 1. Try to get keys from Vite (import.meta.env) first, then fallback to others
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// 1. Use only Vite-provided environment variables for the public Supabase client.
+// Do NOT fall back to process.env here - the frontend should rely solely on
+// `import.meta.env.VITE_SUPABASE_URL` and `import.meta.env.VITE_SUPABASE_ANON_KEY`.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // 2. Check if keys exist
 const isConfigured = !!supabaseUrl && !!supabaseKey;
@@ -11,7 +13,7 @@ const isConfigured = !!supabaseUrl && !!supabaseKey;
 if (isConfigured) {
   console.log("✅ Supabase Client initialized successfully");
 } else {
-  console.error("🚨 Supabase Keys missing! Check your .env file.");
+  console.error("🚨 Supabase VITE keys missing! Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.");
 }
 
 // 4. Create the client

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 // Fix: Added Winner and Order to import
 import { Product, Category, CartItem, User, SpecialOffer, Voucher, Notification, VoucherMeta, AffiliateLeaderboardItem, PackagingItem, EarringMaterial, AffiliateStats, ShippingAddress, Winner, Order, VaultItem, CommissionRecord, AffiliatePayout, AffiliateMilestone } from '../types';
 import { INITIAL_USER, INITIAL_SPECIALS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../constants';
-import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
+import { supabase, isSupabaseConfigured, subscribeToTable } from '../utils/supabaseClient';
 import { initializePushNotifications } from '../utils/pushNotifications';
 import { callServerFunction } from '../utils/supabaseClient';
 
@@ -96,6 +96,7 @@ interface StoreContextType {
   shareProduct: (productId: string) => Promise<void>;
   claimSocialReward: (platform: 'tiktok'|'twitter'|'whatsapp'|'facebook'|'pinterest', handle?: string) => Promise<void>;
   updateUserAddress: (address: ShippingAddress) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<boolean>;
   
   // Voucher Actions
   
@@ -171,22 +172,160 @@ const sanitizeFirestoreData = (data: any, seen = new WeakSet()): any => {
 
   const sanitized: any = {};
     for (const key in data) {
-      // Exclude internal Firebase keys and complex objects we don't need in LocalStorage
+      // Exclude internal Firebase keys and complex objects we don't need in LocalStorage or Database
       if (
         key.startsWith('_') ||
         key === 'auth' ||
         key === 'firestore' ||
         key === 'proactiveRefresh' ||
-        key === 'providerData'
+        key === 'providerData' ||
+        // UI-only fields that should NOT be sent to database
+        key === 'isEditing' ||
+        key === 'tempImage' ||
+        key === 'tempTag' ||
+        key === 'tempKeyword' ||
+        key === 'editingReviewId' ||
+        key === 'editReviewData' ||
+        // Legacy fields - images array is the source of truth
+        key === 'imageUrl' ||
+        key === 'image_url'
       ) continue;
 
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         const val = sanitizeFirestoreData((data as any)[key], seen);
-        if (val !== undefined && val !== null) sanitized[key] = val;
+        if (val !== undefined && val !== null) {
+          // convert camelCase keys to snake_case for Supabase/Postgres compatibility
+          const snake = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+          sanitized[snake] = val;
+        }
       }
     }
   return sanitized;
 };
+
+/**
+ * Final payload sanitization for Supabase/PostgreSQL
+ * Handles the critical Error 22007: empty strings -> null for timestamps
+ * Ensures proper data types for all columns
+ */
+const sanitizePayload = (data: any, isUpdate: boolean = false): any => {
+  const cleaned = { ...data };
+  
+  // List of timestamp columns that MUST NOT be empty strings
+  const timestampFields = ['promo_starts_at', 'promo_expires_at', 'created_at', 'updated_at'];
+  
+  // List of boolean columns (all is_* fields)
+  const booleanFields = [
+    'is_new_arrival', 'is_best_seller', 'is_featured_ring', 'is_featured_bracelet',
+    'is_featured_watch', 'is_unique_pendant', 'is_featured_stud', 'is_featured_dangle',
+    'is_featured_jewelry_box', 'is_featured_perfume_holder', 'is_jewelry_set',
+    'is_sold_out', 'is_featured', 'is_on_sale', 'show_earring_options', 'pendant_wire_wrapped'
+  ];
+
+  // List of JSONB/array columns
+  const jsonbFields = [
+    'images', 'tags', 'options', 'ring_stock', 'earring_materials',
+    'pendant_chain_lengths', 'chain_styles', 'packaging', 'colors',
+    'sizes', 'metadata', 'seo_keywords', 'reviews', 'ads'
+  ];
+
+  // List of numeric columns
+  const numericFields = [
+    'price', 'price_usd', 'member_price', 'member_price_usd', 'cost_price',
+    'compare_at_price', 'compare_at_price_usd', 'promo_price',
+    'promo_basic_member_price', 'promo_premium_member_price', 'promo_deluxe_member_price',
+    'stock', 'stock_quantity', 'weight', 'shipping_cost', 'sold_count', 'gift_value'
+  ];
+
+  Object.keys(cleaned).forEach(key => {
+    const value = cleaned[key];
+
+    // RULE 1: Convert empty strings to null for ALL fields (prevents Error 22007)
+    if (value === "" || value === "undefined" || value === "null") {
+      cleaned[key] = null;
+      return;
+    }
+
+    // RULE 2: Ensure booleans are actual booleans, not strings
+    if (booleanFields.includes(key)) {
+      if (typeof value === 'string') {
+        cleaned[key] = value === 'true' || value === '1';
+      } else if (typeof value === 'number') {
+        cleaned[key] = value === 1;
+      } else {
+        cleaned[key] = Boolean(value);
+      }
+      return;
+    }
+
+    // RULE 3: Ensure JSONB fields are properly formatted
+    if (jsonbFields.includes(key) && value !== null) {
+      // If it's already an object/array, keep it
+      // Supabase client will handle JSON serialization
+      if (typeof value === 'string') {
+        try {
+          cleaned[key] = JSON.parse(value);
+        } catch {
+          // If parse fails, wrap string in array for array fields
+          if (['images', 'tags', 'colors', 'sizes'].includes(key)) {
+            cleaned[key] = [value];
+          } else {
+            cleaned[key] = {};
+          }
+        }
+      }
+      return;
+    }
+
+    // RULE 4: Ensure numeric fields are actual numbers
+    if (numericFields.includes(key) && value !== null) {
+      const num = Number(value);
+      cleaned[key] = isNaN(num) ? 0 : num;
+      return;
+    }
+
+    // RULE 5: Handle timestamp fields - ensure ISO format or null
+    if (timestampFields.includes(key) && value !== null) {
+      // If it's a valid date string, keep it
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        cleaned[key] = null;
+      } else {
+        cleaned[key] = date.toISOString();
+      }
+      return;
+    }
+  });
+
+  // RULE 6: Remove 'id' from update payload (it's in the .eq() clause)
+  if (isUpdate) {
+    delete cleaned.id;
+  }
+
+  // RULE 7: Build options column from individual fields for backward compatibility
+  // This ensures the options JSON blob is updated when individual columns change
+  const optionsData: any = {};
+  
+  // Populate options with key fields for dashboard filters
+  if (cleaned.compare_at_price) optionsData.compareAtPrice = cleaned.compare_at_price;
+  if (cleaned.member_price) optionsData.memberPrice = cleaned.member_price;
+  if (cleaned.packaging) optionsData.packaging = cleaned.packaging;
+  if (cleaned.ring_stock) optionsData.ringStock = cleaned.ring_stock;
+  if (cleaned.earring_materials) optionsData.earringMaterials = cleaned.earring_materials;
+  if (cleaned.pendant_chain_lengths) optionsData.pendantChainLengths = cleaned.pendant_chain_lengths;
+  if (cleaned.chain_styles) optionsData.chainStyles = cleaned.chain_styles;
+  
+  // Only set options if we have data to add
+  if (Object.keys(optionsData).length > 0) {
+    cleaned.options = optionsData;
+  }
+
+  return cleaned;
+};
+
+// Strict list of allowed top-level columns for the `products` table.
+// Any other keys will be moved into the `options` JSONB column to avoid schema errors (400s).
+const ALLOWED_COLUMNS = ['id','name','slug','description','price','price_usd','stock','status','category','images','options','code'];
 
 // Normalize DB user rows to the app User shape (map snake_case, ensure booleans)
 const normalizeUserRow = (row: any): User => {
@@ -197,6 +336,75 @@ const normalizeUserRow = (row: any): User => {
   if (u.created_at && !u.createdAt) u.createdAt = typeof u.created_at === 'string' ? u.created_at : (u.created_at.toISOString ? u.created_at.toISOString() : String(u.created_at));
   return u as User;
 };
+
+  // Safely upsert into the users table while handling PostgREST schema cache issues
+  const safeUpsertUser = async (obj: any) => {
+    const sanitized = sanitizeFirestoreData(obj);
+    // Filter out any keys with unexpected characters to avoid schema cache errors
+    const filtered: any = {};
+    for (const k of Object.keys(sanitized)) {
+      if (/^[a-z0-9_]+$/.test(k)) filtered[k] = (sanitized as any)[k];
+    }
+
+    try {
+      console.debug('Attempting users upsert with payload:', filtered);
+      let attemptPayload = { ...filtered };
+      let attempts = 0;
+      while (true) {
+        attempts++;
+        const { error } = await supabase.from('users').upsert([attemptPayload]);
+        if (!error) break;
+        const msg = String(error.message || error);
+        console.warn('Users upsert error:', msg);
+        const match = msg.match(/Could not find the '([^']+)' column/i);
+        const missingCol = match ? match[1] : null;
+        if (missingCol && attemptPayload[missingCol] !== undefined) {
+          console.warn('Detected missing column in schema cache:', missingCol, '— removing and retrying upsert without it');
+          delete attemptPayload[missingCol];
+          // continue retry loop
+        } else {
+          // If we've retried more than once, attempt a minimal upsert to ensure at least the user row exists
+          if (attempts > 1) {
+            const minimal = { id: obj.id, email: obj.email, name: obj.name };
+            console.warn('Attempting minimal upsert payload to avoid schema issues:', minimal);
+            const { error: minErr } = await supabase.from('users').upsert([sanitizeFirestoreData(minimal)]);
+            if (minErr) throw minErr;
+            break;
+          }
+          throw error;
+        }
+      }
+    } catch (e) {
+      console.error('Final users upsert failure:', e);
+      throw e;
+    }
+  };
+
+  
+
+  const resendVerificationEmail = async (email: string) => {
+    try {
+      console.log('Attempting to resend verification email to:', email);
+      
+      // Use Supabase auth.resend with proper parameters
+      const { data, error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+      
+      if (error) {
+        console.error('Supabase resend error:', error);
+        throw error;
+      }
+      
+      console.log('Verification email resent successfully:', data);
+      return true;
+    } catch (e: any) {
+      console.error('resendVerificationEmail failed:', e);
+      console.error('Error details:', JSON.stringify(e, null, 2));
+      return false;
+    }
+  };
 
 const generateMonthlyLeaderboard = (): AffiliateLeaderboardItem[] => {
     const names = [
@@ -383,8 +591,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [packagingPresets, setPackagingPresets] = useState<PackagingItem[]>([]);
   const [materialPresets, setMaterialPresets] = useState<EarringMaterial[]>([]);
 
-  // Currency state
-  const [currency, setCurrency] = useState<'ZAR' | 'USD'>('ZAR');
+  // Currency state (persisted)
+  const [currency, setCurrency] = useState<'ZAR' | 'USD'>(() => {
+    try {
+      const stored = localStorage.getItem('spv_currency');
+      return stored === 'USD' ? 'USD' : 'ZAR';
+    } catch (e) {
+      return 'ZAR';
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('spv_currency', currency); } catch (e) { /* ignore */ }
+  }, [currency]);
 
   // Manual winner override state
   const [manualWinner, setManualWinner] = useState<Winner | null>(null);
@@ -443,6 +662,84 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           console.error("Error saving user to localStorage", e);
       }
   };
+
+  // Realtime subscription: listen to public.notifications and update current user's notifications immediately
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user || user.id === 'guest') return;
+    let unsub: (() => void) | null = null;
+    try {
+      unsub = subscribeToTable('notifications', (payload: any) => {
+        try {
+          const rec = payload?.new || payload?.record || payload?.payload?.new || payload?.payload?.record || null;
+          const event = payload?.event || payload?.type || payload?.eventType || (payload?.payload && payload.payload.event);
+          if (!rec) return;
+          const recUserId = rec.user_id || rec.userId || rec.user || rec.uid;
+          if (!recUserId || recUserId !== user.id) return; // not for this user
+
+          const notif: Notification = {
+            id: rec.id || `notif_${Date.now()}`,
+            type: rec.type || 'system',
+            title: rec.title || rec.title_text || '',
+            message: rec.message || rec.body || '',
+            date: rec.created_at || rec.createdAt || new Date().toISOString(),
+            isRead: !!rec.read
+          };
+
+          setUser(prev => {
+            if (!prev) return prev;
+            // If this is an UPDATE, replace existing
+            if (String(event).toLowerCase().includes('update')) {
+              const updatedNotifs = (prev.notifications || []).map(n => n.id === notif.id ? { ...n, ...notif } : n);
+              const updated = { ...prev, notifications: updatedNotifs };
+              persistUser(updated);
+              return updated;
+            }
+
+            // Insert new notification at top if not duplicate
+            const exists = (prev.notifications || []).some(n => n.id === notif.id);
+            if (exists) return prev;
+            const updated = { ...prev, notifications: [notif, ...(prev.notifications || [])] };
+            persistUser(updated);
+            return updated;
+          });
+        } catch (err) {
+          console.warn('notifications subscription handler error:', err);
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to subscribe to notifications realtime:', err);
+    }
+    return () => { try { if (unsub) unsub(); } catch (_) {} };
+  }, [isSupabaseConfigured, user?.id]);
+
+  // If a temporary timestamp-based user id was stored (e.g., user_176686...), replace it with Supabase auth UID when available
+  const isTemporaryUserId = (id?: string) => {
+    if (!id) return false;
+    return /^user_\d+$/.test(id) || /^u\d{6,}$/.test(id);
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!isSupabaseConfigured) return;
+        if (!user?.id) return;
+        if (!isTemporaryUserId(user.id)) return;
+        // Try to fetch the currently authenticated Supabase user and adopt its UID if present
+        try {
+          const { data } = await supabase.auth.getUser();
+          const uid = (data as any)?.user?.id;
+          if (uid && uid !== user.id) {
+            const updated = { ...user, id: uid } as User;
+            setUser(updated);
+            persistUser(updated);
+            console.log('Replaced temporary user id with authenticated supabase uid:', uid);
+          }
+        } catch (err) {
+          // Ignore - this is a best-effort fix
+        }
+      } catch (_) {}
+    })();
+  }, [user?.id, isSupabaseConfigured]);
 
   // Helper: update arbitrary fields for a user in Supabase users table
   const updateUserFields = async (userId: string, fields: Partial<User>) => {
@@ -601,7 +898,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       if (error) {
         console.warn('Supabase signInWithPassword failed:', error.message);
-        setAuthErrorMessage(error.message || 'Sign-in failed.');
+        // Check if it's an email confirmation issue
+        if (error.message.includes('Email not confirmed') || error.message.includes('confirm')) {
+          setAuthErrorMessage('Please verify your email address. Check your inbox for a confirmation link.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          setAuthErrorMessage('Invalid email or password. Please try again.');
+        } else {
+          setAuthErrorMessage(error.message || 'Sign-in failed.');
+        }
         return false;
       }
 
@@ -629,7 +933,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           name: data.user.user_metadata?.full_name || ''
         } as User;
         try {
-          await supabase.from('users').upsert([sanitizeFirestoreData(basicUser)]);
+          await safeUpsertUser(basicUser);
         } catch (e) {
           console.warn('Failed to create basic user profile:', e);
         }
@@ -701,33 +1005,60 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
           // Attempt to create Supabase auth user and users row if credentials provided
           if ((userData as any).password && userData.email) {
-              try {
-                  const { data, error } = await supabase.auth.signUp({ email: userData.email!, password: (userData as any).password });
-                  if (error) {
-                      console.warn('Supabase signUp failed (falling back to local user):', error.message);
-                  } else if (data?.user) {
-                      newUser.id = data.user.id;
-                      // Try to sign in immediately so session exists for subsequent DB actions
-                      try {
-                        const signInRes = await supabase.auth.signInWithPassword({ email: userData.email!, password: (userData as any).password });
-                        if (signInRes.error) {
-                          console.warn('Immediate signIn after signUp failed:', signInRes.error.message);
-                        } else {
-                          console.log('Signed in after registration, session ready');
-                        }
-                      } catch (siErr) {
-                        console.warn('Error signing in after signUp:', siErr);
+              // Basic client-side email validation to catch formatting errors early
+              const email = String(userData.email || '').trim();
+              const emailIsValid = /\S+@\S+\.\S+/.test(email);
+              if (!emailIsValid) throw new Error('Please provide a valid email address.');
+
+              // If running in demo mode or Supabase isn't configured, create a local account only
+              if (isDemoMode || !isSupabaseConfigured) {
+                console.warn('Demo mode or Supabase not configured — skipping remote signUp and creating local account only.');
+              } else {
+                // Try to create a Supabase auth user. If signUp fails with a recoverable error (e.g., "invalid email"),
+                // fall back to creating a local account so dev/demo flows continue to work.
+                try {
+                  const { data, error } = await supabase.auth.signUp({ 
+                    email, 
+                    password: (userData as any).password,
+                    options: {
+                      emailRedirectTo: window.location.origin,
+                      data: {
+                        name: userData.name || '',
+                        first_name: (userData as any).firstName || '',
+                        last_name: (userData as any).lastName || ''
                       }
+                    }
+                  });
+                  if (error) {
+                    const msg = String(error.message || error);
+                    console.warn('Supabase signUp failed:', msg);
+                    // If the error appears to be a simple validation (invalid email), allow local fallback in dev
+                    if (/invalid email|invalid.*email|bad request|400/i.test(msg)) {
+                      setAuthErrorMessage('Account created locally: Supabase signUp failed (' + msg + ').');
+                      console.warn('Falling back to local-only account due to signUp validation failure.');
+                      // continue without setting newUser.id to a remote UUID
+                    } else {
+                      // Non-recoverable error: surface to caller
+                      setAuthErrorMessage(msg);
+                      return false;
+                    }
+                  } else if (data?.user) {
+                    newUser.id = data.user.id;
+                    console.log('Supabase user created. Confirmation email sent to:', email);
+                    // DO NOT sign in immediately - let user confirm email first
+                    // Remove the signInWithPassword call so user must verify email before accessing protected features
                   }
-              } catch (err) {
-                  console.warn('Supabase signup attempt failed (continuing with local user):', err);
+                } catch (err: any) {
+                  console.warn('Supabase signUp threw an exception — falling back to local account:', err?.message || err);
+                  setAuthErrorMessage(err?.message || String(err));
+                  // In case of unexpected exception, still allow local fallback in dev to avoid blocking flow
+                }
               }
           }
 
           // Try to upsert into users table (best-effort)
           try {
-            const { error: upsertErr } = await supabase.from('users').upsert([sanitizeFirestoreData(newUser)]);
-            if (upsertErr) console.warn('Upsert to users table failed (continuing locally):', upsertErr);
+            await safeUpsertUser(newUser);
           } catch (err) {
             console.warn('Upsert to users table threw (continuing locally):', err);
           }
@@ -735,11 +1066,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           setUser(newUser);
           persistUser(newUser);
           return true;
-      } catch (e) {
+      } catch (e: any) {
           console.error("Registration Failed (unexpected)", e);
-          setUser(newUser);
-          persistUser(newUser);
-          return true;
+          setAuthErrorMessage(e?.message || String(e));
+          return false;
       }
   };
 
@@ -776,8 +1106,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
           for (const u of usersToCreate) {
               try {
-                const { error } = await supabase.from('users').upsert([sanitizeFirestoreData(u)]);
-                if (error) throw error;
+                await safeUpsertUser(u);
               } catch (err) {
                 console.error('Failed to upsert test user into Supabase:', err);
               }
@@ -794,7 +1123,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (isDemoMode || !isSupabaseConfigured) {
       // If Supabase isn't configured, fall back to local storage/demo data so the app still works in dev without env vars
       setDataSource(isDemoMode ? 'demo' : 'local');
-      if (!isSupabaseConfigured) setDbConnectionError('Supabase not configured; running with local/demo data. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable Supabase.');
+    if (!isSupabaseConfigured) setDbConnectionError('Supabase not configured; running with local/demo data. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable Supabase.');
       const localProds = localStorage.getItem('spv_products');
       const parsedProds = localProds ? JSON.parse(localProds) : INITIAL_PRODUCTS;
       const publishedProds = (parsedProds as any[]).filter((p: any) => p.status === 'published');
@@ -1112,6 +1441,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addToCart = (product: Product, options: Partial<CartItem> = {}) => {
     setCart(prev => {
+      // Prevent adding products that are explicitly marked sold-out, regardless of stock counts
+      if (product.isSoldOut) {
+        alert('Sorry, this product is marked as sold out.');
+        return prev;
+      }
       const existingIndex = prev.findIndex(item =>
         item.id === product.id &&
         item.selectedSize === options.selectedSize &&
@@ -1473,7 +1807,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const addProduct = async (product: Product) => {
+      // Step 1: Convert camelCase to snake_case
       const safeProduct = sanitizeFirestoreData(product);
+      
+      // Step 2: Apply final payload sanitization (empty strings -> null, type enforcement)
+      const dbPayload = sanitizePayload(safeProduct, false);
+      
       const newProducts = [safeProduct, ...products];
       setProducts(newProducts);
 
@@ -1481,12 +1820,37 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         // --- Simplified, guaranteed-write flow ---
         try {
 
+          // >>> BUILD CLEAN PAYLOAD <<<
+          // Only allow these top-level columns to be written directly. Everything else is moved into `options`.
+          const cleanData: any = {};
+          for (const k of ALLOWED_COLUMNS) {
+            if (dbPayload[k] !== undefined) cleanData[k] = dbPayload[k];
+          }
+
+          // Collect any extra fields and merge into options
+          const extras: any = {};
+          for (const k of Object.keys(dbPayload)) {
+            if (!ALLOWED_COLUMNS.includes(k)) extras[k] = dbPayload[k];
+          }
+          if (Object.keys(extras).length > 0) {
+            console.debug('addProduct: moving extra keys into options:', Object.keys(extras));
+          }
+          cleanData.options = Object.assign({}, cleanData.options || {}, extras, cleanData.options || {});
+
           // >>> DEBUG LOG <<<
-          console.log("DEBUG: Final Product Data to Firestore (Add):", JSON.stringify(safeProduct, null, 2));
+          console.log("DEBUG: Final Product Data to Supabase (Add) - cleanData:", JSON.stringify(cleanData, null, 2));
 
           try {
-            const { error } = await supabase.from('products').upsert([safeProduct]);
-            if (error) throw error;
+            const res = await supabase.from('products').upsert([cleanData]).select();
+            console.log('Supabase addProduct response:', res);
+            if (res.error) {
+              console.error('Supabase addProduct ERROR:', res.error);
+              // Suggest RLS/permission issue if status indicates forbidden
+              if ((res.error as any).status === 403 || (res.error as any).code === '42501') {
+                console.error('Permission / RLS error detected when inserting product. Check RLS policies and grants.');
+              }
+              throw res.error;
+            }
             setDbConnectionError(null);
           } catch (err) {
             console.warn('Supabase addProduct failed, saving to local storage instead:', err);
@@ -1497,7 +1861,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }
           setDbConnectionError(null); // Clear any old error
         } catch (err: any) {
-          console.error('CRITICAL FIRESTORE ERROR (addProduct):', err, 'Product:', safeProduct);
+          console.error('CRITICAL FIRESTORE ERROR (addProduct):', err, 'Product:', dbPayload);
           try {
             localStorage.setItem('spv_products', JSON.stringify(newProducts));
             setDbConnectionError(`Failed to add product: ${err.code || 'Unknown Error'}. Changes saved locally.`);
@@ -1521,22 +1885,55 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const updateProduct = async (product: Product) => {
+     // Step 1: Convert camelCase to snake_case
      const safeProduct = sanitizeFirestoreData(product);
+     
+     // Step 2: Apply final payload sanitization (empty strings -> null, type enforcement)
+     // isUpdate=true will remove 'id' from payload since it's in .eq() clause
+     const dbPayload = sanitizePayload(safeProduct, true);
+     
      const updated = products.map(p => p.id === safeProduct.id ? safeProduct : p);
      setProducts(updated);
 
     if (!isDemoMode && isSupabaseConfigured) {
        try {
 
+         // >>> BUILD CLEAN PAYLOAD <<<
+         const cleanData: any = {};
+         for (const k of ALLOWED_COLUMNS) {
+           if (dbPayload[k] !== undefined) cleanData[k] = dbPayload[k];
+         }
+         const extras: any = {};
+         for (const k of Object.keys(dbPayload)) {
+           if (!ALLOWED_COLUMNS.includes(k)) extras[k] = dbPayload[k];
+         }
+         if (Object.keys(extras).length > 0) {
+           console.debug('updateProduct: moving extra keys into options:', Object.keys(extras));
+         }
+         cleanData.options = Object.assign({}, cleanData.options || {}, extras, cleanData.options || {});
+
          // >>> DEBUG LOG <<<
-         console.log("DEBUG: Final Product Data to Firestore (Update):", JSON.stringify(safeProduct, null, 2));
+         console.log("DEBUG: Final Product Data to Supabase (Update) - cleanData:", JSON.stringify(cleanData, null, 2));
+         console.log("DEBUG: Product ID for .eq() clause:", safeProduct.id);
 
          try {
-           const { error } = await supabase.from('products').update(safeProduct).eq('id', safeProduct.id);
-           if (error) throw error;
+           const res = await supabase
+             .from('products')
+             .update(cleanData)
+             .eq('id', safeProduct.id)
+             .select();
+           console.log('Supabase updateProduct response:', res);
+           if (res.error) {
+             console.error('Supabase updateProduct ERROR DETAILS:', res.error, 'productId:', safeProduct.id);
+             if ((res.error as any).status === 403 || (res.error as any).code === '42501') {
+               console.error('Permission / RLS error detected when updating product. Check RLS policies and grants.');
+             }
+             throw res.error;
+           }
            setDbConnectionError(null);
-         } catch (err) {
+         } catch (err: any) {
            console.warn('Supabase updateProduct failed, saving to local storage instead:', err);
+           console.error('Full error object:', JSON.stringify(err, null, 2));
            try {
              const existing = JSON.parse(localStorage.getItem('spv_products') || '[]');
              const updated = existing.map((p: any) => p.id === safeProduct.id ? safeProduct : p);
@@ -1544,7 +1941,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
            } catch (_) {}
          }
        } catch (err: any) {
-         console.error('CRITICAL FIRESTORE ERROR (updateProduct):', err, 'Product:', safeProduct);
+         console.error('CRITICAL FIRESTORE ERROR (updateProduct):', err, 'Product:', dbPayload);
          try {
            localStorage.setItem('spv_products', JSON.stringify(updated));
            setDbConnectionError(`Failed to update product: ${err.code || 'Unknown Error'}. Changes saved locally.`);
@@ -1736,17 +2133,79 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!user.email) {
         throw new Error("User must be logged in to checkout.");
     }
-
-    const newOrder: Order = {
-        ...orderData,
-        id: `ord_${Date.now()}`,
-        orderNumber: `#SMV-${Date.now().toString().slice(-6)}`,
-        date: new Date().toISOString(),
-        customerName: user.name,
-        customerEmail: user.email,
-        status: 'Pending',
+    // Build order payload (let DB assign UUID id)
+    const orderNumber = `#SMV-${Date.now().toString().slice(-6)}`;
+    const orderPayload: any = {
+      order_number: orderNumber,
+      customer_name: user.name,
+      customer_email: user.email,
+      items: cart.map(i => ({ id: i.id, name: i.name, sku: (i as any).code || i.id, quantity: i.quantity, unit_price: i.price })),
+      subtotal: getCartTotal(),
+      shipping_cost: orderData.shippingCost ?? 0,
+      discount: 0,
+      total: orderData.total,
+      payment_method: 'payfast',
+      shipping_address: orderData.shippingDetails ? (typeof orderData.shippingDetails === 'string' ? JSON.parse(orderData.shippingDetails) : orderData.shippingDetails) : null,
+      status: 'pending',
+      voucher_code: null,
+      affiliate_code: null,
+      points_redeemed: orderData.pointsToRedeem || 0
     };
 
+    // Insert into DB (ensures DB-generated UUID id)
+    let insertedOrder: any = null;
+    if (!isDemoMode && isSupabaseConfigured) {
+      try {
+        // Ensure we include user_id derived from auth
+        const { data: authData } = await supabase.auth.getUser();
+        const authUser = (authData as any)?.user;
+        if (!authUser || !authUser.id) throw new Error('Authenticated user required to create order');
+        orderPayload.user_id = authUser.id;
+
+        const { data, error } = await supabase.from('orders').insert([orderPayload]).select().maybeSingle();
+        if (error) throw error;
+        insertedOrder = data;
+
+        // Insert order items with variants metadata
+        const itemsToInsert = cart.map(i => ({
+          order_id: insertedOrder.id,
+          product_id: i.id,
+          product_name: i.name,
+          sku: i.code || i.id,
+          quantity: i.quantity,
+          unit_price: i.price,
+          variant_details: {
+            selectedSize: i.selectedSize || null,
+            selectedMaterial: i.selectedMaterial || null,
+            selectedChainStyle: i.selectedChainStyle || null,
+            selectedChainLength: i.selectedChainLength || null
+          }
+        }));
+        if (itemsToInsert.length > 0) {
+          const { error: itemsErr } = await supabase.from('order_items').insert(itemsToInsert);
+          if (itemsErr) console.warn('Failed to insert order_items:', itemsErr);
+        }
+      } catch (err) {
+        console.error('Order DB insert failed, falling back to local order creation:', err);
+      }
+    }
+
+    // Build the Order object returned to the caller
+    const newOrder: Order = {
+      id: (insertedOrder && insertedOrder.id) || `ord_${Date.now()}`,
+      orderNumber: orderNumber,
+      date: (insertedOrder && insertedOrder.created_at) || new Date().toISOString(),
+      customerName: user.name,
+      customerEmail: user.email,
+      status: (insertedOrder && (insertedOrder.status ? (insertedOrder.status.charAt(0).toUpperCase() + insertedOrder.status.slice(1)) : 'Pending')) || 'Pending',
+      items: cart,
+      shippingCost: orderPayload.shipping_cost,
+      shippingMethod: orderData.shippingMethod || orderPayload.shipping_method || 'pudo',
+      shippingDetails: orderData.shippingDetails || orderPayload.shipping_address || '',
+      total: orderPayload.total
+    };
+
+    // Persist locally and in-store
     await addOrder(newOrder);
 
     // Process affiliate commissions
@@ -2038,139 +2497,132 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  const applyForArtist = async (data: { name: string; surname: string; artistTradeName?: string; contactNumber: string; email: string; productImages: string[] }) => {
-      if (!user.id || user.id === 'guest') {
-          if (!isDemoMode) {
-            console.error("Cannot apply for artist as guest user.");
-            return;
-          }
-          // allow demo-mode submissions without a real user id
+  const applyForArtist = async (data: { shop_name?: string; product_images?: string[]; terms_agreed?: boolean; plan?: string | null }) => {
+    // Require a verified Supabase user for artist applications (RLS will enforce this)
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      throw new Error('You must be logged in with a verified account to apply.');
+    }
+
+    // Prevent duplicate/pending applications (use canonical column 'user_id')
+    try {
+      const { data: existing, error: existingErr } = await supabase.from('artist_applications').select('id,status').eq('user_id', authUser.id).in('status', ['pending','approved']);
+      if (existingErr) {
+        console.warn('applyForArtist duplicate check could not complete (Supabase error), continuing:', existingErr);
+      } else if (existing && existing.length > 0) {
+        throw new Error('You already have an active application.');
+      }
+    } catch (err) {
+      console.warn('applyForArtist duplicate check encountered an unexpected error, continuing as best-effort:', err);
+    }
+
+    // Build minimal payload (only allowed keys): user_id, shop_name, product_images, status
+    // Apply sanitization: empty strings -> null, ensure product_images is an array of non-empty strings
+    const payload: any = {
+      user_id: authUser.id,
+      shop_name: data.shop_name && String(data.shop_name).trim() !== '' ? String(data.shop_name).trim() : null,
+      product_images: Array.isArray(data.product_images) ? data.product_images.filter(p => !!p).map(String) : [],
+      status: 'pending'
+    };
+
+    // Insert into DB (no extra fields, no demo fallback)
+    try {
+      const res = await supabase.from('artist_applications').insert([payload]).select().maybeSingle();
+      console.log('artist_applications.insert response', res);
+      const inserted = (res as any)?.data || (res as any);
+      if ((res as any)?.error) {
+        console.error('Insert into artist_applications returned error object:', (res as any));
+        throw (res as any).error || (res as any);
       }
 
-      // Resolve effective user id (prefer Supabase auth uid over local demo 'user_' ids)
-      let effectiveUserId: string | null = user && user.id ? String(user.id) : null;
-      if (effectiveUserId && /^user_/.test(effectiveUserId) && typeof supabase !== 'undefined' && supabase) {
-        try {
-          const sessionRes = await supabase.auth.getUser();
-          const realId = (sessionRes as any)?.data?.user?.id;
-          if (realId) effectiveUserId = realId;
-        } catch (e) {
-          console.warn('applyForArtist: could not resolve real auth user id, proceeding with existing id', e);
-        }
-      }
+      // Update user's local state to block re-apply and show In Review
+      const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as User;
+      setUser(updatedUser);
+      persistUser(updatedUser);
+      await updateUserFields(user.id, { artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as any);
 
-      // Prevent duplicate/pending applications (use canonical column 'user_id')
+      // Audit log: record the creation of this artist application for troubleshooting
       try {
-        const { data: existing, error: existingErr } = await supabase.from('artist_applications').select('id,status').eq('user_id', effectiveUserId).in('status', ['pending','approved']);
-        if (existingErr) {
-          console.warn('applyForArtist duplicate check could not complete (Supabase error), continuing:', existingErr);
-        } else if (existing && existing.length > 0) {
-          throw new Error('You already have an active application.');
-        }
-      } catch (err) {
-        console.warn('applyForArtist duplicate check encountered an unexpected error, continuing as best-effort:', err);
+        await supabase.from('artist_applications_logs').insert([{
+          application_id: inserted?.id || null,
+          user_id: authUser.id,
+          action: 'create',
+          payload: payload,
+          created_at: new Date().toISOString()
+        }]);
+      } catch (logErr) {
+        console.warn('Failed to write artist application audit log:', logErr);
       }
 
-      // Create artist application document
-        const applicationData = {
-          uid: effectiveUserId || user.id,
-          user_id: effectiveUserId || user.id,
-          name: data.name,
-          surname: data.surname,
-          artistTradeName: data.artistTradeName,
-          contactNumber: data.contactNumber,
-          email: data.email,
-          productImages: data.productImages,
-          product_images: JSON.stringify(data.productImages || []),
-          plan: (data as any).plan || null,
-          termsAgreed: !!(data as any).termsAgreed,
-          terms_agreed: !!(data as any).termsAgreed,
-          status: 'pending',
-          submitted_at: new Date().toISOString(),
-          submittedAt: new Date().toISOString(),
+      // Acknowledgement notification
+      const notification: Notification = {
+        id: `artist_app_sub_${Date.now()}`,
+        type: 'system',
+        title: 'Artist Application Received',
+        message: 'Thank you for applying to the Spoil Me Vintage Artist Program. We will review your application and respond within 72 hours. If approved, you will receive instructions on next steps.',
+        date: new Date().toISOString(),
+        isRead: false
       };
+      await appendNotificationToUser(user.id, notification);
+      await pushToIndividual(user.id, notification.title, notification.message);
 
-          if (!isDemoMode) {
+      // Notify admins: insert notification for each admin and push to their devices
+      try {
+        const { data: admins } = await supabase.from('users').select('id').eq('is_admin', true);
+        if (Array.isArray(admins) && admins.length > 0) {
+          const adminNotif = {
+            title: 'New Artist Application',
+            message: `New application from ${payload.shop_name || (user.name || user.email || 'Unknown Artist')}`,
+            link: '/#/admin/artists',
+            read: false,
+            created_at: new Date().toISOString()
+          } as any;
+
+          // Insert notifications for admins and send push
+          for (const a of admins) {
             try {
-              const res = await supabase.from('artist_applications').insert([applicationData]).select().maybeSingle();
-                // Log full response to help diagnose 400/422 errors coming from Postgres / Supabase
-                console.log('artist_applications.insert response', res);
-                const inserted = (res as any)?.data || (res as any);
-                if ((res as any)?.error) {
-                  console.error('Insert into artist_applications returned error object:', (res as any));
-                  throw (res as any).error || (res as any);
-                }
-              // Update user's local state to block re-apply and show In Review
-              const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as User;
-              setUser(updatedUser);
-              persistUser(updatedUser);
-              await updateUserFields(user.id, { artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as any);
-
-              // Send a professional acknowledgement notification to the user
-              const notification: Notification = {
-                id: `artist_app_sub_${Date.now()}`,
-                type: 'system',
-                title: 'Artist Application Received',
-                message: 'Thank you for applying to the Spoil Me Vintage Artist Program. We will review your application and respond within 72 hours. If approved, you will receive instructions on next steps.',
-                date: new Date().toISOString(),
-                isRead: false
-              };
-              await appendNotificationToUser(user.id, notification);
-              await pushToIndividual(user.id, notification.title, notification.message);
-            } catch (error) {
-              console.error('Error submitting artist application:', error);
-              throw error;
+              // Append to user's notifications JSONB field
+              await appendNotificationToUser(a.id, { id: `artist_app_alert_${Date.now()}_${a.id}`, type: 'general', title: adminNotif.title, message: adminNotif.message, date: adminNotif.created_at, isRead: false } as unknown as Notification);
+              await pushToIndividual(a.id, adminNotif.title, adminNotif.message, adminNotif.link);
+            } catch (adminErr) {
+              console.warn('Failed to notify admin', a.id, adminErr);
             }
-          } else {
-            // Demo mode: persist the application locally so it can be reviewed in the admin view
-              // Try to insert into Supabase even in demo mode (best-effort). If it fails, fall back to local persistence.
-              try {
-                const res = await supabase.from('artist_applications').insert([applicationData]).select().maybeSingle();
-                if ((res as any)?.error) throw (res as any).error;
-                const inserted = (res as any)?.data || (res as any);
-                // update user's local state to block re-apply and show In Review
-                const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as User;
-                setUser(updatedUser);
-                persistUser(updatedUser);
-                try { await updateUserFields(user.id, { artistApplicationStatus: 'pending', artistApplicationId: inserted?.id || null } as any); } catch (_) {}
-
-                const notification: Notification = {
-                  id: `artist_app_sub_${Date.now()}`,
-                  type: 'system',
-                  title: 'Artist Application Received',
-                  message: 'Thank you for applying to the Spoil Me Vintage Artist Program. We will review your application and respond within 72 hours.',
-                  date: new Date().toISOString(),
-                  isRead: false
-                };
-                try { await appendNotificationToUser(user.id, notification); await pushToIndividual(user.id, notification.title, notification.message); } catch (_) { }
-              } catch (err) {
-                console.warn('Supabase insert failed in demo mode; falling back to local persistence', err);
-                try {
-                  const localAppsRaw = localStorage.getItem('spv_artist_applications');
-                  const localApps = localAppsRaw ? JSON.parse(localAppsRaw) : [];
-                  const id = `demo_${Date.now()}`;
-                  const demoApp = { ...applicationData, id, uid: user?.id || 'demo_user' };
-                  localApps.unshift(demoApp);
-                  localStorage.setItem('spv_artist_applications', JSON.stringify(localApps));
-                  // update local user state if present
-                  const updatedUser: User = { ...user, artistApplicationStatus: 'pending', artistApplicationId: id } as User;
-                  setUser(updatedUser);
-                  persistUser(updatedUser);
-                  const notification: Notification = {
-                    id: `artist_app_sub_${Date.now()}`,
-                    type: 'system',
-                    title: 'Artist Application Received',
-                    message: 'Thank you for applying to the Spoil Me Vintage Artist Program (demo). We will review your application and respond within 72 hours.',
-                    date: new Date().toISOString(),
-                    isRead: false
-                  };
-                  await appendNotificationToUser(user?.id || 'demo_user', notification);
-                } catch (err2) {
-                  console.error('Failed to persist demo application locally', err2);
-                  throw err2;
-                }
-              }
           }
+        }
+      } catch (notifyErr) {
+        console.warn('Failed to notify admins about new artist application:', notifyErr);
+      }
+    } catch (error) {
+      console.error('Error submitting artist application:', error);
+        // If user is a local-only account (id starts with 'user_') or in demo mode, persist application locally so user isn't blocked
+        try {
+          const isLocalAccount = !!user?.id && String(user.id).startsWith('user_');
+          if (isDemoMode || isLocalAccount) {
+            const pendingKey = `pending_artist_application:${user.id}`;
+            localStorage.setItem(pendingKey, JSON.stringify({ payload, error: String(error), createdAt: new Date().toISOString() }));
+            console.warn('Saved artist application locally due to submission error:', error);
+
+            const updatedUser: User = { ...user, artistApplicationStatus: 'pending_local' } as User;
+            setUser(updatedUser);
+            persistUser(updatedUser);
+
+            const notification: Notification = {
+              id: `artist_app_local_${Date.now()}`,
+              type: 'system',
+              title: 'Artist Application Saved Locally',
+              message: 'Your application was saved locally because the server could not be reached. An admin will not see this until it is synced.',
+              date: new Date().toISOString(),
+              isRead: false
+            };
+            await appendNotificationToUser(user.id, notification);
+            return; // gracefully return — application saved locally
+          }
+        } catch (localErr) {
+          console.error('Failed to persist application locally after DB error:', localErr);
+        }
+
+        throw error;
+    }
 
       const notification: Notification = {
           id: `artist_app_${Date.now()}`,
@@ -2208,6 +2660,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Admin Winner Override
       manualWinner, setManualWinner, auth: supabase.auth,
       authErrorMessage, clearAuthError, signInWithLocalDevAdmin, isSupabaseConfigured: isSupabaseConfigured,
+      resendVerificationEmail,
       dataSource,
 
       // Account Management
