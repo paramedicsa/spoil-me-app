@@ -1,80 +1,88 @@
-// If using Deno, ensure your editor supports Deno types (e.g., install Deno extension for VSCode).
-// If using Node.js, replace with an appropriate HTTP server, e.g.:
-import { createServer } from "http";
-
-// Example Node.js replacement for serve:
-const serve = (handler: (req: Request) => Promise<Response>) => {
-  const server = createServer(async (req, res) => {
-    const request = new Request(`http://${req.headers.host}${req.url}`, {
-      method: req.method,
-      headers: req.headers as any,
-    });
-    const response = await handler(request);
-    res.writeHead(response.status, Object.fromEntries(response.headers));
-    const body = await response.text();
-    res.end(body);
-  });
-  server.listen(8000);
-};
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 serve(async (req) => {
-  // 1. Handle CORS
+  // 1. Handle CORS (Essential for Vercel calls)
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } })
+    return new Response('ok', { 
+      headers: { 
+        'Access-Control-Allow-Origin': '*', 
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'POST'
+      } 
+    })
   }
 
   try {
     const { action, image, category } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+
+    if (!apiKey) throw new Error("GEMINI_API_KEY is missing in Supabase Secrets");
 
     if (action === 'analyze-image') {
-      // CLEAN THE BASE64 STRING
-      const base64Data = image.split(',')[1] || image;
+      // Clean Base64: remove prefix if present and capture MIME type when available
+      let base64Data = image.includes(',') ? image.split(',')[1] : image;
+      const mimeMatch = image.match(/^data:(image\/[A-Za-z0-9.+-]+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-        const prompt = `You are an expert jewelry cataloger for "Spoil Me Vintage". 
-      ANALYZE THIS IMAGE CAREFULLY. 
-      Identify the exact color (e.g. Amber, Sunset Orange, Tangerine), the shape (e.g. Square, Geometric), the material (e.g. Resin, Glass, Acrylic), and the type (e.g. Stud Earring, Dangle).
-      
-      RETURN ONLY A JSON OBJECT with these keys:
+      const prompt = `You are a professional jewelry specialist. Analyze this image carefully for visual details (color, texture, and shape).
+      Specifically look for PRIMARY COLOR (e.g., Amber, Sunset Orange), TEXTURE (e.g., glossy resin, matte metal), and SHAPE (e.g., square, round, geometric).
+      Identify MATERIAL (e.g., Resin, Copper, Glass, Beads) and the PIECE TYPE (e.g., Stud Earring, Dangle, Ring).
+      Respond ONLY with a JSON object structured exactly as follows:
       {
-        "name": "A creative, high-end name for this specific piece",
-        "description": "A 3-sentence luxury description focusing on the visual details seen in the photo",
-          "whenAndHowToWear": "short guidance on when and how to wear",
-        "tags": ["5 specific tags"],
-        "seoKeywords": ["5 high-ranking keywords"],
-        "colors": ["The dominant color name"]
-      }`;
+        "name": "High-end creative name for this piece",
+        "description": "A 3-sentence luxury description focusing on the visible details",
+        "whenAndHowToWear": "Short, actionable styling advice",
+        "tags": ["tag1","tag2","tag3","tag4","tag5"],
+        "seoKeywords": ["kw1","kw2","kw3","kw4","kw5"],
+        "colors": ["Primary Color"]
+      }
+      Ensure colors describe only the product (ignore background or skin). Return ONLY the raw JSON object and nothing else.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      // V1BETA - GEMINI 1.5 FLASH (Stable for vision tasks)
+      const googleUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: base64Data } }
+          ]
+        }]
+      };
+
+      // Log the exact body sent to Gemini for debugging in Supabase logs
+      console.log('Gemini Request Body:', payload);
+
+      const response = await fetch(googleUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: "image/png", data: base64Data } }
-            ]
-          }]
-        })
+        body: JSON.stringify(payload)
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Google API Error Body:', errorText);
+        throw new Error(`Google API Error: ${response.status} ${errorText}`);
+      }
+
       const result = await response.json();
-      // Extract the text content and parse the JSON hidden inside it
-      const textResponse = result.candidates[0].content.parts[0].text;
-      const cleanJson = textResponse.replace(/```json|```/g, "").trim();
+      const aiText = result.candidates[0].content.parts[0].text;
+      
+      // Clean the AI text (removes markdown code blocks)
+      const cleanJson = aiText.replace(/```json|```/g, "").trim();
       
       return new Response(cleanJson, { 
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'Action not supported' }), { status: 400 });
 
   } catch (err) {
-    const errorMessage = typeof err === "object" && err !== null && "message" in err ? (err as { message: string }).message : String(err);
-    return new Response(JSON.stringify({ error: errorMessage }), { 
+    console.error("Function Error:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), { 
       status: 500, 
-      headers: { 'Access-Control-Allow-Origin': '*' } 
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });
   }
 })
