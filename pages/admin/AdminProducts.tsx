@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Product, PackagingItem, Review } from '../../types';
 import { Plus, Edit2, Trash2, Sparkles, Save, X, Link as LinkIcon, Tag, MessageSquare, Star, Gift, Clock, Package, ExternalLink, AlertTriangle, Crown, Percent, Truck, RefreshCw, Upload, Loader2, Camera, Check, Info, Bot, DollarSign, BarChart3, Search, Filter, Layers, ImagePlus, Smartphone, FileDown, Bookmark, Gem } from 'lucide-react';
-import { generateProductDescription, generateProductMetadataFromImage, generateSouthAfricanReviews, generateUniquePendantReviews } from '../../services/geminiService';
-import { uploadFile, getDocument, isSupabaseConfigured } from '../../utils/supabaseClient';
+// NOTE: AI calls are proxied through an Edge Function; do not import the server-side geminiService on the client.
+import { uploadFile, getDocument, isSupabaseConfigured, supabase } from '../../utils/supabaseClient';
 import { handleImageError } from '../../utils/imageUtils';
 
 // Chain Length Descriptions from Firestore
@@ -34,13 +34,22 @@ const DEFAULT_BASE_MATERIALS = [
 ];
 
 const BASE_MATERIALS_STORAGE_KEY = 'spv_base_materials';
+const MADE_BY_STORAGE_KEY = 'spv_made_by_options';
+
+const DEFAULT_MADE_BY_OPTIONS = [
+  'Spoil Me Vintage',
+  'Outsourced',
+];
 
 const AdminProducts: React.FC = () => {
   const { products, addProduct, updateProduct, deleteProduct, categories, packagingPresets, materialPresets, savePackagingPreset, saveMaterialPreset, deleteMaterialPreset, dbConnectionError, login, manualWinner, setManualWinner, isLoading } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+   const [showGenerateFromImage, setShowGenerateFromImage] = useState(false);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+   const [imageAutoFillMessage, setImageAutoFillMessage] = useState<string | null>(null);
+   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const [isGeneratingReviews, setIsGeneratingReviews] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'pricing' | 'inventory' | 'media' | 'marketing' | 'reviews' | 'promotions' | 'gifts'>('general');
 
@@ -57,6 +66,18 @@ const AdminProducts: React.FC = () => {
    });
    const [newBaseMaterial, setNewBaseMaterial] = useState('');
 
+   const [madeByOptions, setMadeByOptions] = useState<string[]>(() => {
+      try {
+         const raw = localStorage.getItem(MADE_BY_STORAGE_KEY);
+         const parsed = raw ? JSON.parse(raw) : null;
+         const fromStorage = Array.isArray(parsed) ? parsed.map((s: any) => String(s)).filter(Boolean) : [];
+         return Array.from(new Set([...DEFAULT_MADE_BY_OPTIONS, ...fromStorage]));
+      } catch {
+         return DEFAULT_MADE_BY_OPTIONS;
+      }
+   });
+   const [newMadeBy, setNewMadeBy] = useState('');
+
    useEffect(() => {
       try {
          localStorage.setItem(BASE_MATERIALS_STORAGE_KEY, JSON.stringify(baseMaterialOptions));
@@ -64,6 +85,14 @@ const AdminProducts: React.FC = () => {
          // ignore
       }
    }, [baseMaterialOptions]);
+
+   useEffect(() => {
+      try {
+         localStorage.setItem(MADE_BY_STORAGE_KEY, JSON.stringify(madeByOptions));
+      } catch {
+         // ignore
+      }
+   }, [madeByOptions]);
 
    const parseBaseMaterials = (raw?: string) => {
       if (!raw) return [];
@@ -104,6 +133,18 @@ const AdminProducts: React.FC = () => {
       setNewBaseMaterial('');
       toggleBaseMaterial(value);
    };
+
+   const addMadeByOption = () => {
+      const value = newMadeBy.trim();
+      if (!value) return;
+
+      setMadeByOptions(prev => {
+         const exists = prev.some(m => m.toLowerCase() === value.toLowerCase());
+         return exists ? prev : [...prev, value];
+      });
+      setFormData(prev => ({ ...prev, madeBy: value }));
+      setNewMadeBy('');
+   };
   
   // Review Editing State
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
@@ -116,6 +157,7 @@ const AdminProducts: React.FC = () => {
   const [filterColor, setFilterColor] = useState('');
   const [filterPromo, setFilterPromo] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterMadeBy, setFilterMadeBy] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -357,7 +399,9 @@ const AdminProducts: React.FC = () => {
       const results = await Promise.all(uploadPromises);
       processedImages = results.filter((i: string) => i && i.trim() !== '');
 
-        const productToSave: Product = { 
+      const EXCHANGE_RATE = 29; // ZAR per USD - used to ensure currency fields are consistent
+
+      const productToSave: Product = { 
             ...formData,
             images: processedImages,
             price: Number(formData.price),
@@ -375,10 +419,61 @@ const AdminProducts: React.FC = () => {
             promoPremiumMemberPrice: Number(formData.promoPremiumMemberPrice || 0),
             promoDeluxeMemberPrice: Number(formData.promoDeluxeMemberPrice || 0),
         };
+                  // Ensure consistent ZAR <-> USD fields: if one currency is present and the other is empty, derive it
+                  try {
+                     // Price
+                     if ((productToSave.price || 0) > 0 && !(productToSave.priceUSD || 0) ) {
+                        productToSave.priceUSD = parseFloat((productToSave.price / EXCHANGE_RATE).toFixed(2));
+                     } else if ((productToSave.priceUSD || 0) > 0 && !(productToSave.price || 0)) {
+                        productToSave.price = parseFloat((productToSave.priceUSD * EXCHANGE_RATE).toFixed(2));
+                     }
+
+                     // Member price
+                     if ((productToSave.memberPrice || 0) > 0 && !(productToSave.memberPriceUSD || 0)) {
+                        productToSave.memberPriceUSD = parseFloat((productToSave.memberPrice / EXCHANGE_RATE).toFixed(2));
+                     } else if ((productToSave.memberPriceUSD || 0) > 0 && !(productToSave.memberPrice || 0)) {
+                        productToSave.memberPrice = parseFloat((productToSave.memberPriceUSD * EXCHANGE_RATE).toFixed(2));
+                     }
+
+                     // Compare at price
+                     if ((productToSave.compareAtPrice || 0) > 0 && !(productToSave.compareAtPriceUSD || 0)) {
+                        productToSave.compareAtPriceUSD = parseFloat((productToSave.compareAtPrice / EXCHANGE_RATE).toFixed(2));
+                     } else if ((productToSave.compareAtPriceUSD || 0) > 0 && !(productToSave.compareAtPrice || 0)) {
+                        productToSave.compareAtPrice = parseFloat((productToSave.compareAtPriceUSD * EXCHANGE_RATE).toFixed(2));
+                     }
+                  } catch (convErr) {
+                     console.warn('Currency conversion failed:', convErr);
+                  }
+            // Ensure slug is present (required for frontend routes)
+                  if (!productToSave.slug || !productToSave.slug.trim()) {
+                        const slugVal = (productToSave.name || '').toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+                        productToSave.slug = slugVal || `product-${productToSave.id || Date.now()}`;
+                        setFormData(prev => ({ ...prev, slug: productToSave.slug }));
+                  }
+
+            // Build options object containing extended attributes to be stored in the JSONB options column
+            const optionsObj: any = {
+               packaging: productToSave.packaging || [],
+               ringStock: productToSave.ringStock || {},
+               earringMaterials: productToSave.earringMaterials || [],
+               chainStyles: productToSave.chainStyles || []
+            };
+            // Attach options to product payload so it will be saved to options JSONB column
+            (productToSave as any).options = optionsObj;
         
         if (productToSave.type === 'Ring' && productToSave.ringStock) {
            productToSave.stock = Object.values(productToSave.ringStock).reduce((a: number, b: number) => a + b, 0);
         }
+
+            console.log('DEBUG: Product to save (final):', {
+               id: productToSave.id,
+               slug: productToSave.slug,
+               price: productToSave.price,
+               stock: productToSave.stock,
+               status: productToSave.status,
+               images: productToSave.images,
+               options: (productToSave as any).options
+            });
 
             if (products.some(p => p.id === productToSave.id)) {
                await updateProduct(productToSave);
@@ -430,12 +525,27 @@ const AdminProducts: React.FC = () => {
   };
 
   const handleTextAIGenerate = async () => {
-    if (!formData.name || !formData.category) { alert("Please enter a name and category first."); return; }
-    setIsGeneratingAI(true);
-    const desc = await generateProductDescription(formData.name, formData.category, "Handmade, Unique, Vintage");
-    setFormData(prev => ({ ...prev, description: desc }));
-    setIsGeneratingAI(false);
+      if (!formData.name || !formData.category) { alert("Please enter a name and category first."); return; }
+      const desc = await generateDescriptionFor(formData.name, formData.category);
+      setFormData(prev => ({ ...prev, description: desc }));
+      setShowGenerateFromImage(false);
   };
+
+   const generateDescriptionFor = async (productName: string, category: string) => {
+      setIsGeneratingAI(true);
+      try {
+         const proxyUrl = (import.meta as any).env?.VITE_GEMINI_PROXY_URL || '/api/gemini-proxy';
+         const resp = await fetch(`${proxyUrl}/generate-description`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productName, category, keywords: 'Handmade, Unique, Vintage' }) });
+         const json = await resp.json().catch(() => ({} as any));
+         const text = json?.text || json?.description || '';
+         return text;
+      } catch (err) {
+         console.warn('Failed to generate description:', err);
+         return '';
+      } finally {
+         setIsGeneratingAI(false);
+      }
+   };
 
   const handleImageUploadAndAnalyze = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -447,19 +557,73 @@ const AdminProducts: React.FC = () => {
           const updatedImages = [base64String, ...formData.images.filter(i => i !== '')];
           setFormData(prev => ({ ...prev, images: updatedImages }));
           console.log('AdminProducts: Added base64 image for analysis (preview length):', (base64String as string).slice(0, 80));
-          const metadata = await generateProductMetadataFromImage(base64String, formData.category);
-          if (metadata) {
-              setFormData(prev => ({
-                  ...prev,
-                  name: metadata.name,
-                  description: metadata.description,
-                  whenAndHowToWear: metadata.whenAndHowToWear,
-                  tags: [...new Set([...prev.tags, ...metadata.tags])],
-                  seoKeywords: [...new Set([...(prev.seoKeywords || []), ...metadata.seoKeywords])],
-                  colors: [...new Set([...(prev.colors || []), ...metadata.colors])],
-                  slug: metadata.name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-')
-              }));
-          }
+               let metadata: any = null;
+               try {
+                  const { data, error } = await supabase.functions.invoke('gemini-analyze', {
+                    body: { image: base64String, category: formData.category }
+                  });
+                  if (error) {
+                    console.warn('gemini-analyze returned error:', error);
+                  } else {
+                    metadata = data;
+                  }
+               } catch (err) {
+                  console.warn('Failed to call supabase function gemini-analyze:', err);
+               }
+
+               if (!metadata) {
+                  // Use a local fallback so the admin still gets immediate suggestions
+                  const fallback = generateLocalProductMetadata(formData.category || 'Jewelry');
+                  if (fallback) {
+                     setFormData(prev => ({
+                        ...prev,
+                        name: fallback.name,
+                        description: fallback.description,
+                        whenAndHowToWear: fallback.whenAndHowToWear,
+                        tags: [...new Set([...(prev.tags || []), ...fallback.tags])],
+                        seoKeywords: [...new Set([...(prev.seoKeywords || []), ...fallback.seoKeywords])],
+                        colors: [...new Set([...(prev.colors || []), ...fallback.colors])],
+                        slug: fallback.name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-')
+                     }));
+                     setShowGenerateFromImage(true);
+                     setImageAutoFillMessage('Image analysis unavailable — applied local suggestions');
+                     setTimeout(() => setImageAutoFillMessage(null), 5000);
+                  }
+                  setIsAnalyzingImage(false);
+                  return;
+               }
+
+               // Apply metadata from proxy
+               setFormData(prev => ({
+                     ...prev,
+                     name: metadata.name,
+                     description: metadata.description,
+                     whenAndHowToWear: metadata.whenAndHowToWear,
+                     tags: [...new Set([...(prev.tags || []), ...(metadata.tags || [])])],
+                     seoKeywords: [...new Set([...(prev.seoKeywords || []), ...(metadata.seoKeywords || [])])],
+                     colors: [...new Set([...(prev.colors || []), ...(metadata.colors || [])])],
+                     slug: (metadata.name || prev.name).toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-')
+               }));
+
+               // Show the Generate-from-Image button so admin can re-run generation on demand
+               setShowGenerateFromImage(true);
+
+               // If the AI returned no description or it's very short, auto-generate a richer description
+               const desc = (metadata.description || '').trim();
+               if (!desc || desc.length < 40) {
+                  const gen = await generateDescriptionFor(metadata.name || formData.name || '', formData.category || 'Jewelry');
+                  if (gen && gen.trim().length > 0) {
+                     setFormData(prev => ({ ...prev, description: gen }));
+                     setImageAutoFillMessage('Fields auto-filled from image analysis (description generated)');
+                     setTimeout(() => setImageAutoFillMessage(null), 4000);
+                  }
+               }
+               // UX: focus the product name input and show a transient message
+               setTimeout(() => {
+                try { nameInputRef.current?.focus(); } catch (_) {}
+                setImageAutoFillMessage('Fields auto-filled from image analysis');
+                setTimeout(() => setImageAutoFillMessage(null), 4000);
+               }, 50);
           setIsAnalyzingImage(false);
       };
       reader.readAsDataURL(file);
@@ -483,7 +647,10 @@ const AdminProducts: React.FC = () => {
   const handleGenerateReviews = async () => {
      if (!formData.name) { alert("Please enter a product name first."); return; }
      setIsGeneratingReviews(true);
-     const newReviews = await generateSouthAfricanReviews(formData.name, reviewGenCount);
+   // Call the Gemini proxy directly for reviews generation
+   const proxyUrl = (import.meta as any).env?.VITE_GEMINI_PROXY_URL || '/api/gemini-proxy';
+   const resp = await fetch(`${proxyUrl}/generate-reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productName: formData.name, count: reviewGenCount, type: 'south_african' }) });
+   const newReviews = (await resp.json()) || [];
      if (newReviews.length > 0) {
        setFormData(prev => ({ ...prev, reviews: [...(prev.reviews || []), ...newReviews] }));
      }
@@ -492,7 +659,9 @@ const AdminProducts: React.FC = () => {
   
   const handleGenerateUniqueReviews = async () => {
     setIsGeneratingReviews(true);
-    const newReviews = await generateUniquePendantReviews(25);
+   const proxyUrl = (import.meta as any).env?.VITE_GEMINI_PROXY_URL || '/api/gemini-proxy';
+   const resp = await fetch(`${proxyUrl}/generate-reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: 25, type: 'unique_pendant' }) });
+   const newReviews = (await resp.json()) || [];
     if (newReviews.length > 0) {
       setFormData(prev => ({ ...prev, reviews: [...(prev.reviews || []), ...newReviews] }));
     }
@@ -509,6 +678,28 @@ const AdminProducts: React.FC = () => {
     const slug = formData.name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
     setFormData(prev => ({ ...prev, slug }));
   };
+
+   // Local fallback metadata generator used when the AI proxy is unavailable
+   const generateLocalProductMetadata = (categoryContext: string) => {
+      try {
+         const adjectives = ["Timeless", "Elegant", "Vintage", "Handmade", "Artisan", "Luxe", "Delicate", "Statement", "Classic", "Boho"];
+         const materials = ["Gold", "Silver", "Sterling Silver", "Resin", "Bronze", "Copper", "Glass", "Crystal", "Gemstone"];
+         const styles = ["Art Deco", "Vintage", "Boho", "Minimalist", "Retro", "Contemporary", "Minimal"];
+         const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+         const nameBase = (categoryContext || 'Piece').replace(/[^a-zA-Z0-9 ]/g, '');
+         const name = `${pick(adjectives)} ${pick(styles)} ${nameBase}`.trim();
+         const tags = Array.from(new Set([pick(materials), pick(['Ring','Pendant','Stud','Dangle','Bracelet'])])).slice(0,5);
+         const description = `${name} is expertly crafted and perfect for elevating everyday looks or special occasions. Hand-finished details and quality materials ensure lasting beauty.`;
+         const seoKeywords = Array.from(new Set(name.split(' ').slice(0,4).map(s => s.toLowerCase()).concat(tags.map(t => t.toLowerCase())))).slice(0,6);
+         const colors: string[] = [];
+         const whenAndHowToWear = 'Perfect for both everyday wear and special occasions. Layer with other pieces for a curated look.';
+
+         return { name, description, whenAndHowToWear, tags, seoKeywords, colors };
+      } catch (err) {
+         return null;
+      }
+   };
 
   const handleParseReviews = () => { /* Same as before */ };
   const handleRemoveReview = (reviewId: string) => { setFormData(prev => ({ ...prev, reviews: prev.reviews?.filter(r => r.id !== reviewId) })); };
@@ -650,7 +841,8 @@ const AdminProducts: React.FC = () => {
             (filterCategory ? p.category === filterCategory : true) &&
             (filterColor ? p.colors?.includes(filterColor) : true) &&
             (filterPromo ? (p.promoPrice && p.promoPrice > 0) : true) &&
-            (filterStatus ? p.status === filterStatus : true);
+            (filterStatus ? p.status === filterStatus : true) &&
+            (filterMadeBy ? (p.madeBy || 'Spoil Me Vintage') === filterMadeBy : true);
   });
 
   // Debug logging
@@ -728,8 +920,16 @@ const AdminProducts: React.FC = () => {
                    <option value="published">Published</option>
                 </select>
              </div>
-             {(searchTerm || filterType || filterCategory || filterColor || filterPromo || filterStatus) && (
-                <button onClick={() => { setSearchTerm(''); setFilterType(''); setFilterCategory(''); setFilterColor(''); setFilterPromo(false); setFilterStatus(''); }} className="px-3 py-2 text-xs text-gray-500 hover:text-white underline decoration-dotted">Reset Filters</button>
+             <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <select className="pl-10 pr-8 py-2 bg-black border border-gray-700 rounded-lg text-white text-sm outline-none"
+                   value={filterMadeBy} onChange={e => setFilterMadeBy(e.target.value)}>
+                   <option value="">All Makers</option>
+                   {madeByOptions.map(maker => <option key={maker} value={maker}>{maker}</option>)}
+                </select>
+             </div>
+             {(searchTerm || filterType || filterCategory || filterColor || filterPromo || filterStatus || filterMadeBy) && (
+                <button onClick={() => { setSearchTerm(''); setFilterType(''); setFilterCategory(''); setFilterColor(''); setFilterPromo(false); setFilterStatus(''); setFilterMadeBy(''); }} className="px-3 py-2 text-xs text-gray-500 hover:text-white underline decoration-dotted">Reset Filters</button>
              )}
          </div>
       )}
@@ -749,11 +949,12 @@ const AdminProducts: React.FC = () => {
             {activeTab === 'general' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in">
                 <div className="space-y-4">
-                   <div>
-                     <label className="block text-sm font-medium text-gray-400 mb-1">Product Name *</label>
-                     <input type="text" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm focus:border-pink-500" 
-                        value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                   </div>
+                            <div>
+                               <label className="block text-sm font-medium text-gray-400 mb-1">Product Name *</label>
+                               <input ref={nameInputRef} type="text" className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm focus:border-pink-500" 
+                                    value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                               {imageAutoFillMessage && <p className="text-xs text-green-400 mt-1">{imageAutoFillMessage}</p>}
+                            </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-400 mb-1">URL Slug</label>
                      <div className="flex gap-2">
@@ -808,11 +1009,57 @@ const AdminProducts: React.FC = () => {
                    </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-400 mb-1">Made By</label>
-                     <select className="w-full p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
-                        value={formData.madeBy} onChange={e => setFormData({...formData, madeBy: e.target.value})}>
-                         <option value="Spoil Me Vintage">Spoil Me Vintage (Handmade)</option>
-                         <option value="Outsourced">Outsourced</option>
-                      </select>
+                     <div className="bg-black/40 border border-gray-800 rounded-lg p-3">
+                        <div className="flex flex-wrap gap-2 mb-3">
+                           {madeByOptions.map(option => {
+                              const selected = formData.madeBy === option;
+                              return (
+                                 <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, madeBy: option })}
+                                    className={
+                                       selected
+                                          ? 'px-3 py-1.5 rounded-full text-xs font-bold border bg-cyan-600/20 border-cyan-500 text-cyan-200'
+                                          : 'px-3 py-1.5 rounded-full text-xs font-medium border bg-zinc-900 border-gray-700 text-gray-300 hover:text-white hover:border-gray-500'
+                                    }
+                                 >
+                                    <span className="inline-flex items-center gap-1">
+                                       {selected && <Check size={14} />}
+                                       {option}
+                                    </span>
+                                 </button>
+                              );
+                           })}
+                        </div>
+
+                        <div className="flex gap-2">
+                           <input
+                              type="text"
+                              className="flex-1 p-2 bg-black border border-gray-700 rounded-md text-white text-sm"
+                              value={newMadeBy}
+                              onChange={e => setNewMadeBy(e.target.value)}
+                              placeholder="Add new maker (saved for future)"
+                              onKeyDown={e => {
+                                 if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addMadeByOption();
+                                 }
+                              }}
+                           />
+                           <button
+                              type="button"
+                              onClick={addMadeByOption}
+                              className="px-3 bg-zinc-800 border border-gray-700 rounded-md text-gray-200 hover:text-white hover:bg-zinc-700 transition-colors"
+                           >
+                              Save
+                           </button>
+                        </div>
+
+                        <div className="mt-2 text-xs text-gray-500">
+                           Current: {formData.madeBy || 'None selected'}
+                        </div>
+                     </div>
                    </div>
                    <div>
                       <label className="block text-sm font-medium text-gray-400 mb-1">Base Material</label>
@@ -1372,7 +1619,18 @@ const AdminProducts: React.FC = () => {
                          </button>
                      </div>
                   </div>
-                  <div className="flex justify-between items-center"><label className="block text-sm font-medium text-gray-400">Description</label><button onClick={handleTextAIGenerate} disabled={isGeneratingAI} className="text-xs text-cyan-400 flex items-center gap-1 hover:text-cyan-300"><Bot size={12} /> {isGeneratingAI ? 'Writing...' : 'Generate from Text'}</button></div>
+                           <div className="flex justify-between items-center">
+                              <label className="block text-sm font-medium text-gray-400">Description</label>
+                              <div className="flex items-center gap-3">
+                                 {showGenerateFromImage && <button onClick={async () => {
+                                          if (!formData.name) { alert('Please enter a product name or upload an image first.'); return; }
+                                          const desc = await generateDescriptionFor(formData.name, formData.category);
+                                          setFormData(prev => ({ ...prev, description: desc }));
+                                          setShowGenerateFromImage(false);
+                                    }} disabled={isGeneratingAI} className="text-xs text-green-400 flex items-center gap-1 hover:text-green-300"><Bot size={12} /> {isGeneratingAI ? 'Generating...' : 'Generate from Image'}</button>}
+                                 <button onClick={handleTextAIGenerate} disabled={isGeneratingAI} className="text-xs text-cyan-400 flex items-center gap-1 hover:text-cyan-300"><Bot size={12} /> {isGeneratingAI ? 'Writing...' : 'Generate from Text'}</button>
+                              </div>
+                           </div>
                   <textarea className="w-full p-2 bg-black border border-gray-700 rounded-md h-32 text-white text-sm" value={formData.description} onChange={e => setFormData({...formData,description: e.target.value})} />
                   <div><label className="block text-sm font-medium text-gray-400 mb-1">When & How to Wear</label><textarea className="w-full p-2 bg-black border border-gray-700 rounded-md h-24 text-white text-sm" value={formData.whenAndHowToWear} onChange={e => setFormData({...formData, whenAndHowToWear: e.target.value})} placeholder="Styling advice..." /></div>
                 </div>
@@ -1435,7 +1693,7 @@ const AdminProducts: React.FC = () => {
         <div className="bg-zinc-900 rounded-xl border border-gray-800 shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-950 border-b border-gray-800 text-gray-400 font-medium">
-                     <tr><th className="p-4">Product</th><th className="p-4">Type</th><th className="p-4">SKU</th><th className="p-4">Price (R)</th><th className="p-4">Price (USD)</th><th className="p-4">Stock</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
+                     <tr><th className="p-4">Product</th><th className="p-4">Type</th><th className="p-4">Made By</th><th className="p-4">SKU</th><th className="p-4">Price (R)</th><th className="p-4">Price (USD)</th><th className="p-4">Stock</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {filteredProducts.map(product => (
@@ -1443,6 +1701,7 @@ const AdminProducts: React.FC = () => {
                   <td className="p-4 flex items-center gap-3"><img src={product.images[0] || 'https://via.placeholder.com/40'} className="w-10 h-10 rounded bg-black object-cover border border-gray-800" alt="" onError={handleImageError} />
                   <div><span className="font-medium text-gray-200 block">{product.name}</span><span className="text-xs text-gray-500">{product.category}</span></div></td>
                   <td className="p-4 text-gray-400">{getTypeLabel(getProductType(product))}</td>
+                  <td className="p-4 text-gray-400 text-sm">{product.madeBy || 'Spoil Me Vintage'}</td>
                   <td className="p-4 text-gray-500 font-mono text-xs">{product.code}</td>
                   <td className="p-4 font-medium text-green-400">R{(product.price ? product.price.toFixed(2) : '0.00')}</td>
                   <td className="p-4 font-medium text-yellow-400">$ {(product.priceUSD ? product.priceUSD.toFixed(2) : '0.00')}</td>
